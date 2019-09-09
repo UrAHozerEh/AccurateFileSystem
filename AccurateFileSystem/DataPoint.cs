@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AccurateFileSystem.FileFactories
+namespace AccurateFileSystem
 {
-    public abstract class FileFactory
+    public abstract class DataPoint : Object
     {
-        public abstract Task<File> GetFile();
+
     }
 }
