@@ -120,7 +120,12 @@
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Class1.cs" />
+    <Compile Include="AllegroCISFile.cs" />
+    <Compile Include="File.cs" />
+    <Compile Include="FileFactories\AllegroCISFileFactory.cs" />
+    <Compile Include="FileFactories\FileFactory.cs" />
+    <Compile Include="Object.cs" />
+    <Compile Include="OnOffFile.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Properties\AccurateFileSystem.rd.xml" />
   </ItemGroup>

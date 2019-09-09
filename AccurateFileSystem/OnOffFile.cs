@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 
 namespace AccurateFileSystem
 {
-    public class Class1
+    public abstract class OnOffFile : File
     {
+        public override FileType Type => FileType.OnOff;
     }
 }
