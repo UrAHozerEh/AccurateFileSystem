@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Windows.Devices.Geolocation;
 using Windows.Storage;
 
 namespace AccurateFileSystem
@@ -27,18 +29,34 @@ namespace AccurateFileSystem
                 case ".svy":
                 case ".aci":
                 case ".dcv":
-                    return await GetAllegroFile();
                 case ".csv":
+                case ".bak":
+                    if (await IsAllegroFile())
+                        return await GetAllegroFile();
+                    else
+                        throw new Exception();
                 default:
                     throw new Exception();
+            }
+        }
+
+        private async Task<bool> IsAllegroFile()
+        {
+            using (var stream = await File.OpenStreamForReadAsync())
+            using (var reader = new StreamReader(stream))
+            {
+                string line = reader.ReadLine();
+                return line.Contains("Start survey:");
             }
         }
 
         private async Task<File> GetAllegroFile()
         {
             Dictionary<string, string> header = new Dictionary<string, string>();
+            Dictionary<int, AllegroDataPoint> points = new Dictionary<int, AllegroDataPoint>();
             string extension = File.FileType;
             string headerDelimiter;
+            int pointId = 0;
             switch (extension)
             {
                 case ".svy":
@@ -60,7 +78,7 @@ namespace AccurateFileSystem
                 if (line != "Start survey:") throw new Exception();
                 while (!reader.EndOfStream)
                 {
-                    line = reader.ReadLine();
+                    line = reader.ReadLine().Trim(); ;
                     if (isHeader)
                     {
                         int firstDelimiter = line.IndexOf(headerDelimiter);
@@ -77,26 +95,79 @@ namespace AccurateFileSystem
                     }
                     else
                     {
+                        if (line == "End survey" || string.IsNullOrEmpty(line))
+                            continue;
                         AllegroDataPoint point;
                         if (headerDelimiter == "=")
-                            point = ParseAllegroLineFromACI(line);
+                            point = ParseAllegroLineFromACI(pointId, line);
                         else
-                            point = ParseAllegroLineFromCSV(line);
+                            point = ParseAllegroLineFromCSV(pointId, line);
+
+                        points.Add(pointId, point);
+                        ++pointId;
                     }
                 }
             }
-            throw new Exception();
+            FileType type = FileType.Unknown;
+            if (header.ContainsKey("onoff"))
+            {
+                if (header["onoff"] == "T")
+                    type = FileType.OnOff;
+            }
+            var output = new AllegroCISFile(File.DisplayName, header, points, type);
+            return output;
         }
 
-        private AllegroDataPoint ParseAllegroLineFromCSV(string line)
+        private AllegroDataPoint ParseAllegroLineFromCSV(int id, string line)
         {
             return null;
         }
 
-        private AllegroDataPoint ParseAllegroLineFromACI(string line)
+        private AllegroDataPoint ParseAllegroLineFromACI(int id, string line)
         {
-            string firstPattern = @"$(\s+?[^\s]+)";
-            return null;
+            string firstPattern = @"([^\s]+) M?\s? ([^\s]+)\s+([^\s]+)";
+            string gpsPattern = @"\{GD?E? ([^\}]+)\}";
+            string timePattern = @"\{T ([^g\}]+)g?\}";
+            var match = Regex.Match(line, firstPattern);
+            if (!match.Success)
+                throw new Exception();
+            double footage = double.Parse(match.Groups[1].Value);
+            double on = double.Parse(match.Groups[2].Value);
+            double off = double.Parse(match.Groups[3].Value);
+            line = Regex.Replace(line, match.Value, "").Trim();
+            match = Regex.Match(line, gpsPattern);
+            BasicGeoposition gps = new BasicGeoposition();
+            if (match.Success)
+            {
+                var split = match.Groups[1].Value.Split(',');
+                if (split.Length != 4)
+                    throw new Exception();
+                double lat = double.Parse(split[0]);
+                double lon = double.Parse(split[1]);
+                double alt = double.Parse(split[2]);
+                gps = new BasicGeoposition
+                {
+                    Altitude = alt,
+                    Longitude = lon,
+                    Latitude = lat
+                };
+                line = line = Regex.Replace(line, match.Value, "").Trim();
+            }
+            var timeMatches = Regex.Matches(line, timePattern);
+            List<DateTime> times = new List<DateTime>();
+            foreach (Match timeMatch in timeMatches)
+            {
+                var timeString = timeMatch.Groups[1].Value;
+                DateTime time;
+                if (timeString.Contains('.'))
+                    time = DateTime.ParseExact(timeString, "MM/dd/yyyy, HH:mm:ss.fff", CultureInfo.InvariantCulture);
+                else
+                    time = DateTime.ParseExact(timeString, "MM/dd/yyyy, HH:mm:ss", CultureInfo.InvariantCulture);
+                times.Add(time);
+                line = line = Regex.Replace(line, timeMatch.Value, "").Trim();
+            }
+            var output = new AllegroDataPoint(id, footage, on, off, gps, times, line);
+            return output;
         }
     }
 }

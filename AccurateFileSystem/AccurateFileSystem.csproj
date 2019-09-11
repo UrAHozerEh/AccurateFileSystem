@@ -128,6 +128,7 @@
     <Compile Include="Object.cs" />
     <Compile Include="OnOffFile.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TestStationRead.cs" />
     <EmbeddedResource Include="Properties\AccurateFileSystem.rd.xml" />
   </ItemGroup>
   <ItemGroup>
