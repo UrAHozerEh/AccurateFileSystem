@@ -35,6 +35,12 @@ namespace AccurateFileSystem
                         return await GetAllegroFile();
                     else
                         throw new Exception();
+                case ".txt":
+                    return null;
+                case ".xlsx":
+                case ".xls":
+                case ".zip":
+                    return null;
                 default:
                     throw new Exception();
             }
@@ -50,11 +56,38 @@ namespace AccurateFileSystem
             }
         }
 
+        private async Task<AllegroWaveformFile> GetAllegroWaveform()
+        {
+            using (var stream = await File.OpenStreamForReadAsync())
+            using (var reader = new StreamReader(stream))
+            {
+                string timeLine = reader.ReadLine();
+                string rangeLine = reader.ReadLine();
+                string rateLine = reader.ReadLine();
+                string remarkLine = reader.ReadLine();
+                reader.ReadLine();
+                while (!reader.EndOfStream)
+                {
+                    string line = reader.ReadLine().Trim();
+                    if (string.IsNullOrEmpty(line)) continue;
+                    string[] split = line.Split(' ');
+                    if (split.Length != 4)
+                        throw new Exception();
+
+                    double value = double.Parse(split[0]);
+                    bool on = split[1] == "1";
+                    bool two = split[2] == "1";
+                    bool three = split[3] == "1";
+                }
+            }
+            return null;
+        }
+
         private async Task<File> GetAllegroFile()
         {
             Dictionary<string, string> header = new Dictionary<string, string>();
             Dictionary<int, AllegroDataPoint> points = new Dictionary<int, AllegroDataPoint>();
-            string extension = File.FileType;
+            string extension = File.FileType.ToLower();
             string headerDelimiter;
             int pointId = 0;
             switch (extension)
@@ -62,6 +95,7 @@ namespace AccurateFileSystem
                 case ".svy":
                 case ".aci":
                 case ".dcv":
+                case ".bak":
                     headerDelimiter = "=";
                     break;
                 case ".csv":
@@ -75,12 +109,16 @@ namespace AccurateFileSystem
             {
                 bool isHeader = true;
                 string line = reader.ReadLine();
-                if (line != "Start survey:") throw new Exception();
+                if (!line.Contains("Start survey:")) throw new Exception();
+                Match extraCommasMatch = Regex.Match(line, ",+");
+                string extraCommasShort = extraCommasMatch.Success ? extraCommasMatch.Value.Substring(1) : "";
                 while (!reader.EndOfStream)
                 {
-                    line = reader.ReadLine().Trim(); ;
+                    line = reader.ReadLine().Trim();
                     if (isHeader)
                     {
+                        if (extraCommasMatch.Success)
+                            line = line.Replace(extraCommasShort, "");
                         int firstDelimiter = line.IndexOf(headerDelimiter);
                         if (firstDelimiter == -1)
                             throw new Exception();
@@ -95,6 +133,8 @@ namespace AccurateFileSystem
                     }
                     else
                     {
+                        if (extraCommasMatch.Success)
+                            line = line.Replace(extraCommasMatch.Value, "");
                         if (line == "End survey" || string.IsNullOrEmpty(line))
                             continue;
                         AllegroDataPoint point;
@@ -114,7 +154,8 @@ namespace AccurateFileSystem
                 if (header["onoff"] == "T")
                     type = FileType.OnOff;
             }
-            var output = new AllegroCISFile(File.DisplayName, header, points, type);
+            string name = Regex.Replace(File.Name, @"(\.[^\.]{3})?\.[^\.]{3}$", "");
+            var output = new AllegroCISFile(name, header, points, type);
             return output;
         }
 

@@ -74,7 +74,11 @@ namespace AccurateFileSystem
                 CommentTemplate = CommentTemplate.Replace(tsString, tsId);
                 TestStationRead read = TestStationReadFactory.GetRead(tsString, tsId);
                 if (read == null)
-                    continue;
+                {
+                    CommentTemplate = CommentTemplate.Replace(tsId, tsString);
+                }
+                else
+                    ++count;
             }
         }
     }

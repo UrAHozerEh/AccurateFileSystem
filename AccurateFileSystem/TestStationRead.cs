@@ -32,6 +32,12 @@ namespace AccurateFileSystem
                 return new SideDrainTestStationRead(value, replaceId);
             if (ReconnectTestStationRead.IsMatch(value))
                 return new ReconnectTestStationRead(value, replaceId);
+            if (CasingTestStationRead.IsMatch(value))
+                return new CasingTestStationRead(value, replaceId);
+            if (InsulationTestStationRead.IsMatch(value))
+                return new InsulationTestStationRead(value, replaceId);
+            if (CrossingTestStationRead.IsMatch(value))
+                return new CrossingTestStationRead(value, replaceId);
             return null;
         }
     }
@@ -57,11 +63,12 @@ namespace AccurateFileSystem
 
     public class SingleTestStationRead : TestStationRead
     {
-        public static string OnOffRegexPattern => @"\(Single([^:]+)?: Struct P/S ([^V]+)V IRF ([^V]+)V\)";
+        public static string OnOffRegexPattern => @"\(Single([^:]+)?:(.*)P/S ([^V]+)V IRF ([^V]+)V\)";
         public static string OnRegexPattern => @"\(Single([^:]+)?: Struct P/S ([^V]+)V\)";
         public bool IsOnOff { get; }
         public double On { get; }
         public double Off { get; }
+        public string Title { get; }
         public SingleTestStationRead(string original, string replaceId) : base(original, replaceId)
         {
             Match onOffMatch = Regex.Match(original, OnOffRegexPattern);
@@ -70,8 +77,9 @@ namespace AccurateFileSystem
             {
                 IsOnOff = true;
                 int count = onOffMatch.Groups.Count;
-                if (count == 4)
+                if (count == 5)
                     Tag = onOffMatch.Groups[1].Value;
+                Title = onOffMatch.Groups[count - 3].Value.Trim();
                 On = double.Parse(onOffMatch.Groups[count - 2].Value);
                 Off = double.Parse(onOffMatch.Groups[count - 1].Value);
             }
@@ -130,7 +138,7 @@ namespace AccurateFileSystem
 
     public class ReconnectTestStationRead : TestStationRead
     {
-        public static string OnOffRegexPattern => @"\(TPR([^:]+)?:FG ([^V]+)V/([^V]+)V, MIR ([^V]+)V/([^V]+)V, NG ([^V]+)V/([^V]+)V\)";
+        public static string OnOffRegexPattern => @"\(TPR([^:]+)?:FG ([^V]+)V/([^V]+)V, MIR ([^V]+)V/([^V]+)V, NG ([^V]+)V/([^V]+)V?\)";
         public static string OnRegexPattern => @"\(TPR([^:]+)?:FG ([^V]+)V, MIR ([^V]+)V, NG ([^V]+)V\)";
         public bool IsOnOff { get; }
         public double FGOn { get; }
@@ -172,4 +180,126 @@ namespace AccurateFileSystem
             return Regex.IsMatch(value, OnOffRegexPattern) || Regex.IsMatch(value, OnRegexPattern);
         }
     }
+
+    public class CasingTestStationRead : TestStationRead
+    {
+        public static string OnOffRegexPattern => @"\(Line/casing([^:]+)?: Struct P/S ([^V]+)V IRF ([^V]+)V, Casing P/S ([^V]+)V IRF ([^V]+)V\)";
+        public static string OnRegexPattern => @"\(Line/casing([^:]+)?: Struct P/S ([^V]+)V, Casing P/S ([^V]+)V\)";
+        public bool IsOnOff { get; }
+        public double StructOn { get; }
+        public double StructOff { get; }
+        public double CasingOn { get; }
+        public double CasingOff { get; }
+
+        public CasingTestStationRead(string original, string replaceId) : base(original, replaceId)
+        {
+            Match onOffMatch = Regex.Match(original, OnOffRegexPattern);
+            Match onMatch = Regex.Match(original, OnRegexPattern);
+            if (onOffMatch.Success)
+            {
+                IsOnOff = true;
+                int count = onOffMatch.Groups.Count;
+                if (count == 6)
+                    Tag = onOffMatch.Groups[1].Value;
+                StructOn = double.Parse(onOffMatch.Groups[count - 4].Value);
+                StructOff = double.Parse(onOffMatch.Groups[count - 3].Value);
+
+                CasingOn = double.Parse(onOffMatch.Groups[count - 2].Value);
+                CasingOff = double.Parse(onOffMatch.Groups[count - 1].Value);
+            }
+            else if (onMatch.Success)
+            {
+                IsOnOff = false;
+            }
+            else
+                throw new Exception();
+        }
+
+        public static bool IsMatch(string value)
+        {
+            return Regex.IsMatch(value, OnOffRegexPattern) || Regex.IsMatch(value, OnRegexPattern);
+        }
+    }
+
+    public class CrossingTestStationRead : TestStationRead
+    {
+        public static string OnOffRegexPattern => @"\(Crossing without bond([^:]+)?: Struct P/S ([^V]+)V IRF ([^V]+)V, Forgn P/S ([^V]+)V IRF ([^V]+)V\)";
+        public static string OnRegexPattern => @"\(Crossing without bond([^:]+)?: Struct P/S ([^V]+)V, Forgn P/S ([^V]+)V\)";
+        public bool IsOnOff { get; }
+        public double StructOn { get; }
+        public double StructOff { get; }
+        public double ForeignOn { get; }
+        public double ForeignOff { get; }
+
+        public CrossingTestStationRead(string original, string replaceId) : base(original, replaceId)
+        {
+            Match onOffMatch = Regex.Match(original, OnOffRegexPattern);
+            Match onMatch = Regex.Match(original, OnRegexPattern);
+            if (onOffMatch.Success)
+            {
+                IsOnOff = true;
+                int count = onOffMatch.Groups.Count;
+                if (count == 6)
+                    Tag = onOffMatch.Groups[1].Value;
+                StructOn = double.Parse(onOffMatch.Groups[count - 4].Value);
+                StructOff = double.Parse(onOffMatch.Groups[count - 3].Value);
+
+                ForeignOn = double.Parse(onOffMatch.Groups[count - 2].Value);
+                ForeignOff = double.Parse(onOffMatch.Groups[count - 1].Value);
+            }
+            else if (onMatch.Success)
+            {
+                IsOnOff = false;
+            }
+            else
+                throw new Exception();
+        }
+
+        public static bool IsMatch(string value)
+        {
+            return Regex.IsMatch(value, OnOffRegexPattern) || Regex.IsMatch(value, OnRegexPattern);
+        }
+    }
+    //(Crossing without bond: Struct P/S -1.292V IRF -1.002V, Forgn P/S -1.287V IRF -0.996V)
+
+    public class InsulationTestStationRead : TestStationRead
+    {
+        public static string OnOffRegexPattern => @"\(Insulation TP([^:]+)?: Struct P/S ([^V]+)V IRF ([^V]+)V, Forgn P/S ([^V]+)V IRF ([^V]+)V\)";
+        public static string OnRegexPattern => @"\(Insulation TP([^:]+)?: Struct P/S ([^V]+)V, Forgn P/S ([^V]+)V\)";
+        public bool IsOnOff { get; }
+        public double StructOn { get; }
+        public double StructOff { get; }
+        public double ForeignOn { get; }
+        public double ForeignOff { get; }
+
+        public InsulationTestStationRead(string original, string replaceId) : base(original, replaceId)
+        {
+            Match onOffMatch = Regex.Match(original, OnOffRegexPattern);
+            Match onMatch = Regex.Match(original, OnRegexPattern);
+            if (onOffMatch.Success)
+            {
+                IsOnOff = true;
+                int count = onOffMatch.Groups.Count;
+                if (count == 6)
+                    Tag = onOffMatch.Groups[1].Value;
+                StructOn = double.Parse(onOffMatch.Groups[count - 4].Value);
+                StructOff = double.Parse(onOffMatch.Groups[count - 3].Value);
+
+                ForeignOn = double.Parse(onOffMatch.Groups[count - 2].Value);
+                ForeignOff = double.Parse(onOffMatch.Groups[count - 1].Value);
+            }
+            else if (onMatch.Success)
+            {
+                IsOnOff = false;
+            }
+            else
+                throw new Exception();
+        }
+
+        public static bool IsMatch(string value)
+        {
+            return Regex.IsMatch(value, OnOffRegexPattern) || Regex.IsMatch(value, OnRegexPattern);
+        }
+    }
+    //(Insulation TP: Struct P/S -0.984V IRF -0.931V, Forgn P/S -0.987V IRF -0.947V)
 }
