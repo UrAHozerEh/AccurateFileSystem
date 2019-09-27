@@ -36,7 +36,7 @@ namespace AccurateFileSystem
                     else
                         throw new Exception();
                 case ".txt":
-                    return null;
+                    return await GetAllegroWaveform();
                 case ".xlsx":
                 case ".xls":
                 case ".zip":
@@ -61,11 +61,13 @@ namespace AccurateFileSystem
             using (var stream = await File.OpenStreamForReadAsync())
             using (var reader = new StreamReader(stream))
             {
-                string timeLine = reader.ReadLine();
+                string timeLine = reader.ReadLine().Replace("Time:","").Trim();
+                DateTime time = DateTime.Parse(timeLine);
                 string rangeLine = reader.ReadLine();
                 string rateLine = reader.ReadLine();
                 string remarkLine = reader.ReadLine();
                 reader.ReadLine();
+                var points = new List<AllegroWaveformFile.DataPoint>();
                 while (!reader.EndOfStream)
                 {
                     string line = reader.ReadLine().Trim();
@@ -76,8 +78,19 @@ namespace AccurateFileSystem
 
                     double value = double.Parse(split[0]);
                     bool on = split[1] == "1";
-                    bool two = split[2] == "1";
-                    bool three = split[3] == "1";
+                    bool second = split[2] == "1";
+                    bool third = split[3] == "1";
+                    points.Add(new AllegroWaveformFile.DataPoint
+                    {
+                        Value = value,
+                        IsOn = on,
+                        Second = second,
+                        Third = third
+                    });
+                }
+                for(int i = 0; i < points.Count; ++i)
+                {
+
                 }
             }
             return null;
