@@ -6,10 +6,15 @@ using System.Threading.Tasks;
 
 namespace AccurateFileSystem
 {
-    public abstract class Object
+    public abstract class Object: IEquatable<Object>
     {
         public string Name { get; protected set; }
         public Guid Guid { get; } = Guid.NewGuid();
+
+        public Object(string name)
+        {
+            Name = name;
+        }
 
         public override int GetHashCode()
         {

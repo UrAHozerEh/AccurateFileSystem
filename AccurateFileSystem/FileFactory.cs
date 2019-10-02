@@ -8,16 +8,19 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
 using Windows.Storage;
+using AllegroWaveformPoint = AccurateFileSystem.AllegroWaveformFile.DataPoint;
 
 namespace AccurateFileSystem
 {
     public class FileFactory
     {
         private StorageFile File;
+        private string FileName;
 
         public FileFactory(StorageFile file)
         {
             File = file;
+            FileName = Regex.Replace(File.Name, @"(\.[^\.]{3})?\.[^\.]{3}$", "");
         }
 
         public async Task<File> GetFile()
@@ -61,39 +64,66 @@ namespace AccurateFileSystem
             using (var stream = await File.OpenStreamForReadAsync())
             using (var reader = new StreamReader(stream))
             {
-                string timeLine = reader.ReadLine().Replace("Time:","").Trim();
-                DateTime time = DateTime.Parse(timeLine);
-                string rangeLine = reader.ReadLine();
-                string rateLine = reader.ReadLine();
-                string remarkLine = reader.ReadLine();
-                reader.ReadLine();
-                var points = new List<AllegroWaveformFile.DataPoint>();
+                string line = reader.ReadLine().Trim();
+                DateTime time = new DateTime(0);
+                int sampleRate = 0;
+                string remark = "";
+                string range = "";
+                while (!string.IsNullOrEmpty(line))
+                {
+                    if (!line.Contains(':'))
+                        throw new Exception();
+                    string label = line.Substring(0, line.IndexOf(':')).Trim();
+                    string value = line.Substring(line.IndexOf(':') + 1).Trim();
+
+                    switch (label)
+                    {
+                        case "Time":
+                            time = DateTime.Parse(value);
+                            break;
+                        case "Range":
+                            range = value;
+                            break;
+                        case "Remark":
+                            remark = value;
+                            break;
+                        case "Sample rate":
+                            sampleRate = int.Parse(value);
+                            break;
+                        default:
+                            throw new Exception();
+                    }
+
+                    line = reader.ReadLine().Trim();
+                }
+                var points = new List<AllegroWaveformPoint>();
                 while (!reader.EndOfStream)
                 {
-                    string line = reader.ReadLine().Trim();
+                    line = reader.ReadLine().Trim();
                     if (string.IsNullOrEmpty(line)) continue;
+                    if (!line.Contains(' '))
+                        line = line;
                     string[] split = line.Split(' ');
-                    if (split.Length != 4)
+                    if (split.Length != 4 && split.Length != 1)
                         throw new Exception();
-
                     double value = double.Parse(split[0]);
-                    bool on = split[1] == "1";
-                    bool second = split[2] == "1";
-                    bool third = split[3] == "1";
-                    points.Add(new AllegroWaveformFile.DataPoint
+                    if (split.Length == 1)
                     {
-                        Value = value,
-                        IsOn = on,
-                        Second = second,
-                        Third = third
-                    });
+                        points.Add(new AllegroWaveformPoint(value));
+                    }
+                    else
+                    {
+                        bool on = split[1] == "1";
+                        bool second = split[2] == "1";
+                        bool third = split[3] == "1";
+                        points.Add(new AllegroWaveformPoint(value, on, second, third));
+                    }
                 }
-                for(int i = 0; i < points.Count; ++i)
-                {
-
-                }
+                if (time == new DateTime(0))
+                    throw new Exception();
+                var output = new AllegroWaveformFile(FileName, points, time, sampleRate, range, remark);
+                return output;
             }
-            return null;
         }
 
         private async Task<File> GetAllegroFile()
@@ -120,14 +150,17 @@ namespace AccurateFileSystem
             using (var stream = await File.OpenStreamForReadAsync())
             using (var reader = new StreamReader(stream))
             {
+                int lineCount = 0;
                 bool isHeader = true;
                 string line = reader.ReadLine();
+                ++lineCount;
                 if (!line.Contains("Start survey:")) throw new Exception();
                 Match extraCommasMatch = Regex.Match(line, ",+");
                 string extraCommasShort = extraCommasMatch.Success ? extraCommasMatch.Value.Substring(1) : "";
                 while (!reader.EndOfStream)
                 {
                     line = reader.ReadLine().Trim();
+                    ++lineCount;
                     if (isHeader)
                     {
                         if (extraCommasMatch.Success)
@@ -167,8 +200,7 @@ namespace AccurateFileSystem
                 if (header["onoff"] == "T")
                     type = FileType.OnOff;
             }
-            string name = Regex.Replace(File.Name, @"(\.[^\.]{3})?\.[^\.]{3}$", "");
-            var output = new AllegroCISFile(name, header, points, type);
+            var output = new AllegroCISFile(FileName, header, points, type);
             return output;
         }
 
@@ -179,7 +211,7 @@ namespace AccurateFileSystem
 
         private AllegroDataPoint ParseAllegroLineFromACI(int id, string line)
         {
-            string firstPattern = @"([^\s]+) M?\s? ([^\s]+)\s+([^\s]+)";
+            string firstPattern = @"^([^\s]+) M?\s+([^\s]+)\s+([^\s]+)";
             string gpsPattern = @"\{GD?E? ([^\}]+)\}";
             string timePattern = @"\{T ([^g\}]+)g?\}";
             var match = Regex.Match(line, firstPattern);

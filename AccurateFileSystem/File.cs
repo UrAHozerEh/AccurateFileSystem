@@ -8,7 +8,12 @@ namespace AccurateFileSystem
 {
     public abstract class File : Object
     {
-        public abstract FileType Type { get; }
+        public FileType Type { get; }
+
+        public File(string name, FileType type) : base(name)
+        {
+            Type = type;
+        }
     }
 
     public enum FileType

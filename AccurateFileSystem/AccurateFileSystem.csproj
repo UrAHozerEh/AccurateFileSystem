@@ -123,11 +123,9 @@
     <Compile Include="AllegroCISFile.cs" />
     <Compile Include="AllegroDataPoint.cs" />
     <Compile Include="AllegroWaveformFile.cs" />
-    <Compile Include="DataPoint.cs" />
     <Compile Include="File.cs" />
     <Compile Include="FileFactory.cs" />
     <Compile Include="Object.cs" />
-    <Compile Include="OnOffFile.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TestStationRead.cs" />
     <EmbeddedResource Include="Properties\AccurateFileSystem.rd.xml" />
