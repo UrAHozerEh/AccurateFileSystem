@@ -54,6 +54,27 @@ namespace AccurateFileSystem
             return $"'{Name}' waveform for {Points.Count / SampleRate} seconds";
         }
 
+        public override bool IsEquivalent(File otherFile)
+        {
+            var other = otherFile as AllegroWaveformFile;
+            if (other == null)
+                return false;
+            if (Time != other.Time)
+                return false;
+            if (SampleRate != other.SampleRate)
+                return false;
+            if (Range != other.Range)
+                return false;
+            if (Remark != other.Remark)
+                return false;
+            if (Points.Count != other.Points.Count)
+                return false;
+            for(int i = 0; i < Points.Count; ++i)
+                if (!Points[i].Equals(other.Points[i]))
+                    return false;
+            return true;
+        }
+
         /// <summary>
         /// Stores the data that is recorded after the header in the waveform files. Each line has a double reading
         /// followed by either 3 boolean values if the GPS is synced, or nothing if it is not. The HasInterruptorData
@@ -98,6 +119,21 @@ namespace AccurateFileSystem
                 Second = second;
                 Third = third;
                 HasInterruptorData = true;
+            }
+
+            public bool Equals(DataPoint other)
+            {
+                if (Value != other.Value)
+                    return false;
+                if (HasInterruptorData != other.HasInterruptorData)
+                    return false;
+                if (IsOn != other.IsOn)
+                    return false;
+                if (Second != other.Second)
+                    return false;
+                if (Third != other.Third)
+                    return false;
+                return true;
             }
         }
     }

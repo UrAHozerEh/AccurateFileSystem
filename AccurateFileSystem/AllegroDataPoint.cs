@@ -74,12 +74,47 @@ namespace AccurateFileSystem
                 CommentTemplate = CommentTemplate.Replace(tsString, tsId);
                 TestStationRead read = TestStationReadFactory.GetRead(tsString, tsId);
                 if (read == null)
-                {
                     CommentTemplate = CommentTemplate.Replace(tsId, tsString);
-                }
                 else
+                {
+                    TestStationReads.Add(read);
                     ++count;
+                }
             }
+        }
+
+        public bool Equals(AllegroDataPoint other)
+        {
+            if (Id != other.Id)
+                return false;
+            if (Footage != other.Footage)
+                return false;
+            if (On != other.On)
+                return false;
+            if (OriginalComment != other.OriginalComment)
+                return false;
+            if (!GPS.Equals(other.GPS) && !CloseEnough(GPS, other.GPS))
+                return false;
+            if (Times.Count != other.Times.Count)
+                return false;
+            for (int i = 0; i < Times.Count; ++i)
+                if (Times[i] != other.Times[i])
+                    return false;
+            return true;
+        }
+
+        private bool CloseEnough(BasicGeoposition gps1, BasicGeoposition gps2)
+        {
+            double diff;
+            if (gps1.Altitude != gps2.Altitude)
+                return false;
+            diff = Math.Abs(gps1.Longitude - gps2.Longitude);
+            if (diff > 0.0000001)
+                return false;
+            diff = Math.Abs(gps1.Latitude - gps2.Latitude);
+            if (diff > 0.0000001)
+                return false;
+            return true;
         }
     }
 }

@@ -14,6 +14,8 @@ namespace AccurateFileSystem
         {
             Type = type;
         }
+
+        public abstract bool IsEquivalent(File otherFile);
     }
 
     public enum FileType

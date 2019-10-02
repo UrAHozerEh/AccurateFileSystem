@@ -101,8 +101,6 @@ namespace AccurateFileSystem
                 {
                     line = reader.ReadLine().Trim();
                     if (string.IsNullOrEmpty(line)) continue;
-                    if (!line.Contains(' '))
-                        line = line;
                     string[] split = line.Split(' ');
                     if (split.Length != 4 && split.Length != 1)
                         throw new Exception();
@@ -175,6 +173,7 @@ namespace AccurateFileSystem
                             value = value.Replace(":", "");
                             isHeader = false;
                         }
+                        (key, value) = FixHeaderKeyValue(key, value);
                         header.Add(key, value);
                     }
                     else
@@ -204,9 +203,86 @@ namespace AccurateFileSystem
             return output;
         }
 
+        private (string, string) FixHeaderKeyValue(string key, string value)
+        {
+            if (key == "Onoff_begins_w_ON")
+                return ("Onoff_cycle_begins_with_ON", value);
+            if (key == "ON_time")
+                return ("Onoff_ON_time", value);
+            if (key == "OFF_time")
+                return ("Onoff_OFF_time", value);
+            if (key == "version" && value.Length != 9)
+                return (key, value.PadLeft(9, '0'));
+            if (key == "date" && value.Length != 10)
+            {
+                var split = value.Split('/');
+                split[0] = split[0].PadLeft(2, '0');
+                split[1] = split[1].PadLeft(2, '0');
+                return (key, $"{split[0]}/{split[1]}/{split[2]}");
+            }
+            return (key, value);
+        }
+
         private AllegroDataPoint ParseAllegroLineFromCSV(int id, string line)
         {
-            return null;
+            var split = line.Split(',');
+            if (split.Length < 16)
+                return null;
+            var comment = split[15];
+            if (split.Length > 16)
+            {
+                var sublist = split.Skip(15);
+                comment = string.Join(",", sublist);
+            }
+            if (comment == "\"\"")
+                comment = "";
+            if (comment.Contains('"'))
+                comment = Regex.Replace(comment, "^\"(.*)\"$", "$1");
+
+            double footage = double.Parse(split[0]);
+            double on = double.Parse(split[2]);
+            double off = double.Parse(split[3]);
+
+            List<DateTime> times = new List<DateTime>();
+            if (IsValidTime(split, 4))
+                times.Add(JoinAndParseDateTime(split, 4));
+            if (IsValidTime(split, 7))
+                times.Add(JoinAndParseDateTime(split, 7));
+
+            double lat = double.Parse(split[10]);
+            double lon = double.Parse(split[11]);
+            double alt = double.Parse(split[12]);
+            BasicGeoposition gps = new BasicGeoposition();
+            if (lat != 0 && lon != 0)
+            {
+                gps = new BasicGeoposition
+                {
+                    Altitude = alt,
+                    Longitude = lon,
+                    Latitude = lat
+                };
+            }
+
+            var output = new AllegroDataPoint(id, footage, on, off, gps, times, comment.Trim());
+            return output;
+        }
+
+        private bool IsValidTime(string[] split, int start)
+        {
+            string date = split[start].Trim();
+            if (date == "00/00/0000")
+                return false;
+            if (date == "01/01/1980")
+                return false;
+            if (string.IsNullOrWhiteSpace(date))
+                return false;
+            return true;
+        }
+
+        private DateTime JoinAndParseDateTime(string[] split, int start)
+        {
+            var joined = $"{split[start]},{split[start + 1]}".Trim();
+            return ParseDateTime(joined);
         }
 
         private AllegroDataPoint ParseAllegroLineFromACI(int id, string line)
@@ -244,16 +320,19 @@ namespace AccurateFileSystem
             foreach (Match timeMatch in timeMatches)
             {
                 var timeString = timeMatch.Groups[1].Value;
-                DateTime time;
-                if (timeString.Contains('.'))
-                    time = DateTime.ParseExact(timeString, "MM/dd/yyyy, HH:mm:ss.fff", CultureInfo.InvariantCulture);
-                else
-                    time = DateTime.ParseExact(timeString, "MM/dd/yyyy, HH:mm:ss", CultureInfo.InvariantCulture);
+                DateTime time = ParseDateTime(timeString);
                 times.Add(time);
                 line = line = Regex.Replace(line, timeMatch.Value, "").Trim();
             }
             var output = new AllegroDataPoint(id, footage, on, off, gps, times, line);
             return output;
+        }
+
+        private DateTime ParseDateTime(string input)
+        {
+            if (input.Contains('.'))
+                return DateTime.ParseExact(input, "MM/dd/yyyy, HH:mm:ss.fff", CultureInfo.InvariantCulture);
+            return DateTime.ParseExact(input, "MM/dd/yyyy, HH:mm:ss", CultureInfo.InvariantCulture);
         }
     }
 }

@@ -38,8 +38,12 @@ namespace AccurateFileSystem
         /// </summary>
         /// <param name="obj">The other AllegroCISFile.</param>
         /// <returns>A bool stating if the two objects are equal.</returns>
-        public bool Placeholder(AllegroCISFile other)
+        // TODO: Add a return for what the differences are.
+        public override bool IsEquivalent(File otherFile)
         {
+            var other = otherFile as AllegroCISFile;
+            if (other == null)
+                return false;
             // If Guid is equal then we know they are equal. Probably an uncommon check.
             if (other.Guid.Equals(Guid))
                 return true;

@@ -30,5 +30,10 @@ namespace AccurateFileSystem
             }
             return false;
         }
+
+        bool IEquatable<Object>.Equals(Object other)
+        {
+            return Guid.Equals(other.Guid);
+        }
     }
 }

@@ -45,6 +45,22 @@ namespace AFSTester
                 if (newFile != null)
                     newFiles.Add(newFile);
             }
+            newFiles.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
+            for(int i = 0; i < newFiles.Count; ++i)
+            {
+                var curFile = newFiles[i];
+                for(int j = i+1; j < newFiles.Count; ++j)
+                {
+                    var nextFile = newFiles[j];
+                    if(curFile.Name != nextFile.Name)
+                        break;
+                    if(curFile.IsEquivalent(nextFile))
+                    {
+                        newFiles.RemoveAt(j);
+                        --j;
+                    }
+                }
+            }
             /*
             var picker = new FileOpenPicker();
             picker.FileTypeFilter.Add(".svy");
