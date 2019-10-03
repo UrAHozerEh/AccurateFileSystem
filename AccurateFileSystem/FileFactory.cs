@@ -199,7 +199,7 @@ namespace AccurateFileSystem
                 if (header["onoff"] == "T")
                     type = FileType.OnOff;
             }
-            var output = new AllegroCISFile(FileName, header, points, type);
+            var output = new AllegroCISFile(FileName, extension, header, points, type);
             return output;
         }
 

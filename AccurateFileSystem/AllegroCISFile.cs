@@ -10,10 +10,12 @@ namespace AccurateFileSystem
     {
         public Dictionary<string, string> Header { get; private set; }
         public Dictionary<int, AllegroDataPoint> Points { get; private set; }
-        public AllegroCISFile(string name, Dictionary<string, string> header, Dictionary<int, AllegroDataPoint> points, FileType type) : base(name, type)
+        public string Extension { get; }
+        public AllegroCISFile(string name, string extension, Dictionary<string, string> header, Dictionary<int, AllegroDataPoint> points, FileType type) : base(name, type)
         {
             Header = header;
             Points = points;
+            Extension = extension;
             ProcessPoints();
         }
 

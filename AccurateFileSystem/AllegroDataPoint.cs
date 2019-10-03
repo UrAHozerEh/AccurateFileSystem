@@ -91,7 +91,9 @@ namespace AccurateFileSystem
                 return false;
             if (On != other.On)
                 return false;
-            if (OriginalComment != other.OriginalComment)
+            if (Off != other.Off)
+                return false;
+            if (OriginalComment.Replace('"', '\'') != other.OriginalComment.Replace('"', '\''))
                 return false;
             if (!GPS.Equals(other.GPS) && !CloseEnough(GPS, other.GPS))
                 return false;
