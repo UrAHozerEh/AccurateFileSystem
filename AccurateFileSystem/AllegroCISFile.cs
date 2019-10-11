@@ -6,16 +6,21 @@ using System.Threading.Tasks;
 
 namespace AccurateFileSystem
 {
-    public class AllegroCISFile : File
+    public class AllegroCISFile : File, ISurveyFile
     {
         public Dictionary<string, string> Header { get; private set; }
         public Dictionary<int, AllegroDataPoint> Points { get; private set; }
         public string Extension { get; }
+        public double StartFootage { get; private set; }
+        public double EndFootage { get; private set; }
+
         public AllegroCISFile(string name, string extension, Dictionary<string, string> header, Dictionary<int, AllegroDataPoint> points, FileType type) : base(name, type)
         {
             Header = header;
             Points = points;
             Extension = extension;
+            StartFootage = points[0].Footage;
+            EndFootage = points[points.Count - 1].Footage;
             ProcessPoints();
         }
 
@@ -68,6 +73,47 @@ namespace AccurateFileSystem
 
             // All of the counts, name, header, and points are equal.
             return true;
+        }
+
+        public List<(double footage, double value)> GetDoubleData(string fieldName, double startFootage, double endFootage)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Type GetDataType(string fieldName)
+        {
+            throw new NotImplementedException();
+        }
+
+        public List<(string fieldName, Type fieldType)> GetFields()
+        {
+            var list = new List<(string fieldName, Type fieldType)>();
+            list.Add(("On", typeof(double)));
+            list.Add(("Off", typeof(double)));
+            list.Add(("On Compensated", typeof(double)));
+            list.Add(("Off Compensated", typeof(double)));
+            return list;
+        }
+
+        public List<(double footage, double value)> GetDoubleData(string fieldName)
+        {
+            switch (fieldName)
+            {
+                case "On":
+                    return GetOnData();
+                default:
+                    return null;
+            }
+        }
+
+        private List<(double footage, double value)> GetOnData()
+        {
+            var list = new List<(double, double)>();
+            for(int i = 0; i < Points.Count; ++i)
+            {
+                list.Add((Points[i].Footage, Points[i].On));
+            }
+            return list;
         }
     }
 }

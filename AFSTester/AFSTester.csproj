@@ -159,6 +159,10 @@
       <Project>{4099b184-bdf8-428b-af37-325bdbe37d5b}</Project>
       <Name>AccurateFileSystem</Name>
     </ProjectReference>
+    <ProjectReference Include="..\AccurateReportSystem\AccurateReportSystem.csproj">
+      <Project>{3777e8df-de95-4ec4-8aca-cbe4ef6cd112}</Project>
+      <Name>AccurateReportSystem</Name>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>
