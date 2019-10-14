@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
+using Windows.UI;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media.Imaging;
 
@@ -18,33 +19,24 @@ namespace AccurateReportSystem
         public Container Container { get; set; }
         public Rect DrawArea { get; set; } = new Rect(0, 0, 11 * DEFAULT_DPI, 8.5 * DEFAULT_DPI);
         public Size DrawAreaSize => new Size(DrawArea.Width, DrawArea.Height);
-        private static int DEFAULT_DPI = 300;
+        private static int DEFAULT_DPI = 96;
 
-        public async Task<List<byte[]>> GetImages(double startFootage, double endFootage)
+        public List<CanvasRenderTarget> GetImages(double startFootage, double endFootage)
         {
-            Measure(DrawAreaSize);
-            var image = new WriteableBitmap((int)DrawArea.Width, (int)DrawArea.Height);
             var totalFootage = endFootage - startFootage;
             var pages = PageSetup.GetAllPages(startFootage, totalFootage);
             CanvasDevice device = CanvasDevice.GetSharedDevice();
-
+            var list = new List<CanvasRenderTarget>();
             foreach (var page in pages)
             {
-                CanvasRenderTarget offscreen = new CanvasRenderTarget(device, (float)DrawArea.Width, (float)DrawArea.Height, 300);
-                using (CanvasDrawingSession ds = offscreen.CreateDrawingSession())
+                CanvasRenderTarget offscreen = new CanvasRenderTarget(device, (float)DrawArea.Width, (float)DrawArea.Height, 150);
+                using (CanvasDrawingSession session = offscreen.CreateDrawingSession())
                 {
-                    Container.Draw(page);
-                    Arrange(DrawArea);
-                    RenderTargetBitmap rtb = new RenderTargetBitmap();
-                    await rtb.RenderAsync(this);
-                    var pixelBuffer = await rtb.GetPixelsAsync();
-                    DataReader dataReader = DataReader.FromBuffer(pixelBuffer);
-                    byte[] bytes = new byte[pixelBuffer.Length];
-                    dataReader.ReadBytes(bytes);
-                    list.Add(bytes);
+                    session.Clear(Colors.White);
+                    Container.Draw(page, session);
                 }
+                list.Add(offscreen);
             }
-
 
             return list;
         }

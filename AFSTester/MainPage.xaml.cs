@@ -63,25 +63,19 @@ namespace AFSTester
                     var report = new GraphicalReport();
                     var graph = new Graph(report.DrawArea, null, report);
                     var on = new GraphSeries("On", allegroFile.GetDoubleData("On"));
+                    var off = new GraphSeries("Off", allegroFile.GetDoubleData("Off"));
                     graph.Series.Add(on);
+                    graph.Series.Add(off);
                     report.Container = graph;
-                    var images = await report.GetImages(allegroFile.StartFootage, allegroFile.EndFootage);
+                    var images = report.GetImages(allegroFile.StartFootage, allegroFile.EndFootage);
                     for (int i = 0; i < images.Count; ++i)
                     {
                         var page = $"{i + 1}".PadLeft(3, '0');
-                        var rtb = images[i];
-                        var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {page}" + ".png", CreationCollisionOption.ReplaceExisting);
+                        var image = images[i];
+                        var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {page}" + ".bmp", CreationCollisionOption.ReplaceExisting);
                         using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
                         {
-                            var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
-                            encoder.SetPixelData(BitmapPixelFormat.Bgra8,
-                                                 BitmapAlphaMode.Premultiplied,
-                                                 (uint)report.DrawArea.Width,
-                                                 (uint)report.DrawArea.Height,
-                                                 300,
-                                                 300,
-                                                 rtb);
-                            await encoder.FlushAsync();
+                            await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Bmp);
                         }
                     }
                 }

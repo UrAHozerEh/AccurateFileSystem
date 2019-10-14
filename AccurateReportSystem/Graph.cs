@@ -8,6 +8,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Foundation;
+using Windows.UI;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
 using Windows.UI.Xaml.Shapes;
@@ -25,28 +26,16 @@ namespace AccurateReportSystem
         public double YValueHeight => MaximumYValue - MinimumYValue;
         public bool IsInverted { get; set; } = false;
         public List<GraphSeries> Series { get; set; } = new List<GraphSeries>();
-        private List<Path> Paths;
-        private List<(CanvasGeometry, ICanvasBrush)> Geometries;
+        private List<GeometryInfo> Geometries;
 
         public Graph(Rect drawArea, Container parent, GraphicalReport report) : base(drawArea, parent, report)
         {
 
         }
 
-        public void GeneratePaths()
-        {
-            Paths = new List<Path>();
-            foreach (var series in Series)
-            {
-                var curPaths = series.GetPaths();
-                foreach (var path in curPaths)
-                    Paths.Add(path);
-            }
-        }
-
         public void GenerateGeometries()
         {
-            Geometries = new List<(CanvasGeometry, ICanvasBrush)>();
+            Geometries = new List<GeometryInfo>();
             foreach (var series in Series)
             {
                 var geos = series.GetGeomitries();
@@ -57,12 +46,13 @@ namespace AccurateReportSystem
 
         public override void Draw(PageInformation page, CanvasDrawingSession session)
         {
-            GeneratePaths();
-            GenerateGeometries();
-            var newClip = CanvasGeometry.CreateRectangle(session, (float)page.StartFootage, (float)MinimumYValue, (float)page.Width, (float)YValueHeight);
-            var clip = new RectangleGeometry();
-            var clipRect = new Rect(page.StartFootage, -3, page.Width, 3);
-            clip.Rect = clipRect;
+            Geometries = new List<GeometryInfo>();
+            foreach (var series in Series)
+            {
+                var geos = series.GetGeomitries();
+                Geometries.Add(geos[0]);
+            }
+            var clipRect = new Rect(page.StartFootage, (float)MinimumYValue, page.Width, (float)YValueHeight);
             var widthScalar = DrawArea.Width / clipRect.Width;
             var heightScalar = DrawArea.Height / clipRect.Height;
             var xTranslate = DrawArea.X - clipRect.X;
@@ -74,17 +64,10 @@ namespace AccurateReportSystem
             transform.ScaleY = heightScalar;
             var translateMatrix = Matrix3x2.CreateTranslation(new Vector2((float)xTranslate, (float)yTranslate));
             var scaleMatrix = Matrix3x2.CreateScale((float)widthScalar, (float)heightScalar, new Vector2());
-            foreach (var path in Paths)
+            foreach (var geoInfo in Geometries)
             {
-                path.Clip = clip;
-                path.RenderTransform = transform;
-                Report.Children.Add(path);
-            }
-            foreach (var (geo, brush) in Geometries)
-            {
-                var clippedGeo = geo.CombineWith(newClip, Matrix3x2.Identity, CanvasGeometryCombine.Intersect);
-                var transformedGeo = clippedGeo.Transform(translateMatrix).Transform(scaleMatrix);
-                session.DrawGeometry(geo, brush);
+                var transformedGeo = geoInfo.Geometry.Transform(translateMatrix).Transform(scaleMatrix);
+                session.DrawGeometry(transformedGeo, geoInfo.GetCanvasBrush(session));
             }
         }
     }

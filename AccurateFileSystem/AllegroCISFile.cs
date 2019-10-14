@@ -92,6 +92,7 @@ namespace AccurateFileSystem
             list.Add(("Off", typeof(double)));
             list.Add(("On Compensated", typeof(double)));
             list.Add(("Off Compensated", typeof(double)));
+            list.Add(("Comment", typeof(string)));
             return list;
         }
 
@@ -101,6 +102,8 @@ namespace AccurateFileSystem
             {
                 case "On":
                     return GetOnData();
+                case "Off":
+                    return GetOffData();
                 default:
                     return null;
             }
@@ -114,6 +117,31 @@ namespace AccurateFileSystem
                 list.Add((Points[i].Footage, Points[i].On));
             }
             return list;
+        }
+
+        private List<(double footage, double value)> GetOffData()
+        {
+            var list = new List<(double, double)>();
+            for (int i = 0; i < Points.Count; ++i)
+            {
+                list.Add((Points[i].Footage, Points[i].Off));
+            }
+            return list;
+        }
+
+        public List<(double footage, string value)> GetStringData(string fieldName)
+        {
+            var list = new List<(double, string)>();
+            for (int i = 0; i < Points.Count; ++i)
+            {
+                list.Add((Points[i].Footage, Points[i].OriginalComment));
+            }
+            return list;
+        }
+
+        public List<(double footage, string value)> GetStringData(string fieldName, double startFootage, double endFootage)
+        {
+            throw new NotImplementedException();
         }
     }
 }

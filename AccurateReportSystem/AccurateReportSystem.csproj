@@ -120,7 +120,9 @@
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="CommentSeries.cs" />
     <Compile Include="Container.cs" />
+    <Compile Include="GeometryInfo.cs" />
     <Compile Include="Graph.cs" />
     <Compile Include="GraphicalReport.cs" />
     <Compile Include="GraphSeries.cs" />

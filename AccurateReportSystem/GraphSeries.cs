@@ -1,4 +1,5 @@
-﻿using Microsoft.Graphics.Canvas.Brushes;
+﻿using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Brushes;
 using Microsoft.Graphics.Canvas.Geometry;
 using System;
 using System.Collections.Generic;
@@ -40,9 +41,9 @@ namespace AccurateReportSystem
             return paths;
         }
 
-        public List<(CanvasGeometry, Color)> GetGeomitries()
+        public List<GeometryInfo> GetGeomitries()
         {
-            var paths = new List<(CanvasGeometry, Color)>();
+            var paths = new List<GeometryInfo>();
             if (Values != null && Values.Count != 0)
                 paths.Add(GetLineGeometry());
             if (PointShape != Shape.None && Values != null && Values.Count != 0)
@@ -50,12 +51,27 @@ namespace AccurateReportSystem
             return paths;
         }
 
-        private (CanvasGeometry, Color) GetLineGeometry()
+        private GeometryInfo GetLineGeometry()
         {
-            return null;
+            if (Values == null || Values.Count == 0)
+                return null;
+            var pathBuilder = new CanvasPathBuilder(CanvasDevice.GetSharedDevice());
+            var (firstFootage, firstValue) = Values[0];
+            pathBuilder.BeginFigure((float)firstFootage, (float)firstValue);
+            for (int i = 1; i < Values.Count; ++i)
+            {
+                var (footage, value) = Values[i];
+                pathBuilder.AddLine((float)footage, (float)value);
+            }
+            pathBuilder.EndFigure(CanvasFigureLoop.Open);
+            return new GeometryInfo
+            {
+                Geometry = CanvasGeometry.CreatePath(pathBuilder),
+                Color = LineColor
+            };
         }
 
-        private (CanvasGeometry, Color) GetPointGeometry()
+        private GeometryInfo GetPointGeometry()
         {
             return null;
         }
@@ -73,7 +89,7 @@ namespace AccurateReportSystem
             figure.StartPoint = GetPoint(Values[0]);
             var pathSegments = new PathSegmentCollection();
             var curSegment = new PolyLineSegment();
-            for(int i = 1; i < Values.Count; ++i)
+            for (int i = 1; i < Values.Count; ++i)
             {
                 curSegment.Points.Add(GetPoint(Values[i]));
             }
