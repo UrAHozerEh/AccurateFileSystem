@@ -27,6 +27,7 @@ namespace AccurateReportSystem
         public bool IsInverted { get; set; } = false;
         public List<GraphSeries> Series { get; set; } = new List<GraphSeries>();
         private List<GeometryInfo> Geometries;
+        public CommentSeries CommentSeries { get; set; }
 
         public Graph(Rect drawArea, Container parent, GraphicalReport report) : base(drawArea, parent, report)
         {
@@ -68,6 +69,14 @@ namespace AccurateReportSystem
             {
                 var transformedGeo = geoInfo.Geometry.Transform(translateMatrix).Transform(scaleMatrix);
                 session.DrawGeometry(transformedGeo, geoInfo.GetCanvasBrush(session));
+            }
+            if(CommentSeries != null)
+            {
+                var commentGeoInfo = CommentSeries.GetGeometry(page, DrawArea);
+                var style = new CanvasStrokeStyle();
+                style.TransformBehavior = CanvasStrokeTransformBehavior.Hairline;
+                session.DrawGeometry(commentGeoInfo.Geometry, commentGeoInfo.Color, 1, style);
+                //TODO: Canvas Stroke Style should be in Geo Info. Also should have different styles for text and the indicators.
             }
         }
     }

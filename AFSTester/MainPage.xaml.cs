@@ -64,6 +64,8 @@ namespace AFSTester
                     var graph = new Graph(report.DrawArea, null, report);
                     var on = new GraphSeries("On", allegroFile.GetDoubleData("On"));
                     var off = new GraphSeries("Off", allegroFile.GetDoubleData("Off"));
+                    var commentSeries = new CommentSeries { Values = allegroFile.GetStringData("Comment") };
+                    graph.CommentSeries = commentSeries;
                     graph.Series.Add(on);
                     graph.Series.Add(off);
                     report.Container = graph;
