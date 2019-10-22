@@ -17,10 +17,6 @@ namespace AccurateReportSystem
 {
     public class Graph : Container
     {
-        public bool HasMinorHorizontalLines { get; set; } = false;
-        public bool HasMajorHorizontalLines { get; set; } = true;
-        public bool HasMinorVerticalLines { get; set; } = false;
-        public bool HasMajorVerticalLines { get; set; } = true;
         public double MaximumYValue { get; set; } = 0;
         public double MinimumYValue { get; set; } = -3;
         public double YValueHeight => MaximumYValue - MinimumYValue;
@@ -28,10 +24,15 @@ namespace AccurateReportSystem
         public List<GraphSeries> Series { get; set; } = new List<GraphSeries>();
         private List<GeometryInfo> Geometries;
         public CommentSeries CommentSeries { get; set; }
+        public GridlineInfo[] Gridlines { get; set; }
 
         public Graph(Rect drawArea, Container parent, GraphicalReport report) : base(drawArea, parent, report)
         {
-
+            Gridlines = new GridlineInfo[4];
+            Gridlines[(int)GridlineName.MinorHorizontal] = new GridlineInfo(50, false, true);
+            Gridlines[(int)GridlineName.MajorHorizontal] = new GridlineInfo(100, false, false);
+            Gridlines[(int)GridlineName.MinorHorizontal] = new GridlineInfo(0.5, true, true);
+            Gridlines[(int)GridlineName.MinorHorizontal] = new GridlineInfo(0.1, true, true);
         }
 
         public void GenerateGeometries()
@@ -65,12 +66,15 @@ namespace AccurateReportSystem
             transform.ScaleY = heightScalar;
             var translateMatrix = Matrix3x2.CreateTranslation(new Vector2((float)xTranslate, (float)yTranslate));
             var scaleMatrix = Matrix3x2.CreateScale((float)widthScalar, (float)heightScalar, new Vector2());
+
+            DrawGridLines(page, session, clipRect, translateMatrix, scaleMatrix);
+
             foreach (var geoInfo in Geometries)
             {
                 var transformedGeo = geoInfo.Geometry.Transform(translateMatrix).Transform(scaleMatrix);
                 session.DrawGeometry(transformedGeo, geoInfo.GetCanvasBrush(session));
             }
-            if(CommentSeries != null)
+            if (CommentSeries != null)
             {
                 var commentGeoInfo = CommentSeries.GetGeometry(page, DrawArea);
                 var style = new CanvasStrokeStyle();
@@ -78,6 +82,16 @@ namespace AccurateReportSystem
                 session.DrawGeometry(commentGeoInfo.Geometry, commentGeoInfo.Color, 1, style);
                 //TODO: Canvas Stroke Style should be in Geo Info. Also should have different styles for text and the indicators.
             }
+        }
+
+        private void DrawGridLines(PageInformation page, CanvasDrawingSession session, Rect clipRect, Matrix3x2 translateMatrix, Matrix3x2 scaleMatrix)
+        {
+
+        }
+
+        public enum GridlineName
+        {
+            MinorHorizontal = 0, MajorHorizontal = 2, MinorVertical = 1, MajorVertical = 3
         }
     }
 }
