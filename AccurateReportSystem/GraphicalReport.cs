@@ -1,4 +1,5 @@
 ﻿using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -34,6 +35,7 @@ namespace AccurateReportSystem
                 using (CanvasDrawingSession session = offscreen.CreateDrawingSession())
                 {
                     session.Clear(Colors.White);
+                    session.TextRenderingParameters = new CanvasTextRenderingParameters(CanvasTextRenderingMode.NaturalSymmetric, CanvasTextGridFit.Default);
                     Container.Draw(page, session, drawArea);
                 }
                 list.Add(offscreen);

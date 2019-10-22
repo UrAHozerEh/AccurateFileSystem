@@ -16,14 +16,15 @@ namespace AccurateReportSystem
     public class CommentSeries
     {
         public List<(double footage, string value)> Values { get; set; }
-        public double TopEdgePadding { get; set; } = 45; //TODO: Make this inches.
+        public double TopEdgePadding { get; set; } = 20; //TODO: Make this inches.
         public Color LineColor { get; set; } = Colors.Black;
         public Color TextColor { get; set; } = Colors.Black;
 
-        public GeometryInfo GetGeometry(PageInformation page, Rect drawArea)
+
+        public (GeometryInfo, GeometryInfo) GetGeometry(PageInformation page, Rect drawArea, CanvasDrawingSession session)
         {
-            var device = CanvasDevice.GetSharedDevice();
-            CanvasGeometry outputGeo = null;// = CanvasGeometry.CreateRectangle(device, 0, 0, (float)drawArea.Height, (float)drawArea.Width);
+            CanvasGeometry commentOutputGeo = null;// = CanvasGeometry.CreateRectangle(device, 0, 0, (float)drawArea.Height, (float)drawArea.Width);
+            CanvasGeometry lineOutputGeo = null;
             Matrix3x2 translation;
             using (var format = new CanvasTextFormat())
             {
@@ -43,11 +44,11 @@ namespace AccurateReportSystem
                         break;
                     if (string.IsNullOrWhiteSpace(comment))
                         continue;
-                    using (var layout = new CanvasTextLayout(device, comment, format, (float)drawArea.Height / 2, 0))
+                    using (var layout = new CanvasTextLayout(session, comment, format, (float)drawArea.Height / 2, 0))
                     {
                         var textBounds = layout.DrawBounds;
 
-                        using (var path = new CanvasPathBuilder(device))
+                        using (var path = new CanvasPathBuilder(session))
                         {
                             var height = textBounds.Height;
                             var textMiddle = new Vector2((float)textBounds.X, (float)(textBounds.Top + (textBounds.Height / 2)));
@@ -61,38 +62,46 @@ namespace AccurateReportSystem
                             translation = Matrix3x2.CreateTranslation((float)(TopEdgePadding + drawArea.Y), (float)textTranslate);
 
                             //TODO: Add getter and setter for line settings.
-                            var lineTopEdgePadding = (float)TopEdgePadding * 0.75f + (float)drawArea.Y;
-                            var lineTopEdgePaddingWithExtra = lineTopEdgePadding + (float)TopEdgePadding * 0.75f;
+                            var lineTopEdgePadding = (float)TopEdgePadding - 2f + (float)drawArea.Y;
+                            var lineTopEdgePaddingWithExtra = lineTopEdgePadding + 10f;
                             var finalFootageInPixels = (float)(drawArea.Width - footageInPixels);
-                            var lineLengthFromMiddle = (float)height / 2f * 1.5f;
+                            var lineLengthFromMiddle = (float)height / 1.5f;// * 1.5f;
 
                             //TODO: Begin figure float double
                             path.BeginFigure((float)drawArea.Y, finalFootageInPixels);
                             path.AddLine(lineTopEdgePadding, finalFootageInPixels);
                             path.AddLine(lineTopEdgePadding, finalFootageInPixels + lineLengthFromMiddle);
-                            path.AddLine(lineTopEdgePaddingWithExtra, finalFootageInPixels + lineLengthFromMiddle);
-                            path.AddLine(lineTopEdgePadding, finalFootageInPixels + lineLengthFromMiddle);
+                            //path.AddLine(lineTopEdgePaddingWithExtra, finalFootageInPixels + lineLengthFromMiddle);
+                            //path.AddLine(lineTopEdgePadding, finalFootageInPixels + lineLengthFromMiddle);
                             path.AddLine(lineTopEdgePadding, finalFootageInPixels - lineLengthFromMiddle);
-                            path.AddLine(lineTopEdgePaddingWithExtra, finalFootageInPixels - lineLengthFromMiddle);
-                            path.AddLine(lineTopEdgePadding, finalFootageInPixels - lineLengthFromMiddle);
+                            //path.AddLine(lineTopEdgePaddingWithExtra, finalFootageInPixels - lineLengthFromMiddle);
+                            //path.AddLine(lineTopEdgePadding, finalFootageInPixels - lineLengthFromMiddle);
                             path.AddLine(lineTopEdgePadding, finalFootageInPixels);
                             path.EndFigure(CanvasFigureLoop.Open);
 
-                            if (outputGeo == null)
+                            if (commentOutputGeo == null)
                             {
                                 //TODO: Probably need to dispose of this stuff.
-                                outputGeo = CanvasGeometry.CreateText(layout).Transform(translation);
+                                commentOutputGeo = CanvasGeometry.CreateText(layout).Transform(translation);
                             }
                             else
                             {
 
                                 using (var geometry = CanvasGeometry.CreateText(layout))
-                                    outputGeo = outputGeo.CombineWith(geometry, translation, CanvasGeometryCombine.Union);
+                                {
+                                    commentOutputGeo = commentOutputGeo.CombineWith(geometry, translation, CanvasGeometryCombine.Union);
+                                }
                             }
-
-                            using (var pathGeo = CanvasGeometry.CreatePath(path))
+                            if (lineOutputGeo == null)
                             {
-                                outputGeo = outputGeo.CombineWith(pathGeo, Matrix3x2.Identity, CanvasGeometryCombine.Union);
+                                lineOutputGeo = CanvasGeometry.CreatePath(path);
+                            }
+                            else
+                            {
+                                using (var pathGeo = CanvasGeometry.CreatePath(path))
+                                {
+                                    lineOutputGeo = lineOutputGeo.CombineWith(pathGeo, Matrix3x2.Identity, CanvasGeometryCombine.Union);
+                                }
                             }
                         }
                     }
@@ -101,13 +110,20 @@ namespace AccurateReportSystem
             var rotationPoint = new Vector2(0, (float)drawArea.Width);
             var rotation = Matrix3x2.CreateRotation((float)(90 * Math.PI / 180), rotationPoint);
             translation = Matrix3x2.CreateTranslation(0, 0 - (float)drawArea.Width);
-            outputGeo = outputGeo.Transform(rotation).Transform(translation);
-            var output = new GeometryInfo
+            commentOutputGeo = commentOutputGeo.Transform(rotation).Transform(translation);
+            lineOutputGeo = lineOutputGeo.Transform(rotation).Transform(translation);
+            var commentOutput = new GeometryInfo
             {
                 Color = TextColor,
-                Geometry = outputGeo
+                Geometry = commentOutputGeo
             };
-            return output;
+
+            var lineOutput = new GeometryInfo
+            {
+                Color = LineColor,
+                Geometry = lineOutputGeo
+            };
+            return (commentOutput, lineOutput);
         }
     }
 }

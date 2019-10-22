@@ -20,4 +20,9 @@ namespace AccurateReportSystem
             return new CanvasSolidColorBrush(creator, Color);
         }
     }
+
+    public enum GeometryInfoDrawType
+    {
+        Fill, Stroke
+    }
 }

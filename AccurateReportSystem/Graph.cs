@@ -106,10 +106,13 @@ namespace AccurateReportSystem
                 }
                 if (CommentSeries != null)
                 {
-                    var commentGeoInfo = CommentSeries.GetGeometry(page, graphBodyDrawArea);
-                    var style = new CanvasStrokeStyle();
-                    style.TransformBehavior = CanvasStrokeTransformBehavior.Hairline;
-                    session.DrawGeometry(commentGeoInfo.Geometry, commentGeoInfo.Color, 1, style);
+                    var (commentGeoInfo, lineGeoInfo) = CommentSeries.GetGeometry(page, graphBodyDrawArea, session);
+                    var style = new CanvasStrokeStyle
+                    {
+                        TransformBehavior = CanvasStrokeTransformBehavior.Hairline
+                    };
+                    session.DrawGeometry(lineGeoInfo.Geometry, lineGeoInfo.Color, 1, style);
+                    session.FillGeometry(commentGeoInfo.Geometry, commentGeoInfo.Color);
                     //TODO: Canvas Stroke Style should be in Geo Info. Also should have different styles for text and the indicators.
                 }
             }

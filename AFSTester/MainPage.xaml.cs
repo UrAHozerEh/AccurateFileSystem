@@ -14,6 +14,7 @@ using Windows.Foundation.Collections;
 using Windows.Graphics.Imaging;
 using Windows.Storage;
 using Windows.Storage.Pickers;
+using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -62,8 +63,14 @@ namespace AFSTester
                     var allegroFile = newFile as AllegroCISFile;
                     var report = new GraphicalReport();
                     var graph = new Graph();
-                    var on = new GraphSeries("On", allegroFile.GetDoubleData("On"));
-                    var off = new GraphSeries("Off", allegroFile.GetDoubleData("Off"));
+                    var on = new GraphSeries("On", allegroFile.GetDoubleData("On"))
+                    {
+                        LineColor = Colors.Green
+                    };
+                    var off = new GraphSeries("Off", allegroFile.GetDoubleData("Off"))
+                    {
+                        LineColor = Colors.Blue
+                    };
                     var commentSeries = new CommentSeries { Values = allegroFile.GetStringData("Comment") };
                     graph.CommentSeries = commentSeries;
                     graph.Series.Add(on);
@@ -74,10 +81,10 @@ namespace AFSTester
                     {
                         var page = $"{i + 1}".PadLeft(3, '0');
                         var image = images[i];
-                        var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {page}" + ".bmp", CreationCollisionOption.ReplaceExisting);
+                        var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {page}" + ".png", CreationCollisionOption.ReplaceExisting);
                         using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
                         {
-                            await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Bmp);
+                            await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
                         }
                     }
                 }
