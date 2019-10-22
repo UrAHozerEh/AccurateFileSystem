@@ -17,28 +17,58 @@ namespace AccurateReportSystem
     {
         public PageSetup PageSetup { get; set; } = new PageSetup();
         public Container Container { get; set; }
-        public Rect DrawArea { get; set; } = new Rect(0, 0, 11 * DEFAULT_DPI, 8.5 * DEFAULT_DPI);
-        public Size DrawAreaSize => new Size(DrawArea.Width, DrawArea.Height);
-        private static int DEFAULT_DPI = 96;
+        public ReportMarginInfo MarginInfo { get; set; } = new ReportMarginInfo();
+        public static int DEFAULT_DPI = 96;
 
         public List<CanvasRenderTarget> GetImages(double startFootage, double endFootage)
         {
+            var pageArea = new Rect(0, 0, DEFAULT_DPI * 11, DEFAULT_DPI * 8.5);
+            var drawArea = new Rect(MarginInfo.Left * DEFAULT_DPI, MarginInfo.Top * DEFAULT_DPI, (11 - MarginInfo.MarginWidth) * DEFAULT_DPI, (8.5 - MarginInfo.MarginHeight) * DEFAULT_DPI);
             var totalFootage = endFootage - startFootage;
             var pages = PageSetup.GetAllPages(startFootage, totalFootage);
             CanvasDevice device = CanvasDevice.GetSharedDevice();
             var list = new List<CanvasRenderTarget>();
             foreach (var page in pages)
             {
-                CanvasRenderTarget offscreen = new CanvasRenderTarget(device, (float)DrawArea.Width, (float)DrawArea.Height, 150);
+                CanvasRenderTarget offscreen = new CanvasRenderTarget(device, (float)pageArea.Width, (float)pageArea.Height, 150);
                 using (CanvasDrawingSession session = offscreen.CreateDrawingSession())
                 {
                     session.Clear(Colors.White);
-                    Container.Draw(page, session);
+                    Container.Draw(page, session, drawArea);
                 }
                 list.Add(offscreen);
             }
 
             return list;
+        }
+    }
+
+    public class ReportMarginInfo
+    {
+        public double Top { get; set; }
+        public double Left { get; set; }
+        public double Right { get; set; }
+        public double Bottom { get; set; }
+        public double MarginWidth => Left + Right;
+        public double MarginHeight => Top + Bottom;
+
+        public ReportMarginInfo()
+        {
+            Top = 0.5;
+            Left = 0.1;
+            Right = 0.1;
+            Bottom = 0.1;
+        }
+
+        public ReportMarginInfo(double allSides)
+        {
+            Top = Left = Right = Bottom = allSides;
+        }
+
+        public ReportMarginInfo(double top, double allOthers)
+        {
+            Top = top;
+            Left = Right = Bottom = allOthers;
         }
     }
 }

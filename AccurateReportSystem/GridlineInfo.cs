@@ -15,7 +15,7 @@ namespace AccurateReportSystem
         public bool IsVertical { get; set; }
         public int Thickness { get; set; } = 1;
         public Color Color { get; set; }
-        public GridlineTickMarkStyle TickMarkStyle { get; set; } 
+        public GridlineTickMarkStyle TickMarkStyle { get; set; }
         public double Offset { get; set; }
 
         public GridlineInfo(double offset, bool isVertical, bool isMinor = false)
@@ -30,11 +30,11 @@ namespace AccurateReportSystem
         {
             var pathBuilder = new CanvasPathBuilder(CanvasDevice.GetSharedDevice());
 
-            if(IsVertical)
+            if (IsVertical)
             {
                 var start = page.StartFootage - (page.StartFootage % Offset);
                 var numLines = (int)(page.Width / Offset);
-                for(int i = 0; i < numLines; ++i)
+                for (int i = 0; i <= numLines; ++i)
                 {
                     var current = start + i * Offset;
                     pathBuilder.BeginFigure((float)current, (float)minimumY);
@@ -44,7 +44,16 @@ namespace AccurateReportSystem
             }
             else
             {
-
+                var height = maximumY - minimumY;
+                var start = ((int)(minimumY / Offset) * Offset);
+                var numLines = (int)(height / Offset);
+                for (int i = 0; i <= numLines; ++i)
+                {
+                    var current = start + i * Offset;
+                    pathBuilder.BeginFigure((float)page.StartFootage, (float)current);
+                    pathBuilder.AddLine((float)page.EndFootage, (float)current);
+                    pathBuilder.EndFigure(CanvasFigureLoop.Open);
+                }
             }
 
             return new GeometryInfo

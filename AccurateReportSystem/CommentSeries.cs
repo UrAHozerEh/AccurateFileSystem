@@ -16,7 +16,9 @@ namespace AccurateReportSystem
     public class CommentSeries
     {
         public List<(double footage, string value)> Values { get; set; }
-        public double TopEdgePadding { get; set; } = 10;
+        public double TopEdgePadding { get; set; } = 45; //TODO: Make this inches.
+        public Color LineColor { get; set; } = Colors.Black;
+        public Color TextColor { get; set; } = Colors.Black;
 
         public GeometryInfo GetGeometry(PageInformation page, Rect drawArea)
         {
@@ -51,34 +53,39 @@ namespace AccurateReportSystem
                             var textMiddle = new Vector2((float)textBounds.X, (float)(textBounds.Top + (textBounds.Height / 2)));
                             var feetToPixels = drawArea.Width / page.Width;
 
-                            var footageInPixels = footage * feetToPixels;
+                            var footageInPixels = footage * feetToPixels + drawArea.X;
                             var distanceFromMiddleToFootage = footageInPixels + textMiddle.Y;
 
                             var textTranslate = drawArea.Width - distanceFromMiddleToFootage;
                             //TODO: Make extention methods that help with float / double things.
-                            translation = Matrix3x2.CreateTranslation((float)TopEdgePadding, (float)textTranslate);
+                            translation = Matrix3x2.CreateTranslation((float)(TopEdgePadding + drawArea.Y), (float)textTranslate);
 
-                            var lineTopEdgePadding = (float)TopEdgePadding * 0.75f;
+                            //TODO: Add getter and setter for line settings.
+                            var lineTopEdgePadding = (float)TopEdgePadding * 0.75f + (float)drawArea.Y;
+                            var lineTopEdgePaddingWithExtra = lineTopEdgePadding + (float)TopEdgePadding * 0.75f;
                             var finalFootageInPixels = (float)(drawArea.Width - footageInPixels);
                             var lineLengthFromMiddle = (float)height / 2f * 1.5f;
 
-                            path.BeginFigure(0, finalFootageInPixels);
+                            //TODO: Begin figure float double
+                            path.BeginFigure((float)drawArea.Y, finalFootageInPixels);
                             path.AddLine(lineTopEdgePadding, finalFootageInPixels);
                             path.AddLine(lineTopEdgePadding, finalFootageInPixels + lineLengthFromMiddle);
-                            path.AddLine(lineTopEdgePadding * 1.5f, finalFootageInPixels + lineLengthFromMiddle);
+                            path.AddLine(lineTopEdgePaddingWithExtra, finalFootageInPixels + lineLengthFromMiddle);
                             path.AddLine(lineTopEdgePadding, finalFootageInPixels + lineLengthFromMiddle);
                             path.AddLine(lineTopEdgePadding, finalFootageInPixels - lineLengthFromMiddle);
-                            path.AddLine(lineTopEdgePadding * 1.5f, finalFootageInPixels - lineLengthFromMiddle);
+                            path.AddLine(lineTopEdgePaddingWithExtra, finalFootageInPixels - lineLengthFromMiddle);
                             path.AddLine(lineTopEdgePadding, finalFootageInPixels - lineLengthFromMiddle);
                             path.AddLine(lineTopEdgePadding, finalFootageInPixels);
                             path.EndFigure(CanvasFigureLoop.Open);
 
                             if (outputGeo == null)
                             {
+                                //TODO: Probably need to dispose of this stuff.
                                 outputGeo = CanvasGeometry.CreateText(layout).Transform(translation);
                             }
                             else
                             {
+
                                 using (var geometry = CanvasGeometry.CreateText(layout))
                                     outputGeo = outputGeo.CombineWith(geometry, translation, CanvasGeometryCombine.Union);
                             }
@@ -97,7 +104,7 @@ namespace AccurateReportSystem
             outputGeo = outputGeo.Transform(rotation).Transform(translation);
             var output = new GeometryInfo
             {
-                Color = Colors.HotPink,
+                Color = TextColor,
                 Geometry = outputGeo
             };
             return output;
