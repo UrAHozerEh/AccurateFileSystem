@@ -56,10 +56,10 @@ namespace AccurateReportSystem
 
         public ReportMarginInfo()
         {
-            Top = 0.5;
-            Left = 0.1;
-            Right = 0.1;
-            Bottom = 0.1;
+            Top = 1;
+            Left = 0.25;
+            Right = 0.25;
+            Bottom = 0.25;
         }
 
         public ReportMarginInfo(double allSides)

@@ -16,11 +16,12 @@ namespace AccurateReportSystem
     public class CommentSeries
     {
         public List<(double footage, string value)> Values { get; set; }
-        public double TopEdgePadding { get; set; } = 20; //TODO: Make this inches.
+        public double TopEdgePadding { get; set; } = 10; //TODO: Make this inches.
         public Color LineColor { get; set; } = Colors.Black;
         public Color TextColor { get; set; } = Colors.Black;
-        public double CommentBuffer { get; set; } = 3;
+        public double CommentBuffer { get; set; } = 5;
         public double EdgeBuffer { get; set; } = 3;
+        public BorderType BorderType { get; set; } = BorderType.Full;
 
         public (GeometryInfo, GeometryInfo) GetGeometry(PageInformation page, Rect drawArea, CanvasDrawingSession session)
         {
@@ -51,14 +52,17 @@ namespace AccurateReportSystem
                     var height = textBounds.Height;
                     var textMiddle = (float)(textBounds.Top + (textBounds.Height / 2));
                     var feetToPixels = drawArea.Width / page.Width;
-                    var footageInPixels = footage * feetToPixels + drawArea.X;
+                    var footageInPixels = (footage - page.StartFootage) * feetToPixels + drawArea.X;
+                    var finalFootageInPixels = (float)(drawArea.Width - footageInPixels);
                     var distanceFromMiddleToFootage = footageInPixels + textMiddle;
                     var textTranslate = drawArea.Width - distanceFromMiddleToFootage;
                     textBounds.Y += textTranslate;
+                    textBounds.X += (float)(TopEdgePadding + drawArea.Y);
                     var curBounds = new CommentBoundsInfo
                     {
                         Layout = layout,
-                        Bounds = textBounds
+                        Bounds = textBounds,
+                        FootageInPixels = finalFootageInPixels
                     };
                     if (first == null)
                     {
@@ -70,11 +74,103 @@ namespace AccurateReportSystem
                         curBounds.Prev = last;
                         last = curBounds;
                     }
+
+
                 }
             }
 
             first.CheckBounds(drawArea, false, CommentBuffer, EdgeBuffer);
             last.CheckBounds(drawArea, true, CommentBuffer, EdgeBuffer);
+
+            while (first != null)
+            {
+                var newBounds = first.Bounds;
+                var oldBounds = first.Layout.DrawBounds;
+                translation = Matrix3x2.CreateTranslation((float)(newBounds.X - oldBounds.X), (float)(newBounds.Y - oldBounds.Y));
+                if (commentOutputGeo == null)
+                {
+                    //TODO: Probably need to dispose of this stuff.
+                    commentOutputGeo = CanvasGeometry.CreateText(first.Layout).Transform(translation);
+                }
+                else
+                {
+
+                    using (var geometry = CanvasGeometry.CreateText(first.Layout))
+                    {
+                        commentOutputGeo = commentOutputGeo.CombineWith(geometry, translation, CanvasGeometryCombine.Union);
+                    }
+                }
+
+                using (var path = new CanvasPathBuilder(session))
+                {
+                    var lineTopEdgePadding = (float)TopEdgePadding - 2f + (float)drawArea.Y;
+                    var lineTopEdgePaddingWithExtra = lineTopEdgePadding + 10f;
+                    var lineFull = (float)(lineTopEdgePadding + newBounds.Width + 4f);
+                    var lineLengthFromMiddle = (float)first.Bounds.Height / 2f + 1.5f;
+
+                    switch (BorderType)
+                    {
+                        case BorderType.Line:
+                            path.BeginFigure((float)drawArea.Y, first.FootageInPixels);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle + lineLengthFromMiddle);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle - lineLengthFromMiddle);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle);
+                            path.EndFigure(CanvasFigureLoop.Open);
+                            break;
+                        case BorderType.Pegs:
+                            path.BeginFigure((float)drawArea.Y, first.FootageInPixels);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle + lineLengthFromMiddle);
+                            path.AddLine(lineTopEdgePaddingWithExtra, first.CommentMiddle + lineLengthFromMiddle);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle + lineLengthFromMiddle);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle - lineLengthFromMiddle);
+                            path.AddLine(lineTopEdgePaddingWithExtra, first.CommentMiddle - lineLengthFromMiddle);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle - lineLengthFromMiddle);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle);
+                            path.EndFigure(CanvasFigureLoop.Open);
+                            break;
+                        case BorderType.Full:
+                            path.BeginFigure((float)drawArea.Y, first.FootageInPixels);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle + lineLengthFromMiddle);
+                            path.AddLine(lineFull, first.CommentMiddle + lineLengthFromMiddle);
+                            path.AddLine(lineFull, first.CommentMiddle - lineLengthFromMiddle);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle - lineLengthFromMiddle);
+                            path.AddLine(lineTopEdgePadding, first.CommentMiddle);
+                            path.EndFigure(CanvasFigureLoop.Open);
+                            break;
+                        default:
+                            break;
+                    }
+                    path.BeginFigure((float)drawArea.Y, first.FootageInPixels);
+                    path.AddLine(lineTopEdgePadding, first.CommentMiddle);
+                    path.AddLine(lineTopEdgePadding, first.CommentMiddle + lineLengthFromMiddle);
+                    //path.AddLine(lineTopEdgePaddingWithExtra, finalFootageInPixels + lineLengthFromMiddle);
+                    //path.AddLine(lineTopEdgePadding, finalFootageInPixels + lineLengthFromMiddle);
+                    path.AddLine(lineTopEdgePadding, first.CommentMiddle - lineLengthFromMiddle);
+                    //path.AddLine(lineTopEdgePaddingWithExtra, finalFootageInPixels - lineLengthFromMiddle);
+                    //path.AddLine(lineTopEdgePadding, finalFootageInPixels - lineLengthFromMiddle);
+                    path.AddLine(lineTopEdgePadding, first.CommentMiddle);
+                    path.EndFigure(CanvasFigureLoop.Open);
+
+                    if (lineOutputGeo == null)
+                    {
+                        lineOutputGeo = CanvasGeometry.CreatePath(path);
+                    }
+                    else
+                    {
+                        using (var pathGeo = CanvasGeometry.CreatePath(path))
+                        {
+                            lineOutputGeo = lineOutputGeo.CombineWith(pathGeo, Matrix3x2.Identity, CanvasGeometryCombine.Union);
+                        }
+                    }
+                }
+
+                var old = first;
+                first = first.Next;
+                old.Dispose();
+            }
 
             var rotationPoint = new Vector2(0, (float)drawArea.Width);
             var rotation = Matrix3x2.CreateRotation((float)(90 * Math.PI / 180), rotationPoint);
@@ -95,12 +191,14 @@ namespace AccurateReportSystem
             return (commentOutput, lineOutput);
         }
 
-        private class CommentBoundsInfo
+        private class CommentBoundsInfo : IDisposable
         {
             public CanvasTextLayout Layout { get; set; }
             public Rect Bounds { get; set; }
             public CommentBoundsInfo Next { get; set; }
             public CommentBoundsInfo Prev { get; set; }
+            public float FootageInPixels { get; set; }
+            public float CommentMiddle => (float)(Bounds.Y + (Bounds.Height / 2));
 
             public void CheckBounds(Rect drawArea, bool isReverse, double buffer, double edgeBuffer)
             {
@@ -182,7 +280,19 @@ namespace AccurateReportSystem
                 }
                 return false;
             }
+
+            public void Dispose()
+            {
+                Layout.Dispose();
+                Next = null;
+                Prev = null;
+            }
         }
+    }
+
+    public enum BorderType
+    {
+        Line, Pegs, Full
     }
     /*
     private void temp()
