@@ -20,13 +20,14 @@ namespace AccurateReportSystem
         public Container Container { get; set; }
         public ReportMarginInfo MarginInfo { get; set; } = new ReportMarginInfo();
         public static int DEFAULT_DPI = 96;
+        public static int DIGITS_TO_ROUND = 2;
 
         public List<CanvasRenderTarget> GetImages(double startFootage, double endFootage)
         {
             var pageArea = new Rect(0, 0, DEFAULT_DPI * 11, DEFAULT_DPI * 8.5);
             var drawArea = new Rect(MarginInfo.Left * DEFAULT_DPI, MarginInfo.Top * DEFAULT_DPI, (11 - MarginInfo.MarginWidth) * DEFAULT_DPI, (8.5 - MarginInfo.MarginHeight) * DEFAULT_DPI);
             var totalFootage = endFootage - startFootage;
-            var pages = PageSetup.GetAllPages(startFootage, totalFootage);
+            var pages = PageSetup.GetAllPages(startFootage, totalFootage, 100);
             CanvasDevice device = CanvasDevice.GetSharedDevice();
             var list = new List<CanvasRenderTarget>();
             foreach (var page in pages)

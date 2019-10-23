@@ -21,7 +21,7 @@ namespace AccurateReportSystem
         public Color TextColor { get; set; } = Colors.Black;
         public double CommentBuffer { get; set; } = 5;
         public double EdgeBuffer { get; set; } = 3;
-        public BorderType BorderType { get; set; } = BorderType.Full;
+        public BorderType BorderType { get; set; } = BorderType.Pegs;
 
         public (GeometryInfo, GeometryInfo) GetGeometry(PageInformation page, Rect drawArea, CanvasDrawingSession session)
         {

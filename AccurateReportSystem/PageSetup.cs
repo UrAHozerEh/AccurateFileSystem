@@ -9,12 +9,12 @@ namespace AccurateReportSystem
     public class PageSetup
     {
         public double FootagePerPage { get; set; }
-        public PageSetup(double footagePerPage = 1320)
+        public PageSetup(double footagePerPage = 1000)
         {
             FootagePerPage = footagePerPage;
         }
 
-        public List<PageInformation> GetAllPages(double startFootage, double totalFootage)
+        public List<PageInformation> GetAllPages(double startFootage, double totalFootage, double overlap = 0)
         {
             int numPages = (int)Math.Ceiling(totalFootage / FootagePerPage);
             if (numPages == 0) return null;
@@ -25,8 +25,9 @@ namespace AccurateReportSystem
                 {
                     TotalPages = numPages,
                     PageNumber = i + 1,
-                    StartFootage = i * FootagePerPage + startFootage,
-                    EndFootage = (i + 1) * FootagePerPage + startFootage
+                    StartFootage = i * FootagePerPage + startFootage - overlap,
+                    EndFootage = (i + 1) * FootagePerPage + startFootage + overlap,
+                    Overlap = overlap
                 });
             }
             return list;

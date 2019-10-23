@@ -28,26 +28,44 @@ namespace AccurateReportSystem
         public CommentSeries CommentSeries { get; set; }
         public GridlineInfo[] Gridlines { get; set; }
         public double LegendWidth { get; set; } = 1.5;
-        public double LegendWidthDIP => LegendWidth * GraphicalReport.DEFAULT_DPI;
+        public double LegendWidthDIP => Math.Round(LegendWidth * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
         public double Y1AxisLabelWidth { get; set; } = 0.25;
-        public double Y1AxisLabelWidthDIP => Y1AxisLabelWidth * GraphicalReport.DEFAULT_DPI;
+        public double Y1AxisLabelWidthDIP => Math.Round(Y1AxisLabelWidth * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
+        public double Y1AxisLabelTickLength { get; set; } = 5;
+        public float Y1AxisLabelFontSize { get; set; } = 8f;
+        public string Y1AxisLabelFormat { get; set; } = "F2";
+        public bool IsY1AxisInverted { get; set; } = true;
         public double Y1AxisTitleWidth { get; set; } = 0.25;
-        public double Y1AxisTitleWidthDIP => Y1AxisTitleWidth * GraphicalReport.DEFAULT_DPI;
+        public double Y1AxisTitleWidthDIP => Math.Round(Y1AxisTitleWidth * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
         public string Y1AxisTitle { get; set; } = "Volts";
+        public float Y1AxisTitleFontSize { get; set; } = 16f;
         public double Y2AxisLabelWidth { get; set; } = 0;
-        public double Y2AxisLabelWidthDIP => Y2AxisLabelWidth * GraphicalReport.DEFAULT_DPI;
+        public double Y2AxisLabelWidthDIP => Math.Round(Y2AxisLabelWidth * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
         public double Y2AxisTitleWidth { get; set; } = 0;
-        public double Y2AxisTitleWidthDIP => Y2AxisTitleWidth * GraphicalReport.DEFAULT_DPI;
+        public double Y2AxisTitleWidthDIP => Math.Round(Y2AxisTitleWidth * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
         public string Y2AxisTitle { get; set; } = "";
         public double XAxisLabelHeight { get; set; } = 0.25;
-        public double XAxisLabelHeightDIP => XAxisLabelHeight * GraphicalReport.DEFAULT_DPI;
+        public double XAxisLabelHeightDIP => Math.Round(XAxisLabelHeight * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
+        public double XAxisLabelTickLength { get; set; } = 5;
+        public float XAxisLabelFontSize { get; set; } = 8f;
+        public string XAxisLabelFormat { get; set; } = "F0";
         public double XAxisTitleHeight { get; set; } = 0.25;
-        public double XAxisTitleHeightDIP => XAxisTitleHeight * GraphicalReport.DEFAULT_DPI;
+        public double XAxisTitleHeightDIP => Math.Round(XAxisTitleHeight * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
         public string XAxisTitle { get; set; } = "Footage";
+        public float XAxisTitleFontSize { get; set; } = 16f;
         private double TotalXValueShift => LegendWidthDIP + Y1AxisLabelWidthDIP + Y1AxisTitleWidthDIP;
         private double TotalWidthShift => TotalXValueShift + Y2AxisLabelWidthDIP + Y2AxisTitleWidthDIP;
         private double TotalYValueShift => 0;
         private double TotalHeightShift => XAxisLabelHeightDIP + XAxisTitleHeightDIP;
+        public string LegendName { get; set; } = "CIS Data";
+        public float LegendNameFontSize { get; set; } = 18f;
+        public Color LegendNameColor { get; set; } = Colors.Black;
+        public float LegendSeriesNameFontSize { get; set; } = 14f;
+        public Color LegendSeriesNameColor { get; set; } = Colors.Black;
+        public double LegendSeriesLineLength { get; set; } = 50;
+        public CanvasVerticalAlignment LegendNameVerticalAlignment { get; set; } = CanvasVerticalAlignment.Center;
+        public CanvasHorizontalAlignment LegendNameHorizontalAlignment { get; set; } = CanvasHorizontalAlignment.Center;
+
 
         public Graph()
         {
@@ -58,9 +76,10 @@ namespace AccurateReportSystem
                 Thickness = 2
             };
             Gridlines[(int)GridlineName.MinorVertical] = new GridlineInfo(100, true, true);
-            Gridlines[(int)GridlineName.MajorVertical] = new GridlineInfo(500, true, false)
+            Gridlines[(int)GridlineName.MajorVertical] = new GridlineInfo(100, true, false)
             {
-                Thickness = 2
+                Thickness = 2,
+                Color = Colors.LightGray
             };
         }
 
@@ -127,7 +146,7 @@ namespace AccurateReportSystem
                 var translateMatrix = Matrix3x2.CreateTranslation(new Vector2((float)xTranslate, (float)yTranslate));
                 var scaleMatrix = Matrix3x2.CreateScale((float)widthScalar, (float)heightScalar, new Vector2((float)graphBodyDrawArea.X, (float)graphBodyDrawArea.Y));
 
-                DrawGridLines(page, session, translateMatrix, scaleMatrix);
+                DrawGridLines(page, graphBodyDrawArea, session, translateMatrix, scaleMatrix);
 
                 foreach (var geoInfo in Geometries)
                 {
@@ -148,40 +167,231 @@ namespace AccurateReportSystem
             }
 
             DrawAxisLabels(page, session, graphBodyDrawArea);
-            DrawAxisTitles(page, session, graphBodyDrawArea);
+            DrawAxisTitles(session, graphBodyDrawArea);
+            DrawOverlapShadow(page, session, graphBodyDrawArea);
+            var legendDrawArea = new Rect(DrawArea.X, DrawArea.Y, LegendWidthDIP, graphBodyDrawArea.Height);
+            DrawLegend(legendDrawArea, session);
         }
 
-        private void DrawGridLines(PageInformation page, CanvasDrawingSession session, Matrix3x2 translateMatrix, Matrix3x2 scaleMatrix)
+        private void DrawOverlapShadow(PageInformation page, CanvasDrawingSession session, Rect graphBodyDrawArea)
+        {
+            var color = Colors.Black;
+            var opacity = 0.25f;
+            var pixelToFootRatio = graphBodyDrawArea.Width / page.Width;
+            var shadowWidth = (float)Math.Round(pixelToFootRatio * page.Overlap, GraphicalReport.DIGITS_TO_ROUND);
+            var startRect = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Y, shadowWidth, graphBodyDrawArea.Height);
+            var endRect = new Rect(graphBodyDrawArea.Right - shadowWidth, graphBodyDrawArea.Y, shadowWidth, graphBodyDrawArea.Height);
+            using (var layer = session.CreateLayer(opacity))
+            {
+                session.FillRectangle(startRect, color);
+                session.FillRectangle(endRect, color);
+            }
+        }
+
+        private void DrawGridLines(PageInformation page, Rect graphBodyDrawArea, CanvasDrawingSession session, Matrix3x2 translateMatrix, Matrix3x2 scaleMatrix)
         {
             for (int i = 0; i < 4; ++i)
             {
-                var geoInfo = Gridlines[i].GetGeometryInfo(page, MinimumYValue, MaximumYValue);
-                var style = new CanvasStrokeStyle
+                using (var geoInfo = Gridlines[i].GetGeometryInfo(page, graphBodyDrawArea, MinimumYValue, MaximumYValue, IsY1AxisInverted))
                 {
-                    TransformBehavior = CanvasStrokeTransformBehavior.Fixed
-                };
+                    var style = new CanvasStrokeStyle
+                    {
+                        TransformBehavior = CanvasStrokeTransformBehavior.Fixed
+                    };
+                    session.DrawGeometry(geoInfo.Geometry, geoInfo.Color, Gridlines[i].Thickness, style);
+                }
+            }
+        }
 
-                var transformedGeo = geoInfo.Geometry.Transform(translateMatrix).Transform(scaleMatrix);
-                session.DrawGeometry(transformedGeo, geoInfo.Color, Gridlines[i].Thickness, style);
+        private void DrawLegend(Rect legendDrawArea, CanvasDrawingSession session)
+        {
+            //session.DrawRectangle(legendDrawArea, Colors.Orange);
+            var height = LegendNameFontSize + LegendSeriesNameFontSize * Series.Count;
+            var exampleRect = new Rect(legendDrawArea.X, legendDrawArea.Y, legendDrawArea.Width, height);
+            //session.DrawRectangle(exampleRect, Colors.Orange);
+
+
+            var nextHeight = 0f;
+            if (LegendNameVerticalAlignment == CanvasVerticalAlignment.Center)
+                nextHeight = (float)Math.Round(legendDrawArea.Height / 2 - height / 2, GraphicalReport.DIGITS_TO_ROUND);
+            else if (LegendNameVerticalAlignment == CanvasVerticalAlignment.Bottom)
+                nextHeight = (float)(legendDrawArea.Bottom - height);
+            using (var format = new CanvasTextFormat())
+            {
+                format.HorizontalAlignment = LegendNameHorizontalAlignment;
+                format.FontSize = LegendNameFontSize;
+                format.FontFamily = "Arial";
+                format.FontWeight = FontWeights.Bold;
+                format.FontStyle = FontStyle.Normal;
+                using (var layout = new CanvasTextLayout(session, LegendName, format, (float)legendDrawArea.Width, 0))
+                {
+                    //var translateX = (float)Math.Round(legendDrawArea.X, GraphicalReport.DIGITS_TO_ROUND);
+                    //var translateY = (float)Math.Round(legendDrawArea.Y, GraphicalReport.DIGITS_TO_ROUND);
+                    //var translate = Matrix3x2.CreateTranslation(translateX, translateY);
+                    using (var geo = CanvasGeometry.CreateText(layout))
+                    {
+                        session.FillGeometry(geo, (float)legendDrawArea.X, (float)legendDrawArea.Y + nextHeight, LegendNameColor);
+                    }
+                    nextHeight += LegendNameFontSize;
+                }
+            }
+            using (var format = new CanvasTextFormat())
+            {
+                format.HorizontalAlignment = LegendNameHorizontalAlignment;
+                format.FontSize = LegendSeriesNameFontSize;
+                format.FontFamily = "Arial";
+                format.FontWeight = FontWeights.Bold;
+                format.FontStyle = FontStyle.Normal;
+                foreach (var series in Series)
+                {
+                    using (var layout = new CanvasTextLayout(session, series.Name, format, (float)legendDrawArea.Width, 0))
+                    {
+                        //var translateX = (float)Math.Round(legendDrawArea.X, GraphicalReport.DIGITS_TO_ROUND);
+                        //var translateY = (float)Math.Round(legendDrawArea.Y, GraphicalReport.DIGITS_TO_ROUND);
+                        //var translate = Matrix3x2.CreateTranslation(translateX, translateY);
+                        using (var geo = CanvasGeometry.CreateText(layout))
+                        {
+                            session.FillGeometry(geo, (float)legendDrawArea.X, (float)legendDrawArea.Y + nextHeight, series.LineColor);
+                        }
+                        nextHeight += LegendSeriesNameFontSize;
+                    }
+                }
             }
         }
 
         private void DrawAxisLabels(PageInformation page, CanvasDrawingSession session, Rect graphBodyDrawArea)
         {
+            var yAxisMajor = Gridlines[(int)GridlineName.MajorHorizontal].GetValues(page, graphBodyDrawArea, MinimumYValue, MaximumYValue, IsY1AxisInverted);
+            var color = Gridlines[(int)GridlineName.MajorHorizontal].Color;
+            var thickness = Gridlines[(int)GridlineName.MajorHorizontal].Thickness;
+            var drawArea = new Rect(graphBodyDrawArea.X - Y1AxisLabelWidthDIP, graphBodyDrawArea.Y, Y1AxisLabelWidthDIP, graphBodyDrawArea.Height);
+            //session.DrawRectangle(drawArea, Colors.Orange);
+            using (var format = new CanvasTextFormat())
+            {
+                format.HorizontalAlignment = CanvasHorizontalAlignment.Right;
+                format.WordWrapping = CanvasWordWrapping.WholeWord;
+                format.FontSize = Y1AxisLabelFontSize;
+                format.FontFamily = "Arial";
+                format.FontWeight = FontWeights.Thin;
+                format.FontStyle = FontStyle.Normal;
+                foreach (var (value, location) in yAxisMajor)
+                {
+                    var endLocation = location;
+                    var width = (float)(Y1AxisLabelWidthDIP - Y1AxisLabelTickLength);
+                    var label = value.ToString(Y1AxisLabelFormat);
+                    using (var layout = new CanvasTextLayout(session, label, format, width, 0))
+                    {
+                        var layoutHeight = (float)Math.Round(layout.LayoutBounds.Height / 2, GraphicalReport.DIGITS_TO_ROUND);
+                        var finalLocation = location - layoutHeight;
+                        if (finalLocation < drawArea.Top)
+                        {
+                            endLocation = (float)drawArea.Top + layoutHeight;
+                            finalLocation = (float)drawArea.Top;
+                        }
+                        else if (finalLocation + (2 * layoutHeight) > drawArea.Bottom)
+                        {
+                            endLocation = (float)drawArea.Bottom - layoutHeight;
+                            finalLocation = (float)drawArea.Bottom - (2 * layoutHeight);
+                        }
+                        var translate = Matrix3x2.CreateTranslation((float)drawArea.X, finalLocation);
+                        using (var geo = CanvasGeometry.CreateText(layout))
+                        {
+                            using (var translatedGeo = geo.Transform(translate))
+                            {
+                                session.FillGeometry(translatedGeo, Colors.Black);
+                            }
+                        }
+                    }
 
+                    using (var pathBuilder = new CanvasPathBuilder(session))
+                    {
+                        pathBuilder.BeginFigure((float)graphBodyDrawArea.X, location);
+                        pathBuilder.AddLine((float)(graphBodyDrawArea.X - Y1AxisLabelTickLength), endLocation);
+                        pathBuilder.EndFigure(CanvasFigureLoop.Open);
+                        using (var geo = CanvasGeometry.CreatePath(pathBuilder))
+                        {
+                            var style = new CanvasStrokeStyle
+                            {
+                                TransformBehavior = CanvasStrokeTransformBehavior.Fixed
+                            };
+                            session.DrawGeometry(geo, color, thickness, style);
+                        }
+                    }
+                }
+            }
+
+            var xAxisMajor = Gridlines[(int)GridlineName.MajorVertical].GetValues(page, graphBodyDrawArea, MinimumYValue, MaximumYValue, IsY1AxisInverted);
+            drawArea = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Bottom, graphBodyDrawArea.Width, XAxisLabelHeightDIP);
+            color = Gridlines[(int)GridlineName.MajorVertical].Color;
+            thickness = Gridlines[(int)GridlineName.MajorVertical].Thickness;
+            //session.DrawRectangle(drawArea, Colors.Green);
+            using (var format = new CanvasTextFormat())
+            {
+                format.HorizontalAlignment = CanvasHorizontalAlignment.Left;
+                format.WordWrapping = CanvasWordWrapping.WholeWord;
+                format.FontSize = XAxisLabelFontSize;
+                format.FontFamily = "Arial";
+                format.FontWeight = FontWeights.Thin;
+                format.FontStyle = FontStyle.Normal;
+                foreach (var (value, location) in xAxisMajor)
+                {
+                    var endLocation = location;
+                    var label = value.ToString(XAxisLabelFormat);
+                    using (var layout = new CanvasTextLayout(session, label, format, 0, 0))
+                    {
+                        var layoutWidth = (float)Math.Round(layout.LayoutBounds.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
+                        var finalLocation = location - layoutWidth;
+                        if (finalLocation < drawArea.Left)
+                        {
+                            endLocation = (float)drawArea.Left + layoutWidth;
+                            finalLocation = (float)drawArea.Left;
+                        }
+                        else if (finalLocation + (2 * layoutWidth) > drawArea.Right)
+                        {
+                            endLocation = (float)drawArea.Right - layoutWidth;
+                            finalLocation = (float)Math.Round(drawArea.Right - (2 * layoutWidth), GraphicalReport.DIGITS_TO_ROUND);
+                        }
+                        var translate = Matrix3x2.CreateTranslation(finalLocation, (float)(drawArea.Top + XAxisLabelTickLength));
+                        using (var geo = CanvasGeometry.CreateText(layout))
+                        {
+                            using (var translatedGeo = geo.Transform(translate))
+                            {
+                                session.FillGeometry(translatedGeo, Colors.Black);
+                            }
+                        }
+                    }
+
+                    using (var pathBuilder = new CanvasPathBuilder(session))
+                    {
+                        pathBuilder.BeginFigure(location, (float)drawArea.Top);
+                        pathBuilder.AddLine(endLocation, (float)(drawArea.Top + XAxisLabelTickLength));
+                        pathBuilder.EndFigure(CanvasFigureLoop.Open);
+                        using (var geo = CanvasGeometry.CreatePath(pathBuilder))
+                        {
+                            var style = new CanvasStrokeStyle
+                            {
+                                TransformBehavior = CanvasStrokeTransformBehavior.Fixed
+                            };
+                            session.DrawGeometry(geo, color, thickness, style);
+                        }
+                    }
+                }
+            }
         }
 
-        private void DrawAxisTitles(PageInformation page, CanvasDrawingSession session, Rect graphBodyDrawArea)
+        private void DrawAxisTitles(CanvasDrawingSession session, Rect graphBodyDrawArea)
         {
             if (XAxisTitleHeight != 0 && !string.IsNullOrWhiteSpace(XAxisTitle))
             {
                 var xAxisDrawArea = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Bottom + XAxisLabelHeightDIP, graphBodyDrawArea.Width, XAxisTitleHeightDIP);
-                DrawAxisTitle(XAxisTitle, session, xAxisDrawArea, 20f, 0);
+                DrawAxisTitle(XAxisTitle, session, xAxisDrawArea, XAxisTitleFontSize, 0);
+                //session.DrawRectangle(xAxisDrawArea, Colors.Orange);
             }
-            if(Y1AxisTitleWidth != 0 && !string.IsNullOrWhiteSpace(Y1AxisTitle))
+            if (Y1AxisTitleWidth != 0 && !string.IsNullOrWhiteSpace(Y1AxisTitle))
             {
                 var y1AxisDrawArea = new Rect(graphBodyDrawArea.X - Y1AxisLabelWidthDIP - Y1AxisTitleWidthDIP, graphBodyDrawArea.Y, Y1AxisTitleWidthDIP, graphBodyDrawArea.Height);
-                DrawAxisTitle(Y1AxisTitle, session, y1AxisDrawArea, 20f, 90);
+                DrawAxisTitle(Y1AxisTitle, session, y1AxisDrawArea, Y1AxisTitleFontSize, 90);
+                //session.DrawRectangle(y1AxisDrawArea, Colors.Orange);
             }
         }
 
@@ -211,7 +421,6 @@ namespace AccurateReportSystem
                 format.FontStyle = FontStyle.Normal;
                 using (var layout = new CanvasTextLayout(session, title, format, width, height))
                 {
-
                     using (var geometry = CanvasGeometry.CreateText(layout))
                     {
                         var bounds = layout.LayoutBounds;
@@ -226,7 +435,6 @@ namespace AccurateReportSystem
                             session.FillGeometry(rotatedGeo, Colors.Black);
                         }
                     }
-
                 }
             }
         }

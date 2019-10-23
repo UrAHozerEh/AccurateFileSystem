@@ -13,5 +13,6 @@ namespace AccurateReportSystem
         public double Width => EndFootage - StartFootage;
         public int PageNumber { get; set; }
         public int TotalPages { get; set; }
+        public double Overlap { get; set; }
     }
 }

@@ -10,10 +10,15 @@ using Windows.UI;
 
 namespace AccurateReportSystem
 {
-    public class GeometryInfo
+    public class GeometryInfo : IDisposable
     {
         public CanvasGeometry Geometry { get; set; }
         public Color Color { get; set; }
+
+        public void Dispose()
+        {
+            Geometry.Dispose();
+        }
 
         public ICanvasBrush GetCanvasBrush(ICanvasResourceCreator creator)
         {
