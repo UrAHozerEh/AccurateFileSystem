@@ -18,5 +18,7 @@ namespace AccurateReportSystem
         public abstract void Draw(PageInformation pageInformation, CanvasDrawingSession session, Rect drawArea);
 
         //TODO: Add function to get requested container size. probably return double.maxvalue for things that want as much space as possible (graph)
+        public abstract double GetRequestedWidth();
+        public abstract double GetRequestedHeight();
     }
 }

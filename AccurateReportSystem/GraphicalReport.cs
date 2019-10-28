@@ -19,13 +19,18 @@ namespace AccurateReportSystem
         public PageSetup PageSetup { get; set; } = new PageSetup();
         public Container Container { get; set; }
         public ReportMarginInfo MarginInfo { get; set; } = new ReportMarginInfo();
-        public static int DEFAULT_DPI = 96;
+        public static int DEFAULT_DIP = 96;
         public static int DIGITS_TO_ROUND = 2;
 
         public List<CanvasRenderTarget> GetImages(double startFootage, double endFootage, double overlap = 100, float dpi = 150)
         {
-            var pageArea = new Rect(0, 0, DEFAULT_DPI * 11, DEFAULT_DPI * 8.5);
-            var drawArea = new Rect(MarginInfo.Left * DEFAULT_DPI, MarginInfo.Top * DEFAULT_DPI, (11 - MarginInfo.MarginWidth) * DEFAULT_DPI, (8.5 - MarginInfo.MarginHeight) * DEFAULT_DPI);
+            var pageAreaWidth = Math.Round(DEFAULT_DIP * 11.0, DIGITS_TO_ROUND);
+            var pageAreaHeight = Math.Round(DEFAULT_DIP * 8.5, DIGITS_TO_ROUND);
+            var pageArea = new Rect(0, 0, pageAreaWidth, pageAreaHeight);
+
+
+            var drawArea = new Rect(MarginInfo.LeftDip, MarginInfo.TopDip, pageAreaWidth - MarginInfo.MarginWidthDip, pageAreaHeight - MarginInfo.MarginHeightDip);
+
             var totalFootage = endFootage - startFootage;
             var pages = PageSetup.GetAllPages(startFootage, totalFootage, overlap);
             CanvasDevice device = CanvasDevice.GetSharedDevice();
@@ -49,11 +54,17 @@ namespace AccurateReportSystem
     public class ReportMarginInfo
     {
         public double Top { get; set; }
+        public double TopDip => Math.Round(Top * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public double Left { get; set; }
+        public double LeftDip => Math.Round(Left * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public double Right { get; set; }
+        public double RightDip => Math.Round(Right * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public double Bottom { get; set; }
+        public double BottomDip => Math.Round(Bottom * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public double MarginWidth => Left + Right;
+        public double MarginWidthDip => Math.Round(MarginWidth * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public double MarginHeight => Top + Bottom;
+        public double MarginHeightDip => Math.Round(MarginHeight * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
 
         public ReportMarginInfo()
         {

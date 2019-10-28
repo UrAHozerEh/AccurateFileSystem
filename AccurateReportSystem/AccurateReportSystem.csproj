@@ -127,7 +127,7 @@
     <Compile Include="GraphicalReport.cs" />
     <Compile Include="GraphSeries.cs" />
     <Compile Include="GridlineInfo.cs" />
-    <Compile Include="NewSplitContainer.cs" />
+    <Compile Include="SplitContainer.cs" />
     <Compile Include="PageInformation.cs" />
     <Compile Include="PageSetup.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

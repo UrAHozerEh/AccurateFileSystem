@@ -28,9 +28,9 @@ namespace AccurateReportSystem
         public CommentSeries CommentSeries { get; set; }
         public GridlineInfo[] Gridlines { get; set; }
         public double LegendWidth { get; set; } = 1.5;
-        public double LegendWidthDIP => Math.Round(LegendWidth * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
+        public double LegendWidthDIP => Math.Round(LegendWidth * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public double Y1AxisLabelWidth { get; set; } = 0.25;
-        public double Y1AxisLabelWidthDIP => Math.Round(Y1AxisLabelWidth * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
+        public double Y1AxisLabelWidthDIP => Math.Round(Y1AxisLabelWidth * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public double Y1AxisLabelTickLength { get; set; } = 5;
         public float Y1AxisLabelFontSize { get; set; } = 8f;
         public string Y1AxisLabelFormat { get; set; } = "F2";
@@ -38,12 +38,12 @@ namespace AccurateReportSystem
         public string Y1AxisTitle { get; set; } = "Volts";
         public float Y1AxisTitleFontSize { get; set; } = 16f;
         public double Y2AxisLabelWidth { get; set; } = 0;
-        public double Y2AxisLabelWidthDIP => Math.Round(Y2AxisLabelWidth * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
+        public double Y2AxisLabelWidthDIP => Math.Round(Y2AxisLabelWidth * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public double Y2AxisTitleWidth { get; set; } = 0;
-        public double Y2AxisTitleWidthDIP => Math.Round(Y2AxisTitleWidth * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
+        public double Y2AxisTitleWidthDIP => Math.Round(Y2AxisTitleWidth * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public string Y2AxisTitle { get; set; } = "";
         public double XAxisLabelHeight { get; set; } = 0.25;
-        public double XAxisLabelHeightDIP => Math.Round(XAxisLabelHeight * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
+        public double XAxisLabelHeightDIP => Math.Round(XAxisLabelHeight * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public double XAxisLabelTickLength { get; set; } = 5;
         public float XAxisLabelFontSize { get; set; } = 8f;
         public string XAxisLabelFormat { get; set; } = "F0";
@@ -317,58 +317,62 @@ namespace AccurateReportSystem
             }
 
             var xAxisMajor = Gridlines[(int)GridlineName.MajorVertical].GetValues(page, graphBodyDrawArea, MinimumYValue, MaximumYValue, IsY1AxisInverted);
-            drawArea = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Bottom, graphBodyDrawArea.Width, XAxisLabelHeightDIP);
-            color = Gridlines[(int)GridlineName.MajorVertical].Color;
-            thickness = Gridlines[(int)GridlineName.MajorVertical].Thickness;
-            //session.DrawRectangle(drawArea, Colors.Green);
-            using (var format = new CanvasTextFormat())
+
+            if (XAxisLabelHeight != 0)
             {
-                format.HorizontalAlignment = CanvasHorizontalAlignment.Left;
-                format.WordWrapping = CanvasWordWrapping.WholeWord;
-                format.FontSize = XAxisLabelFontSize;
-                format.FontFamily = "Arial";
-                format.FontWeight = FontWeights.Thin;
-                format.FontStyle = FontStyle.Normal;
-                foreach (var (value, location) in xAxisMajor)
+                drawArea = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Bottom, graphBodyDrawArea.Width, XAxisLabelHeightDIP);
+                color = Gridlines[(int)GridlineName.MajorVertical].Color;
+                thickness = Gridlines[(int)GridlineName.MajorVertical].Thickness;
+                //session.DrawRectangle(drawArea, Colors.Green);
+                using (var format = new CanvasTextFormat())
                 {
-                    var endLocation = location;
-                    var label = value.ToString(XAxisLabelFormat);
-                    using (var layout = new CanvasTextLayout(session, label, format, 0, 0))
+                    format.HorizontalAlignment = CanvasHorizontalAlignment.Left;
+                    format.WordWrapping = CanvasWordWrapping.WholeWord;
+                    format.FontSize = XAxisLabelFontSize;
+                    format.FontFamily = "Arial";
+                    format.FontWeight = FontWeights.Thin;
+                    format.FontStyle = FontStyle.Normal;
+                    foreach (var (value, location) in xAxisMajor)
                     {
-                        var layoutWidth = (float)Math.Round(layout.LayoutBounds.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
-                        var finalLocation = location - layoutWidth;
-                        if (finalLocation < drawArea.Left)
+                        var endLocation = location;
+                        var label = value.ToString(XAxisLabelFormat);
+                        using (var layout = new CanvasTextLayout(session, label, format, 0, 0))
                         {
-                            endLocation = (float)drawArea.Left + layoutWidth;
-                            finalLocation = (float)drawArea.Left;
-                        }
-                        else if (finalLocation + (2 * layoutWidth) > drawArea.Right)
-                        {
-                            endLocation = (float)drawArea.Right - layoutWidth;
-                            finalLocation = (float)Math.Round(drawArea.Right - (2 * layoutWidth), GraphicalReport.DIGITS_TO_ROUND);
-                        }
-                        var translate = Matrix3x2.CreateTranslation(finalLocation, (float)(drawArea.Top + XAxisLabelTickLength));
-                        using (var geo = CanvasGeometry.CreateText(layout))
-                        {
-                            using (var translatedGeo = geo.Transform(translate))
+                            var layoutWidth = (float)Math.Round(layout.LayoutBounds.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
+                            var finalLocation = location - layoutWidth;
+                            if (finalLocation < drawArea.Left)
                             {
-                                session.FillGeometry(translatedGeo, Colors.Black);
+                                endLocation = (float)drawArea.Left + layoutWidth;
+                                finalLocation = (float)drawArea.Left;
+                            }
+                            else if (finalLocation + (2 * layoutWidth) > drawArea.Right)
+                            {
+                                endLocation = (float)drawArea.Right - layoutWidth;
+                                finalLocation = (float)Math.Round(drawArea.Right - (2 * layoutWidth), GraphicalReport.DIGITS_TO_ROUND);
+                            }
+                            var translate = Matrix3x2.CreateTranslation(finalLocation, (float)(drawArea.Top + XAxisLabelTickLength));
+                            using (var geo = CanvasGeometry.CreateText(layout))
+                            {
+                                using (var translatedGeo = geo.Transform(translate))
+                                {
+                                    session.FillGeometry(translatedGeo, Colors.Black);
+                                }
                             }
                         }
-                    }
 
-                    using (var pathBuilder = new CanvasPathBuilder(session))
-                    {
-                        pathBuilder.BeginFigure(location, (float)drawArea.Top);
-                        pathBuilder.AddLine(endLocation, (float)(drawArea.Top + XAxisLabelTickLength));
-                        pathBuilder.EndFigure(CanvasFigureLoop.Open);
-                        using (var geo = CanvasGeometry.CreatePath(pathBuilder))
+                        using (var pathBuilder = new CanvasPathBuilder(session))
                         {
-                            var style = new CanvasStrokeStyle
+                            pathBuilder.BeginFigure(location, (float)drawArea.Top);
+                            pathBuilder.AddLine(endLocation, (float)(drawArea.Top + XAxisLabelTickLength));
+                            pathBuilder.EndFigure(CanvasFigureLoop.Open);
+                            using (var geo = CanvasGeometry.CreatePath(pathBuilder))
                             {
-                                TransformBehavior = CanvasStrokeTransformBehavior.Fixed
-                            };
-                            session.DrawGeometry(geo, color, thickness, style);
+                                var style = new CanvasStrokeStyle
+                                {
+                                    TransformBehavior = CanvasStrokeTransformBehavior.Fixed
+                                };
+                                session.DrawGeometry(geo, color, thickness, style);
+                            }
                         }
                     }
                 }
@@ -433,6 +437,16 @@ namespace AccurateReportSystem
                     }
                 }
             }
+        }
+
+        public override double GetRequestedWidth()
+        {
+            return double.MaxValue;
+        }
+
+        public override double GetRequestedHeight()
+        {
+            return double.MaxValue;
         }
     }
 
