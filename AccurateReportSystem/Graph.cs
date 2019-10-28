@@ -35,8 +35,6 @@ namespace AccurateReportSystem
         public float Y1AxisLabelFontSize { get; set; } = 8f;
         public string Y1AxisLabelFormat { get; set; } = "F2";
         public bool IsY1AxisInverted { get; set; } = true;
-        public double Y1AxisTitleWidth { get; set; } = 0.25;
-        public double Y1AxisTitleWidthDIP => Math.Round(Y1AxisTitleWidth * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
         public string Y1AxisTitle { get; set; } = "Volts";
         public float Y1AxisTitleFontSize { get; set; } = 16f;
         public double Y2AxisLabelWidth { get; set; } = 0;
@@ -49,14 +47,12 @@ namespace AccurateReportSystem
         public double XAxisLabelTickLength { get; set; } = 5;
         public float XAxisLabelFontSize { get; set; } = 8f;
         public string XAxisLabelFormat { get; set; } = "F0";
-        public double XAxisTitleHeight { get; set; } = 0.25;
-        public double XAxisTitleHeightDIP => Math.Round(XAxisTitleHeight * GraphicalReport.DEFAULT_DPI, GraphicalReport.DIGITS_TO_ROUND);
         public string XAxisTitle { get; set; } = "Footage";
         public float XAxisTitleFontSize { get; set; } = 16f;
-        private double TotalXValueShift => LegendWidthDIP + Y1AxisLabelWidthDIP + Y1AxisTitleWidthDIP;
+        private double TotalXValueShift => LegendWidthDIP + Y1AxisLabelWidthDIP + Y1AxisTitleFontSize;
         private double TotalWidthShift => TotalXValueShift + Y2AxisLabelWidthDIP + Y2AxisTitleWidthDIP;
         private double TotalYValueShift => 0;
-        private double TotalHeightShift => XAxisLabelHeightDIP + XAxisTitleHeightDIP;
+        private double TotalHeightShift => XAxisLabelHeightDIP + XAxisTitleFontSize;
         public string LegendName { get; set; } = "CIS Data";
         public float LegendNameFontSize { get; set; } = 18f;
         public Color LegendNameColor { get; set; } = Colors.Black;
@@ -381,15 +377,15 @@ namespace AccurateReportSystem
 
         private void DrawAxisTitles(CanvasDrawingSession session, Rect graphBodyDrawArea)
         {
-            if (XAxisTitleHeight != 0 && !string.IsNullOrWhiteSpace(XAxisTitle))
+            if (XAxisTitleFontSize != 0 && !string.IsNullOrWhiteSpace(XAxisTitle))
             {
-                var xAxisDrawArea = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Bottom + XAxisLabelHeightDIP, graphBodyDrawArea.Width, XAxisTitleHeightDIP);
+                var xAxisDrawArea = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Bottom + XAxisLabelHeightDIP, graphBodyDrawArea.Width, XAxisTitleFontSize);
                 DrawAxisTitle(XAxisTitle, session, xAxisDrawArea, XAxisTitleFontSize, 0);
                 //session.DrawRectangle(xAxisDrawArea, Colors.Orange);
             }
-            if (Y1AxisTitleWidth != 0 && !string.IsNullOrWhiteSpace(Y1AxisTitle))
+            if (Y1AxisTitleFontSize != 0 && !string.IsNullOrWhiteSpace(Y1AxisTitle))
             {
-                var y1AxisDrawArea = new Rect(graphBodyDrawArea.X - Y1AxisLabelWidthDIP - Y1AxisTitleWidthDIP, graphBodyDrawArea.Y, Y1AxisTitleWidthDIP, graphBodyDrawArea.Height);
+                var y1AxisDrawArea = new Rect(graphBodyDrawArea.X - Y1AxisLabelWidthDIP - Y1AxisTitleFontSize, graphBodyDrawArea.Y, Y1AxisTitleFontSize, graphBodyDrawArea.Height);
                 DrawAxisTitle(Y1AxisTitle, session, y1AxisDrawArea, Y1AxisTitleFontSize, 90);
                 //session.DrawRectangle(y1AxisDrawArea, Colors.Orange);
             }

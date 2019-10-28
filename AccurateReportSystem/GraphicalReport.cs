@@ -22,17 +22,17 @@ namespace AccurateReportSystem
         public static int DEFAULT_DPI = 96;
         public static int DIGITS_TO_ROUND = 2;
 
-        public List<CanvasRenderTarget> GetImages(double startFootage, double endFootage)
+        public List<CanvasRenderTarget> GetImages(double startFootage, double endFootage, double overlap = 100, float dpi = 150)
         {
             var pageArea = new Rect(0, 0, DEFAULT_DPI * 11, DEFAULT_DPI * 8.5);
             var drawArea = new Rect(MarginInfo.Left * DEFAULT_DPI, MarginInfo.Top * DEFAULT_DPI, (11 - MarginInfo.MarginWidth) * DEFAULT_DPI, (8.5 - MarginInfo.MarginHeight) * DEFAULT_DPI);
             var totalFootage = endFootage - startFootage;
-            var pages = PageSetup.GetAllPages(startFootage, totalFootage, 100);
+            var pages = PageSetup.GetAllPages(startFootage, totalFootage, overlap);
             CanvasDevice device = CanvasDevice.GetSharedDevice();
             var list = new List<CanvasRenderTarget>();
             foreach (var page in pages)
             {
-                CanvasRenderTarget offscreen = new CanvasRenderTarget(device, (float)pageArea.Width, (float)pageArea.Height, 150);
+                CanvasRenderTarget offscreen = new CanvasRenderTarget(device, (float)pageArea.Width, (float)pageArea.Height, dpi);
                 using (CanvasDrawingSession session = offscreen.CreateDrawingSession())
                 {
                     session.Clear(Colors.White);
