@@ -60,7 +60,7 @@ namespace AccurateReportSystem
         public string LegendName { get; set; } = "CIS Data";
         public float LegendNameFontSize { get; set; } = 18f;
         public Color LegendNameColor { get; set; } = Colors.Black;
-        public float LegendSeriesNameFontSize { get; set; } = 14f;
+        public float LegendSeriesNameFontSize { get; set; } = 12f;
         public Color LegendSeriesNameColor { get; set; } = Colors.Black;
         public double LegendSeriesLineLength { get; set; } = 50;
         public CanvasVerticalAlignment LegendNameVerticalAlignment { get; set; } = CanvasVerticalAlignment.Center;
