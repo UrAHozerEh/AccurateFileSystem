@@ -62,8 +62,9 @@ namespace AFSTester
                 {
                     var allegroFile = newFile as AllegroCISFile;
                     var report = new GraphicalReport();
-                    var graph1 = new Graph();
-                    var graph2 = new Graph();
+                    var graph1 = new Graph(report);
+                    var graph2 = new Graph(report);
+                    var graph3 = new Graph(report);
                     var on = new GraphSeries("On", allegroFile.GetDoubleData("On"))
                     {
                         LineColor = Colors.Green
@@ -73,16 +74,26 @@ namespace AFSTester
                         LineColor = Colors.Blue
                     };
                     var commentSeries = new CommentSeries { Values = allegroFile.GetStringData("Comment") };
-                    graph1.CommentSeries = commentSeries;
-                    graph2.CommentSeries = commentSeries;
-                    graph1.Series.Add(on);
-                    graph2.Series.Add(off);
 
-                    //graph1.XAxisLabelHeight = 0;
-                    //graph1.XAxisTitleFontSize = 0f;
+                    graph1.CommentSeries = commentSeries;
+                    graph1.Series.Add(on);
+                    graph1.Series.Add(off);
+
+                    graph2.Series.Add(on);
+
+                    graph3.Series.Add(off);
+
+                    //graph1.XAxisInfo.IsEnabled = false;
+                    //graph2.XAxisInfo.IsEnabled = false;
+
                     var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
-                    splitContainer.AddContainer(graph1);
+                    var graph1Measurement = new SplitContainerMeasurement(graph1)
+                    {
+                        RequestedPercent = 0.5
+                    };
+                    splitContainer.AddContainer(graph1Measurement);
                     splitContainer.AddContainer(graph2);
+                    splitContainer.AddContainer(graph3);
                     report.Container = splitContainer;
                     var images = report.GetImages(allegroFile.StartFootage, allegroFile.EndFootage);
                     for (int i = 0; i < images.Count; ++i)

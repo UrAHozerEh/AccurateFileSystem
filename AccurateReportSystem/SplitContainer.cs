@@ -26,6 +26,7 @@ namespace AccurateReportSystem
             //TODO: Containers should probably have a "calculate" that is done once per session so I dont need to do all this each page.
             var size = IsHorizontal ? drawArea.Width : drawArea.Height;
             double requestedTotalPercent = 1;
+            double countPercent = 0;
             double countRemainderPercent = 0;
             int remainderCount = 0;
 
@@ -41,7 +42,11 @@ namespace AccurateReportSystem
                     {
                         requestedTotalPercent -= Math.Round(measure.RequestedPercent.Value, GraphicalReport.DIGITS_TO_ROUND);
                     }
-                    ++countRemainderPercent;
+                    else
+                    {
+                        ++countRemainderPercent;
+                    }
+                    ++countPercent;
                 }
             }
             var remainderPercentPer = requestedTotalPercent / countRemainderPercent;
@@ -59,14 +64,14 @@ namespace AccurateReportSystem
                 else
                 {
                     ++remainderCount;
-                    if (remainderCount == countRemainderPercent)
+                    if (remainderCount == countPercent)
                     {
                         curSize = remainingSize;
                     }
                     else
                     {
                         double percent = measure.IsPercentSpecified ? measure.RequestedPercent.Value : remainderPercentPer;
-                        curSize = Math.Round(percent * remainingSize, GraphicalReport.DIGITS_TO_ROUND);
+                        curSize = Math.Round(percent * size, GraphicalReport.DIGITS_TO_ROUND);
                         remainingSize -= curSize;
                     }
                 }

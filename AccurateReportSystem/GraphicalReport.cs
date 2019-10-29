@@ -19,6 +19,8 @@ namespace AccurateReportSystem
         public PageSetup PageSetup { get; set; } = new PageSetup();
         public Container Container { get; set; }
         public ReportMarginInfo MarginInfo { get; set; } = new ReportMarginInfo();
+        public XAxisInfo XAxisInfo { get; set; } = new XAxisInfo();
+
         public static int DEFAULT_DIP = 96;
         public static int DIGITS_TO_ROUND = 2;
 
