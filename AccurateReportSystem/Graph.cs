@@ -27,8 +27,7 @@ namespace AccurateReportSystem
         private List<GeometryInfo> Geometries;
         public CommentSeries CommentSeries { get; set; }
         public GridlineInfo[] Gridlines { get; set; }
-        public double LegendWidth { get; set; } = 1.5;
-        public double LegendWidthDIP => Math.Round(LegendWidth * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
+        
         public double Y1AxisLabelWidth { get; set; } = 0.25;
         public double Y1AxisLabelWidthDIP => Math.Round(Y1AxisLabelWidth * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public double Y1AxisLabelTickLength { get; set; } = 5;
@@ -43,7 +42,8 @@ namespace AccurateReportSystem
         public double Y2AxisTitleWidthDIP => Math.Round(Y2AxisTitleWidth * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public string Y2AxisTitle { get; set; } = "";
         public XAxisInfo XAxisInfo { get; set; }
-        private double TotalXValueShift => LegendWidthDIP + Y1AxisLabelWidthDIP + Y1AxisTitleFontSize;
+        public LegendInfo LegendInfo { get; set; }
+        private double TotalXValueShift => LegendInfo.LegendWidthDIP + Y1AxisLabelWidthDIP + Y1AxisTitleFontSize;
         private double TotalWidthShift => TotalXValueShift + Y2AxisLabelWidthDIP + Y2AxisTitleWidthDIP;
         private double TotalYValueShift => 0;
         
@@ -52,6 +52,8 @@ namespace AccurateReportSystem
         public Graph(GraphicalReport report)
         {
             XAxisInfo = new XAxisInfo(report.XAxisInfo);
+            LegendInfo = new LegendInfo(report.LegendInfo);
+
             Gridlines = new GridlineInfo[4];
             Gridlines[(int)GridlineName.MinorHorizontal] = new GridlineInfo(0.1, Colors.LightGray);
             Gridlines[(int)GridlineName.MajorHorizontal] = new GridlineInfo(0.5, Colors.Gray)
@@ -152,7 +154,7 @@ namespace AccurateReportSystem
             DrawAxisLabels(page, session, graphBodyDrawArea);
             DrawAxisTitles(session, graphBodyDrawArea);
             DrawOverlapShadow(page, session, graphBodyDrawArea);
-            var legendDrawArea = new Rect(DrawArea.X, DrawArea.Y, LegendWidthDIP, graphBodyDrawArea.Height);
+            var legendDrawArea = new Rect(DrawArea.X, DrawArea.Y, LegendInfo.LegendWidthDIP, graphBodyDrawArea.Height);
             DrawLegend(legendDrawArea, session);
         }
 
@@ -191,31 +193,31 @@ namespace AccurateReportSystem
         private void DrawLegend(Rect legendDrawArea, CanvasDrawingSession session)
         {
             //session.DrawRectangle(legendDrawArea, Colors.Orange);
-            var height = LegendNameFontSize + LegendSeriesNameFontSize * Series.Count;
+            var height = LegendInfo.LegendNameFontSize + LegendInfo.LegendSeriesNameFontSize * Series.Count;
             var exampleRect = new Rect(legendDrawArea.X, legendDrawArea.Y, legendDrawArea.Width, height);
             //session.DrawRectangle(exampleRect, Colors.Orange);
 
 
             var nextHeight = 0f;
-            if (LegendNameVerticalAlignment == CanvasVerticalAlignment.Center)
+            if (LegendInfo.LegendNameVerticalAlignment == CanvasVerticalAlignment.Center)
                 nextHeight = (float)Math.Round(legendDrawArea.Height / 2 - height / 2, GraphicalReport.DIGITS_TO_ROUND);
-            else if (LegendNameVerticalAlignment == CanvasVerticalAlignment.Bottom)
+            else if (LegendInfo.LegendNameVerticalAlignment == CanvasVerticalAlignment.Bottom)
                 nextHeight = (float)(legendDrawArea.Bottom - height);
             using (var format = new CanvasTextFormat())
             {
-                format.HorizontalAlignment = LegendNameHorizontalAlignment;
-                format.FontSize = LegendNameFontSize;
+                format.HorizontalAlignment = LegendInfo.LegendNameHorizontalAlignment;
+                format.FontSize = LegendInfo.LegendNameFontSize;
                 format.FontFamily = "Arial";
                 format.FontWeight = FontWeights.Bold;
                 format.FontStyle = FontStyle.Normal;
-                using (var layout = new CanvasTextLayout(session, LegendName, format, (float)legendDrawArea.Width, 0))
+                using (var layout = new CanvasTextLayout(session, LegendInfo.Name, format, (float)legendDrawArea.Width, 0))
                 {
                     //var translateX = (float)Math.Round(legendDrawArea.X, GraphicalReport.DIGITS_TO_ROUND);
                     //var translateY = (float)Math.Round(legendDrawArea.Y, GraphicalReport.DIGITS_TO_ROUND);
                     //var translate = Matrix3x2.CreateTranslation(translateX, translateY);
                     using (var geo = CanvasGeometry.CreateText(layout))
                     {
-                        session.FillGeometry(geo, (float)legendDrawArea.X, (float)legendDrawArea.Y + nextHeight, LegendNameColor);
+                        session.FillGeometry(geo, (float)legendDrawArea.X, (float)legendDrawArea.Y + nextHeight, LegendInfo.LegendNameColor);
                     }
                     nextHeight += LegendNameFontSize;
                 }
