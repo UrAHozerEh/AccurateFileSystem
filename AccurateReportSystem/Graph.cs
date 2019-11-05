@@ -28,22 +28,10 @@ namespace AccurateReportSystem
         public CommentSeries CommentSeries { get; set; }
         public GridlineInfo[] Gridlines { get; set; }
         
-        public double Y1AxisLabelWidth { get; set; } = 0.25;
-        public double Y1AxisLabelWidthDIP => Math.Round(Y1AxisLabelWidth * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
-        public double Y1AxisLabelTickLength { get; set; } = 5;
-        public float Y1AxisLabelFontSize { get; set; } = 8f;
-        public string Y1AxisLabelFormat { get; set; } = "F2";
-        public bool IsY1AxisInverted { get; set; } = true;
-        public string Y1AxisTitle { get; set; } = "Volts";
-        public float Y1AxisTitleFontSize { get; set; } = 16f;
-        public double Y2AxisLabelWidth { get; set; } = 0;
-        public double Y2AxisLabelWidthDIP => Math.Round(Y2AxisLabelWidth * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
-        public double Y2AxisTitleWidth { get; set; } = 0;
-        public double Y2AxisTitleWidthDIP => Math.Round(Y2AxisTitleWidth * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
-        public string Y2AxisTitle { get; set; } = "";
+        
         public XAxisInfo XAxisInfo { get; set; }
         public LegendInfo LegendInfo { get; set; }
-        private double TotalXValueShift => LegendInfo.LegendWidthDIP + Y1AxisLabelWidthDIP + Y1AxisTitleFontSize;
+        private double TotalXValueShift => LegendInfo.WidthDIP + Y1AxisLabelWidthDIP + Y1AxisTitleFontSize;
         private double TotalWidthShift => TotalXValueShift + Y2AxisLabelWidthDIP + Y2AxisTitleWidthDIP;
         private double TotalYValueShift => 0;
         
@@ -52,7 +40,7 @@ namespace AccurateReportSystem
         public Graph(GraphicalReport report)
         {
             XAxisInfo = new XAxisInfo(report.XAxisInfo);
-            LegendInfo = new LegendInfo(report.LegendInfo);
+            LegendInfo = new LegendInfo(report.LegendInfo, "CIS Data");
 
             Gridlines = new GridlineInfo[4];
             Gridlines[(int)GridlineName.MinorHorizontal] = new GridlineInfo(0.1, Colors.LightGray);
@@ -154,7 +142,7 @@ namespace AccurateReportSystem
             DrawAxisLabels(page, session, graphBodyDrawArea);
             DrawAxisTitles(session, graphBodyDrawArea);
             DrawOverlapShadow(page, session, graphBodyDrawArea);
-            var legendDrawArea = new Rect(DrawArea.X, DrawArea.Y, LegendInfo.LegendWidthDIP, graphBodyDrawArea.Height);
+            var legendDrawArea = new Rect(DrawArea.X, DrawArea.Y, LegendInfo.WidthDIP, graphBodyDrawArea.Height);
             DrawLegend(legendDrawArea, session);
         }
 
@@ -193,20 +181,20 @@ namespace AccurateReportSystem
         private void DrawLegend(Rect legendDrawArea, CanvasDrawingSession session)
         {
             //session.DrawRectangle(legendDrawArea, Colors.Orange);
-            var height = LegendInfo.LegendNameFontSize + LegendInfo.LegendSeriesNameFontSize * Series.Count;
+            var height = LegendInfo.NameFontSize + LegendInfo.SeriesNameFontSize * Series.Count;
             var exampleRect = new Rect(legendDrawArea.X, legendDrawArea.Y, legendDrawArea.Width, height);
             //session.DrawRectangle(exampleRect, Colors.Orange);
 
 
             var nextHeight = 0f;
-            if (LegendInfo.LegendNameVerticalAlignment == CanvasVerticalAlignment.Center)
+            if (LegendInfo.VerticalAlignment == CanvasVerticalAlignment.Center)
                 nextHeight = (float)Math.Round(legendDrawArea.Height / 2 - height / 2, GraphicalReport.DIGITS_TO_ROUND);
-            else if (LegendInfo.LegendNameVerticalAlignment == CanvasVerticalAlignment.Bottom)
+            else if (LegendInfo.VerticalAlignment == CanvasVerticalAlignment.Bottom)
                 nextHeight = (float)(legendDrawArea.Bottom - height);
             using (var format = new CanvasTextFormat())
             {
-                format.HorizontalAlignment = LegendInfo.LegendNameHorizontalAlignment;
-                format.FontSize = LegendInfo.LegendNameFontSize;
+                format.HorizontalAlignment = LegendInfo.HorizontalAlignment;
+                format.FontSize = LegendInfo.NameFontSize;
                 format.FontFamily = "Arial";
                 format.FontWeight = FontWeights.Bold;
                 format.FontStyle = FontStyle.Normal;
@@ -217,15 +205,15 @@ namespace AccurateReportSystem
                     //var translate = Matrix3x2.CreateTranslation(translateX, translateY);
                     using (var geo = CanvasGeometry.CreateText(layout))
                     {
-                        session.FillGeometry(geo, (float)legendDrawArea.X, (float)legendDrawArea.Y + nextHeight, LegendInfo.LegendNameColor);
+                        session.FillGeometry(geo, (float)legendDrawArea.X, (float)legendDrawArea.Y + nextHeight, LegendInfo.NameColor);
                     }
-                    nextHeight += LegendNameFontSize;
+                    nextHeight += LegendInfo.NameFontSize;
                 }
             }
             using (var format = new CanvasTextFormat())
             {
-                format.HorizontalAlignment = LegendNameHorizontalAlignment;
-                format.FontSize = LegendSeriesNameFontSize;
+                format.HorizontalAlignment = LegendInfo.HorizontalAlignment;
+                format.FontSize = LegendInfo.SeriesNameFontSize;
                 format.FontFamily = "Arial";
                 format.FontWeight = FontWeights.Bold;
                 format.FontStyle = FontStyle.Normal;
@@ -240,7 +228,7 @@ namespace AccurateReportSystem
                         {
                             session.FillGeometry(geo, (float)legendDrawArea.X, (float)legendDrawArea.Y + nextHeight, series.LineColor);
                         }
-                        nextHeight += LegendSeriesNameFontSize;
+                        nextHeight += LegendInfo.SeriesNameFontSize;
                     }
                 }
             }

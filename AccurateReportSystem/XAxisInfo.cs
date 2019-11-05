@@ -86,8 +86,8 @@ namespace AccurateReportSystem
         }
         private float? titleFontSize = null;
         public double TotalHeight => LabelHeightDIP + TitleTotalHeight;
-        public double TitleTotalHeight => TitleFontSize + ExtraTitleHeight;
-        public double ExtraTitleHeight
+        public float TitleTotalHeight => TitleFontSize + ExtraTitleHeight;
+        public float ExtraTitleHeight
         {
             get
             {
@@ -101,7 +101,7 @@ namespace AccurateReportSystem
                     extraTitleHeight = value;
             }
         }
-        private double? extraTitleHeight = null;
+        private float? extraTitleHeight = null;
         public bool IsEnabled
         {
             get
@@ -150,7 +150,7 @@ namespace AccurateReportSystem
             Title = "Footage";
             TitleFontSize = 10f;
             IsEnabled = true;
-            ExtraTitleHeight = 2.0;
+            ExtraTitleHeight = 2f;
             MinorGridlineInfo = new GridlineInfo(100, Colors.Gray)
             {
                 IsEnabled = false

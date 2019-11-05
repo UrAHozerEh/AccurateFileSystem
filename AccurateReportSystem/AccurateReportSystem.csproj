@@ -134,6 +134,7 @@
     <Compile Include="PageSetup.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="XAxisInfo.cs" />
+    <Compile Include="YAxesInfo.cs" />
     <EmbeddedResource Include="Properties\AccurateReportSystem.rd.xml" />
   </ItemGroup>
   <ItemGroup>

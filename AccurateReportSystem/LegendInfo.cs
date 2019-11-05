@@ -13,146 +13,147 @@ namespace AccurateReportSystem
         //TODO: I should add reset functions for all these shits. If there is a master then set to null, else set to defaults.
         //TODO: I guess I should also add defaults as private statics or something if I do that.
         public LegendInfo Master { get; set; }
-        public float LegendNameFontSize
+        public float NameFontSize
         {
             get
             {
-                return legendNameFontSize ?? Master.LegendNameFontSize;
+                return nameFontSize ?? Master.NameFontSize;
             }
             set
             {
                 if (float.IsNaN(value))
-                    legendNameFontSize = null;
+                    nameFontSize = null;
                 else
-                    legendNameFontSize = value;
+                    nameFontSize = value;
             }
         }
-        private float? legendNameFontSize = null;
-        public Color LegendNameColor
+        private float? nameFontSize = null;
+        public Color NameColor
         {
             get
             {
-                return legendNameColor ?? Master.LegendNameColor;
+                return nameColor ?? Master.NameColor;
             }
             set
             {
-                legendNameColor = value;
+                nameColor = value;
             }
         }
-        private Color? legendNameColor = null;
-        public float LegendSeriesNameFontSize
+        private Color? nameColor = null;
+        public float SeriesNameFontSize
         {
             get
             {
-                return legendSeriesNameFontSize ?? Master.LegendSeriesNameFontSize;
+                return seriesNameFontSize ?? Master.SeriesNameFontSize;
             }
             set
             {
                 if (float.IsNaN(value))
-                    legendSeriesNameFontSize = null;
+                    seriesNameFontSize = null;
                 else
-                    legendSeriesNameFontSize = value;
+                    seriesNameFontSize = value;
             }
         }
-        private float? legendSeriesNameFontSize = null;
-        public Color LegendSeriesNameColor
+        private float? seriesNameFontSize = null;
+        public Color SeriesNameColor
         {
             get
             {
-                return legendSeriesNameColor ?? Master.LegendSeriesNameColor;
+                return seriesNameColor ?? Master.SeriesNameColor;
             }
             set
             {
-                legendSeriesNameColor = value;
+                seriesNameColor = value;
             }
         }
-        private Color? legendSeriesNameColor = null;
-        public bool LegendSeriesNameUsesSeriesColor
+        private Color? seriesNameColor = null;
+        public bool SeriesNameUsesSeriesColor
         {
             get
             {
-                return legendSeriesNameUsesSeriesColor ?? Master.LegendSeriesNameUsesSeriesColor;
+                return seriesNameUsesSeriesColor ?? Master.SeriesNameUsesSeriesColor;
             }
             set
             {
-                legendSeriesNameUsesSeriesColor = value;
+                seriesNameUsesSeriesColor = value;
             }
         }
-        private bool? legendSeriesNameUsesSeriesColor = null;
-        public double LegendSeriesSymbolWidth
+        private bool? seriesNameUsesSeriesColor = null;
+        public double SeriesSymbolWidth
         {
             get
             {
-                return legendSeriesSymbolWidth ?? Master.LegendSeriesSymbolWidth;
+                return seriesSymbolWidth ?? Master.SeriesSymbolWidth;
             }
             set
             {
                 if (double.IsNaN(value))
-                    legendSeriesSymbolWidth = null;
+                    seriesSymbolWidth = null;
                 else
-                    legendSeriesSymbolWidth = value;
+                    seriesSymbolWidth = value;
             }
         }
-        private double? legendSeriesSymbolWidth = null;
-        public CanvasVerticalAlignment LegendNameVerticalAlignment
+        private double? seriesSymbolWidth = null;
+        public CanvasVerticalAlignment VerticalAlignment
         {
             get
             {
-                return legendNameVerticalAlignment ?? Master.LegendNameVerticalAlignment;
+                return verticalAlignment ?? Master.VerticalAlignment;
             }
             set
             {
-                legendNameVerticalAlignment = value;
+                verticalAlignment = value;
             }
         }
-        private CanvasVerticalAlignment? legendNameVerticalAlignment = null;
-        public CanvasHorizontalAlignment LegendNameHorizontalAlignment
+        private CanvasVerticalAlignment? verticalAlignment = null;
+        public CanvasHorizontalAlignment HorizontalAlignment
         {
             get
             {
-                return legendNameHorizontalAlignment ?? Master.LegendNameHorizontalAlignment;
+                return horizontalAlignment ?? Master.HorizontalAlignment;
             }
             set
             {
-                legendNameHorizontalAlignment = value;
+                horizontalAlignment = value;
             }
         }
-        private CanvasHorizontalAlignment? legendNameHorizontalAlignment = null;
-        public double LegendWidth
+        private CanvasHorizontalAlignment? horizontalAlignment = null;
+        public double Width
         {
             get
             {
-                return legendWidth ?? Master.LegendWidth;
+                return width ?? Master.Width;
             }
             set
             {
                 if (double.IsNaN(value))
-                    legendWidth = null;
+                    width = null;
                 else
-                    legendWidth = value;
+                    width = value;
             }
         }
-        private double? legendWidth = null;
-        public double LegendWidthDIP => Math.Round(LegendWidth * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
+        private double? width = null;
+        public double WidthDIP => Math.Round(Width * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public string Name { get; set; }
 
         public LegendInfo()
         {
-            LegendNameFontSize = 18f;
-            LegendNameColor = Colors.Black;
-            LegendSeriesNameFontSize = 12f;
-            LegendSeriesNameColor = Colors.Black;
-            LegendSeriesSymbolWidth = 50;
-            LegendNameVerticalAlignment = CanvasVerticalAlignment.Center;
-            LegendNameHorizontalAlignment = CanvasHorizontalAlignment.Center;
-            LegendSeriesNameUsesSeriesColor = true;
-            LegendWidth = 1.5;
+            NameFontSize = 18f;
+            NameColor = Colors.Black;
+            SeriesNameFontSize = 12f;
+            SeriesNameColor = Colors.Black;
+            SeriesSymbolWidth = 50;
+            VerticalAlignment = CanvasVerticalAlignment.Center;
+            HorizontalAlignment = CanvasHorizontalAlignment.Center;
+            SeriesNameUsesSeriesColor = true;
+            Width = 1.5;
+            Name = "Master";
         }
 
         public LegendInfo(LegendInfo master, string name)
         {
             Master = master;
-
+            Name = name;
         }
     }
 }
