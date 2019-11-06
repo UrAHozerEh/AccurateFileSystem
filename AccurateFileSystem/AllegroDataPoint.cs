@@ -16,10 +16,11 @@ namespace AccurateFileSystem
         public double MIROn { get; private set; }
         public double Off { get; private set; }
         public double MIROff { get; private set; }
+        public double? Depth { get; private set; }
         public string OriginalComment { get; private set; }
         public string CommentTemplate { get; private set; }
         public BasicGeoposition GPS { get; private set; }
-        public bool HasGPS => GPS.Equals(new BasicGeoposition());
+        public bool HasGPS => !GPS.Equals(new BasicGeoposition());
         public List<DateTime> Times { get; private set; }
         public bool HasTime => Times.Count != 0;
         public DateTime? OnTime
@@ -56,11 +57,23 @@ namespace AccurateFileSystem
 
         private void ParseComment()
         {
-            if (string.IsNullOrEmpty(OriginalComment))
+            if (string.IsNullOrWhiteSpace(OriginalComment))
+                return;
+            string docPattern = "DOC (\\d+)(in)?";
+            var doc = Regex.Match(OriginalComment, docPattern);
+            if (doc.Success)
+            {
+                Depth = double.Parse(doc.Groups[1].Value);
+                OriginalComment = OriginalComment.Replace(doc.Value, "");
+            }
+
+            if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
             string testStationPattern = @"\([^\)]+\)";
+            
             var matches = Regex.Matches(OriginalComment, testStationPattern);
             CommentTemplate = OriginalComment;
+            
             int count = 0;
             foreach (Match match in matches)
             {

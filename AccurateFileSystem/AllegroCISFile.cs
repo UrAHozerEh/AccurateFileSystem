@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Devices.Geolocation;
 
 namespace AccurateFileSystem
 {
@@ -35,7 +36,19 @@ namespace AccurateFileSystem
         /// </summary>
         private void ProcessPoints()
         {
+            int incVal = int.Parse(Header["autoincval"]);
+            for(int i = 0; i < Points.Count - 1; ++i)
+            {
+                var cur = Points[i];
+                var next = Points[i + 1];
 
+                var footDist = next.Footage - cur.Footage;
+                if (!cur.HasGPS || !next.HasGPS)
+                    throw new Exception();
+                var gpsDist = next.GPS.Distance(cur.GPS);
+                //if (gpsDist - footDist > incVal)
+                //    throw new Exception();
+            }
         }
 
         /// <summary>
@@ -92,6 +105,7 @@ namespace AccurateFileSystem
             list.Add(("Off", typeof(double)));
             list.Add(("On Compensated", typeof(double)));
             list.Add(("Off Compensated", typeof(double)));
+            list.Add(("Depth", typeof(double)));
             list.Add(("Comment", typeof(string)));
             return list;
         }
@@ -104,6 +118,8 @@ namespace AccurateFileSystem
                     return GetOnData();
                 case "Off":
                     return GetOffData();
+                case "Depth":
+                    return GetDepthData();
                 default:
                     return null;
             }
@@ -125,6 +141,17 @@ namespace AccurateFileSystem
             for (int i = 0; i < Points.Count; ++i)
             {
                 list.Add((Points[i].Footage, Points[i].Off));
+            }
+            return list;
+        }
+
+        private List<(double footage, double value)> GetDepthData()
+        {
+            var list = new List<(double, double)>();
+            for (int i = 0; i < Points.Count; ++i)
+            {
+                if(Points[i].Depth.HasValue)
+                    list.Add((Points[i].Footage, Points[i].Depth.Value));
             }
             return list;
         }

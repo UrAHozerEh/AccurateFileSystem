@@ -73,18 +73,26 @@ namespace AFSTester
                     {
                         LineColor = Colors.Blue
                     };
+                    var depth = new GraphSeries("Depth", allegroFile.GetDoubleData("Depth"))
+                    {
+                        LineColor = Colors.Orange
+                    };
                     var commentSeries = new CommentSeries { Values = allegroFile.GetStringData("Comment") };
 
                     graph1.CommentSeries = commentSeries;
-                    graph1.Series.Add(on);
-                    graph1.Series.Add(off);
+                    graph1.Series.Add(depth);
+                    graph1.MaximumYValue = 150;
+                    graph1.MinimumYValue = 0;
+                    graph1.Gridlines[(int)GridlineName.MajorHorizontal].Offset = 15;
+                    graph1.Gridlines[(int)GridlineName.MinorHorizontal].Offset = 5;
 
                     graph2.Series.Add(on);
 
                     graph3.Series.Add(off);
 
-                    //graph1.XAxisInfo.IsEnabled = false;
-                    //graph2.XAxisInfo.IsEnabled = false;
+                    graph1.XAxisInfo.IsEnabled = false;
+                    graph2.XAxisInfo.IsEnabled = false;
+                    graph3.XAxisInfo.IsEnabled = false;
 
                     var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
                     var graph1Measurement = new SplitContainerMeasurement(graph1)

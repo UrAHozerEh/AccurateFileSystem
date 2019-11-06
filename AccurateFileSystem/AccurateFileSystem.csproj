@@ -123,6 +123,7 @@
     <Compile Include="AllegroCISFile.cs" />
     <Compile Include="AllegroDataPoint.cs" />
     <Compile Include="AllegroWaveformFile.cs" />
+    <Compile Include="Extensions.cs" />
     <Compile Include="File.cs" />
     <Compile Include="FileFactory.cs" />
     <Compile Include="Object.cs" />

@@ -170,7 +170,7 @@ namespace AccurateReportSystem
 
         public void Draw()
         {
-
+            /*
             var xAxisMajor = Gridlines[(int)GridlineName.MajorVertical].GetValues(page, graphBodyDrawArea);
 
             if (XAxisInfo.IsEnabled && XAxisInfo.TotalHeight != 0)
@@ -231,7 +231,7 @@ namespace AccurateReportSystem
                         }
                     }
                 }
-            }
+            }*/
         }
     }
 }

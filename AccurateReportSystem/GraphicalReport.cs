@@ -20,6 +20,7 @@ namespace AccurateReportSystem
         public Container Container { get; set; }
         public ReportMarginInfo MarginInfo { get; set; } = new ReportMarginInfo();
         public XAxisInfo XAxisInfo { get; set; } = new XAxisInfo();
+        public YAxesInfo YAxesInfo { get; set; } = new YAxesInfo();
         public LegendInfo LegendInfo { get; set; } = new LegendInfo();
 
         public static int DEFAULT_DIP = 96;
