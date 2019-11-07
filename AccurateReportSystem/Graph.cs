@@ -19,23 +19,20 @@ namespace AccurateReportSystem
 {
     public class Graph : Container
     {
-        public double MaximumYValue { get; set; } = 0;
-        public double MinimumYValue { get; set; } = -3;
-        public double YValueHeight => MaximumYValue - MinimumYValue;
         public bool IsInverted { get; set; } = false;
         public List<GraphSeries> Series { get; set; } = new List<GraphSeries>();
         private List<GeometryInfo> Geometries;
         public CommentSeries CommentSeries { get; set; }
         public GridlineInfo[] Gridlines { get; set; }
-        
-        
+
+
         public XAxisInfo XAxisInfo { get; set; }
         public LegendInfo LegendInfo { get; set; }
         public YAxesInfo YAxesInfo { get; set; }
-        private double TotalXValueShift => LegendInfo.WidthDIP + YAxesInfo.Y1AxisLabelWidthDIP + YAxesInfo.Y1AxisTitleFontSize;
+        private double TotalXValueShift => LegendInfo.WidthDIP + YAxesInfo.Y1TotalHeight;
         private double TotalWidthShift => TotalXValueShift + YAxesInfo.Y2TotalHeight;
         private double TotalYValueShift => 0;
-        
+
 
 
         public Graph(GraphicalReport report)
@@ -56,17 +53,6 @@ namespace AccurateReportSystem
                 Thickness = 2,
                 Color = Colors.LightGray
             };
-        }
-
-        public void GenerateGeometries()
-        {
-            Geometries = new List<GeometryInfo>();
-            foreach (var series in Series)
-            {
-                var geos = series.GetGeomitries();
-                foreach (var geo in geos)
-                    Geometries.Add(geo);
-            }
         }
 
         public override void Draw(PageInformation page, CanvasDrawingSession session, Rect DrawArea)
@@ -103,14 +89,14 @@ namespace AccurateReportSystem
                 //TODO: Simplify getting geometries from the graph series. Should only be done once before getting all the pages.
                 //TODO: Maybe it should actually be drawn per page.
                 Geometries = new List<GeometryInfo>();
-                foreach (var series in Series)
-                {
-                    var geos = series.GetGeomitries();
-                    Geometries.Add(geos[0]);
-                }
-                var clipRect = new Rect(page.StartFootage, (float)MinimumYValue, page.Width, (float)YValueHeight);
+                Rect y1GraphArea = new Rect(page.StartFootage, YAxesInfo.Y1MinimumValue, page.Width, YAxesInfo.Y1ValuesHeight);
+                Rect y2GraphArea = new Rect(page.StartFootage, YAxesInfo.Y2MinimumValue, page.Width, YAxesInfo.Y2ValuesHeight);
+                TransformInformation y1Transform = new TransformInformation(graphBodyDrawArea, y1GraphArea, YAxesInfo.Y1IsInverted);
+                TransformInformation y2Transform = new TransformInformation(graphBodyDrawArea, y2GraphArea, YAxesInfo.Y2IsInverted);
+
+                var clipRect = new Rect(page.StartFootage, (float)YAxesInfo.Y1MinimumValue, page.Width, (float)YAxesInfo.Y1ValuesHeight);
                 var widthScalar = graphBodyDrawArea.Width / page.Width;
-                var heightScalar = graphBodyDrawArea.Height / YValueHeight;
+                var heightScalar = graphBodyDrawArea.Height / YAxesInfo.Y1ValuesHeight;
                 var xTranslate = graphBodyDrawArea.X - clipRect.X;
                 var yTranslate = graphBodyDrawArea.Y - clipRect.Y;
                 var transform = new CompositeTransform();
@@ -123,10 +109,16 @@ namespace AccurateReportSystem
 
                 DrawGridLines(page, graphBodyDrawArea, session, translateMatrix, scaleMatrix);
 
-                foreach (var geoInfo in Geometries)
+                if (XAxisInfo.IsEnabled)
                 {
-                    var transformedGeo = geoInfo.Geometry.Transform(translateMatrix).Transform(scaleMatrix);
-                    session.DrawGeometry(transformedGeo, geoInfo.GetCanvasBrush(session));
+                    var xAxisDrawArea = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Bottom, graphBodyDrawArea.Width, XAxisInfo.TotalHeight);
+                    XAxisInfo.DrawLabels(session, page, y1Transform, y1GraphArea);
+                }
+
+                foreach (var series in Series)
+                {
+                    var curTransform = series.IsY1Axis ? y1Transform : y2Transform;
+                    series.Draw(session, page, curTransform);
                 }
                 if (CommentSeries != null)
                 {
@@ -135,8 +127,10 @@ namespace AccurateReportSystem
                     {
                         TransformBehavior = CanvasStrokeTransformBehavior.Hairline
                     };
-                    session.DrawGeometry(lineGeoInfo.Geometry, lineGeoInfo.Color, 1, style);
-                    session.FillGeometry(commentGeoInfo.Geometry, commentGeoInfo.Color);
+                    if (lineGeoInfo != null)
+                        session.DrawGeometry(lineGeoInfo.Geometry, lineGeoInfo.Color, 1, style);
+                    if (commentGeoInfo != null)
+                        session.FillGeometry(commentGeoInfo.Geometry, commentGeoInfo.Color);
                     //TODO: Canvas Stroke Style should be in Geo Info. Also should have different styles for text and the indicators.
                 }
             }
@@ -169,7 +163,7 @@ namespace AccurateReportSystem
             {
                 var gridline = Gridlines[i];
                 var isVert = (i == 1 || i == 3);
-                using (var geoInfo = isVert ? gridline.GetGeometryInfo(page, graphBodyDrawArea) : gridline.GetGeometryInfo(MinimumYValue, MaximumYValue, YAxesInfo.Y1IsInverted, graphBodyDrawArea))
+                using (var geoInfo = isVert ? gridline.GetGeometryInfo(page, graphBodyDrawArea) : gridline.GetGeometryInfo(YAxesInfo.Y1MinimumValue, YAxesInfo.Y1MaximumValue, YAxesInfo.Y1IsInverted, graphBodyDrawArea))
                 {
                     var style = new CanvasStrokeStyle
                     {
@@ -238,24 +232,24 @@ namespace AccurateReportSystem
 
         private void DrawAxisLabels(PageInformation page, CanvasDrawingSession session, Rect graphBodyDrawArea)
         {
-            var yAxisMajor = Gridlines[(int)GridlineName.MajorHorizontal].GetValues(MinimumYValue, MaximumYValue, YAxesInfo.Y1IsInverted, graphBodyDrawArea);
+            var yAxisMajor = Gridlines[(int)GridlineName.MajorHorizontal].GetValues(YAxesInfo.Y1MinimumValue, YAxesInfo.Y1MaximumValue, YAxesInfo.Y1IsInverted, graphBodyDrawArea);
             var color = Gridlines[(int)GridlineName.MajorHorizontal].Color;
             var thickness = Gridlines[(int)GridlineName.MajorHorizontal].Thickness;
-            var drawArea = new Rect(graphBodyDrawArea.X - YAxesInfo.Y1AxisLabelWidthDIP, graphBodyDrawArea.Y, YAxesInfo.Y1AxisLabelWidthDIP, graphBodyDrawArea.Height);
+            var drawArea = new Rect(graphBodyDrawArea.X - YAxesInfo.Y1LabelHeight, graphBodyDrawArea.Y, YAxesInfo.Y1LabelHeight, graphBodyDrawArea.Height);
             //session.DrawRectangle(drawArea, Colors.Orange);
             using (var format = new CanvasTextFormat())
             {
                 format.HorizontalAlignment = CanvasHorizontalAlignment.Right;
                 format.WordWrapping = CanvasWordWrapping.WholeWord;
-                format.FontSize = YAxesInfo.Y1AxisLabelFontSize;
+                format.FontSize = YAxesInfo.Y1LabelFontSize;
                 format.FontFamily = "Arial";
                 format.FontWeight = FontWeights.Thin;
                 format.FontStyle = FontStyle.Normal;
                 foreach (var (value, location) in yAxisMajor)
                 {
                     var endLocation = location;
-                    var width = (float)(YAxesInfo.Y1AxisLabelWidthDIP - YAxesInfo.Y1AxisLabelTickLength);
-                    var label = value.ToString(YAxesInfo.Y1AxisLabelFormat);
+                    var width = (float)(YAxesInfo.Y1LabelHeight - YAxesInfo.Y1LabelTickLength);
+                    var label = value.ToString(YAxesInfo.Y1LabelFormat);
                     using (var layout = new CanvasTextLayout(session, label, format, width, 0))
                     {
                         var layoutHeight = (float)Math.Round(layout.LayoutBounds.Height / 2, GraphicalReport.DIGITS_TO_ROUND);
@@ -283,7 +277,7 @@ namespace AccurateReportSystem
                     using (var pathBuilder = new CanvasPathBuilder(session))
                     {
                         pathBuilder.BeginFigure((float)graphBodyDrawArea.X, location);
-                        pathBuilder.AddLine((float)(graphBodyDrawArea.X - YAxesInfo.Y1AxisLabelTickLength), endLocation);
+                        pathBuilder.AddLine((float)(graphBodyDrawArea.X - YAxesInfo.Y1LabelTickLength), endLocation);
                         pathBuilder.EndFigure(CanvasFigureLoop.Open);
                         using (var geo = CanvasGeometry.CreatePath(pathBuilder))
                         {
@@ -296,8 +290,6 @@ namespace AccurateReportSystem
                     }
                 }
             }
-
-            XAxisInfo.Draw();
         }
 
         private void DrawAxisTitles(CanvasDrawingSession session, Rect graphBodyDrawArea)
@@ -308,10 +300,10 @@ namespace AccurateReportSystem
                 DrawAxisTitle(XAxisInfo.Title, session, xAxisDrawArea, XAxisInfo.TitleFontSize, 0);
                 //session.DrawRectangle(xAxisDrawArea, Colors.Orange);
             }
-            if (YAxesInfo.Y1AxisTitleFontSize != 0 && !string.IsNullOrWhiteSpace(YAxesInfo.Y1AxisTitle))
+            if (YAxesInfo.Y1TitleFontSize != 0 && !string.IsNullOrWhiteSpace(YAxesInfo.Y1Title))
             {
-                var y1AxisDrawArea = new Rect(graphBodyDrawArea.X - YAxesInfo.Y1AxisLabelWidthDIP - YAxesInfo.Y1AxisTitleFontSize, graphBodyDrawArea.Y, YAxesInfo.Y1AxisTitleFontSize, graphBodyDrawArea.Height);
-                DrawAxisTitle(YAxesInfo.Y1AxisTitle, session, y1AxisDrawArea, YAxesInfo.Y1AxisTitleFontSize, 90);
+                var y1AxisDrawArea = new Rect(graphBodyDrawArea.X - YAxesInfo.Y1TotalHeight, graphBodyDrawArea.Y, YAxesInfo.Y1TitleHeight, graphBodyDrawArea.Height);
+                DrawAxisTitle(YAxesInfo.Y1Title, session, y1AxisDrawArea, YAxesInfo.Y1TitleFontSize, 90);
                 //session.DrawRectangle(y1AxisDrawArea, Colors.Orange);
             }
         }

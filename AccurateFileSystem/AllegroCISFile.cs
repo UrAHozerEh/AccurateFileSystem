@@ -14,6 +14,7 @@ namespace AccurateFileSystem
         public string Extension { get; }
         public double StartFootage { get; private set; }
         public double EndFootage { get; private set; }
+        public List<(int start, int end)> Reconnects { get; private set; }
 
         public AllegroCISFile(string name, string extension, Dictionary<string, string> header, Dictionary<int, AllegroDataPoint> points, FileType type) : base(name, type)
         {
@@ -36,27 +37,59 @@ namespace AccurateFileSystem
         /// </summary>
         private void ProcessPoints()
         {
+            Reconnects = new List<(int, int)>();
+            if (Points == null || Points.Count == 0)
+                return;
             int incVal = int.Parse(Header["autoincval"]);
-            for(int i = 0; i < Points.Count - 1; ++i)
+            int startIndex = 0;
+            for(int i = 1; i < Points.Count - 1; ++i)
             {
                 var cur = Points[i];
+                if(cur.HasReconnect)
+                {
+                    Reconnects.Add((startIndex, i));
+                    startIndex = i;
+                }
+            }
+
+            foreach(var (start, end) in Reconnects)
+            {
+                var startPoint = Points[start];
+                var endPoint = Points[end];
+                var footDist = endPoint.Footage - startPoint.Footage;
+
+                ReconnectTestStationRead reconnect = endPoint.GetReconnect();
+
+                var mirOnPerFoot = reconnect.MIROn / footDist;
+                var mirOffPerFoot = reconnect.MIROff / footDist;
+
+                for(int i = start; i < end; ++i)
+                {
+                    var curPoint = Points[i];
+                    var curDist = curPoint.Footage - startPoint.Footage;
+
+
+                }
+            }
+        }
+
+        /*var cur = Points[i];
                 var next = Points[i + 1];
 
                 var footDist = next.Footage - cur.Footage;
                 if (!cur.HasGPS || !next.HasGPS)
                     throw new Exception();
                 var gpsDist = next.GPS.Distance(cur.GPS);
-                //if (gpsDist - footDist > incVal)
-                //    throw new Exception();
-            }
-        }
+                if (gpsDist - footDist > incVal)
+                    throw new Exception();
+                    */
 
         /// <summary>
         /// Very explicit equals check. Will look at each read and make sure everything is equal in order to reduce the number of duplicate survey files.
         /// This should return true for any of the SVY, CSV, and BAK files from a single survey.
         /// Will also short circuit to true if GUID is equal, without checking anything further.
         /// </summary>
-        /// <param name="obj">The other AllegroCISFile.</param>
+        /// <param name="otherFile">The other AllegroCISFile.</param>
         /// <returns>A bool stating if the two objects are equal.</returns>
         // TODO: Add a return for what the differences are.
         public override bool IsEquivalent(File otherFile)

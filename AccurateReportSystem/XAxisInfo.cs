@@ -1,9 +1,15 @@
-﻿using System;
+﻿using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Geometry;
+using Microsoft.Graphics.Canvas.Text;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Foundation;
 using Windows.UI;
+using Windows.UI.Text;
 
 namespace AccurateReportSystem
 {
@@ -168,29 +174,65 @@ namespace AccurateReportSystem
             isEnabled = null;
         }
 
-        public void Draw()
+        public void DrawGridlines(CanvasDrawingSession session, Rect graphArea, TransformInformation transform)
         {
-            /*
-            var xAxisMajor = Gridlines[(int)GridlineName.MajorVertical].GetValues(page, graphBodyDrawArea);
-
-            if (XAxisInfo.IsEnabled && XAxisInfo.TotalHeight != 0)
+            if (MinorGridlineInfo.IsEnabled)
             {
-                drawArea = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Bottom, graphBodyDrawArea.Width, XAxisInfo.TotalHeight);
-                color = Gridlines[(int)GridlineName.MajorVertical].Color;
-                thickness = Gridlines[(int)GridlineName.MajorVertical].Thickness;
-                //session.DrawRectangle(drawArea, Colors.Green);
-                using (var format = new CanvasTextFormat())
+                var numOffsetInStart = (int)(graphArea.Left / MinorGridlineInfo.Offset);
+                var start = numOffsetInStart * MinorGridlineInfo.Offset;
+                var curVal = start;
+                while (curVal <= graphArea.Right)
                 {
-                    format.HorizontalAlignment = CanvasHorizontalAlignment.Left;
-                    format.WordWrapping = CanvasWordWrapping.WholeWord;
-                    format.FontSize = XAxisInfo.LabelFontSize;
-                    format.FontFamily = "Arial";
-                    format.FontWeight = FontWeights.Thin;
-                    format.FontStyle = FontStyle.Normal;
-                    foreach (var (value, location) in xAxisMajor)
+                    if (curVal >= graphArea.Left)
                     {
+                        var (x, y1) = transform.ToDrawArea(curVal, graphArea.Bottom);
+                        var (_, y2) = transform.ToDrawArea(0, graphArea.Top);
+                        session.DrawLine(x, y1, x, y2, MinorGridlineInfo.Color);
+                    }
+                    curVal += MinorGridlineInfo.Offset;
+                }
+            }
+            if (MajorGridlineInfo.IsEnabled)
+            {
+                var numOffsetInStart = (int)(graphArea.Left / MajorGridlineInfo.Offset);
+                var start = numOffsetInStart * MajorGridlineInfo.Offset;
+                var curVal = start;
+                while (curVal <= graphArea.Right)
+                {
+                    if (curVal >= graphArea.Left)
+                    {
+                        var (x, y1) = transform.ToDrawArea(curVal, graphArea.Bottom);
+                        var (_, y2) = transform.ToDrawArea(0, graphArea.Top);
+                        session.DrawLine(x, y1, x, y2, MajorGridlineInfo.Color);
+                    }
+                    curVal += MajorGridlineInfo.Offset;
+                }
+            }
+        }
+
+        public void DrawLabels(CanvasDrawingSession session, PageInformation page, TransformInformation transform, Rect drawArea)
+        {
+            var numOffsetInStart = (int)(page.StartFootage / MajorGridlineInfo.Offset);
+            var start = numOffsetInStart * MajorGridlineInfo.Offset;
+            var curVal = start;
+            var tickColor = MajorGridlineInfo.Color;
+            var tickThickness = MajorGridlineInfo.Thickness;
+            using (var format = new CanvasTextFormat())
+            {
+                format.HorizontalAlignment = CanvasHorizontalAlignment.Left;
+                format.WordWrapping = CanvasWordWrapping.WholeWord;
+                format.FontSize = LabelFontSize;
+                format.FontFamily = "Arial";
+                format.FontWeight = FontWeights.Thin;
+                format.FontStyle = FontStyle.Normal;
+
+                while (curVal <= page.EndFootage)
+                {
+                    if (curVal >= page.StartFootage)
+                    {
+                        var (location, _) = transform.ToDrawArea(curVal, 0);
                         var endLocation = location;
-                        var label = value.ToString(XAxisInfo.LabelFormat);
+                        var label = curVal.ToString(LabelFormat);
                         using (var layout = new CanvasTextLayout(session, label, format, 0, 0))
                         {
                             var layoutWidth = (float)Math.Round(layout.LayoutBounds.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
@@ -205,7 +247,7 @@ namespace AccurateReportSystem
                                 endLocation = (float)drawArea.Right - layoutWidth;
                                 finalLocation = (float)Math.Round(drawArea.Right - (2 * layoutWidth), GraphicalReport.DIGITS_TO_ROUND);
                             }
-                            var translate = Matrix3x2.CreateTranslation(finalLocation, (float)(drawArea.Top + XAxisInfo.LabelTickLength));
+                            var translate = Matrix3x2.CreateTranslation(finalLocation, (float)(drawArea.Top + LabelTickLength));
                             using (var geo = CanvasGeometry.CreateText(layout))
                             {
                                 using (var translatedGeo = geo.Transform(translate))
@@ -218,7 +260,7 @@ namespace AccurateReportSystem
                         using (var pathBuilder = new CanvasPathBuilder(session))
                         {
                             pathBuilder.BeginFigure(location, (float)drawArea.Top);
-                            pathBuilder.AddLine(endLocation, (float)(drawArea.Top + XAxisInfo.LabelTickLength));
+                            pathBuilder.AddLine(endLocation, (float)(drawArea.Top + LabelTickLength));
                             pathBuilder.EndFigure(CanvasFigureLoop.Open);
                             using (var geo = CanvasGeometry.CreatePath(pathBuilder))
                             {
@@ -226,12 +268,12 @@ namespace AccurateReportSystem
                                 {
                                     TransformBehavior = CanvasStrokeTransformBehavior.Fixed
                                 };
-                                session.DrawGeometry(geo, color, thickness, style);
+                                session.DrawGeometry(geo, tickColor, tickThickness, style);
                             }
                         }
                     }
                 }
-            }*/
+            }
         }
     }
 }

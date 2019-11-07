@@ -74,11 +74,10 @@ namespace AccurateReportSystem
                         curBounds.Prev = last;
                         last = curBounds;
                     }
-
-
                 }
             }
-
+            if (first == null)
+                return (null, null);
             first.CheckBounds(drawArea, false, CommentBuffer, EdgeBuffer);
             last.CheckBounds(drawArea, true, CommentBuffer, EdgeBuffer);
 

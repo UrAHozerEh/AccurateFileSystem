@@ -36,7 +36,7 @@ namespace AccurateReportSystem
             var drawArea = new Rect(MarginInfo.LeftDip, MarginInfo.TopDip, pageAreaWidth - MarginInfo.MarginWidthDip, pageAreaHeight - MarginInfo.MarginHeightDip);
 
             var totalFootage = endFootage - startFootage;
-            var pages = PageSetup.GetAllPages(startFootage, totalFootage, overlap);
+            var pages = PageSetup.GetAllPages(startFootage, totalFootage);
             CanvasDevice device = CanvasDevice.GetSharedDevice();
             var list = new List<CanvasRenderTarget>();
             foreach (var page in pages)

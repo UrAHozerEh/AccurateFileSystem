@@ -43,12 +43,16 @@ namespace AccurateFileSystem
         }
         public bool IsHiLo { get; private set; } = false;
         public List<TestStationRead> TestStationReads = new List<TestStationRead>();
+        public bool HasReconnect { get; private set; } = false;
+
         public AllegroDataPoint(int id, double footage, double on, double off, BasicGeoposition gps, List<DateTime> times, string comment)
         {
             Id = id;
             Footage = footage;
             On = on;
+            MIROn = on;
             Off = off;
+            MIROff = off;
             OriginalComment = comment;
             GPS = gps;
             Times = times;
@@ -90,6 +94,8 @@ namespace AccurateFileSystem
                     CommentTemplate = CommentTemplate.Replace(tsId, tsString);
                 else
                 {
+                    if (read is ReconnectTestStationRead)
+                        HasReconnect = true;
                     TestStationReads.Add(read);
                     ++count;
                 }
@@ -130,6 +136,13 @@ namespace AccurateFileSystem
             if (diff > 0.0000001)
                 return false;
             return true;
+        }
+
+        public ReconnectTestStationRead GetReconnect()
+        {
+            foreach (ReconnectTestStationRead read in TestStationReads)
+                return read;
+            return null;
         }
     }
 }

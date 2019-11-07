@@ -75,24 +75,27 @@ namespace AFSTester
                     };
                     var depth = new GraphSeries("Depth", allegroFile.GetDoubleData("Depth"))
                     {
-                        LineColor = Colors.Orange
+                        LineColor = Colors.Orange,
+                        PointColor = Colors.Orange,
+                        IsY1Axis = false,
+                        PointShape = GraphSeries.Shape.Circle,
+                        GraphType = GraphSeries.Type.Point
                     };
                     var commentSeries = new CommentSeries { Values = allegroFile.GetStringData("Comment") };
 
                     graph1.CommentSeries = commentSeries;
                     graph1.Series.Add(depth);
-                    graph1.MaximumYValue = 150;
-                    graph1.MinimumYValue = 0;
+                    graph1.YAxesInfo.Y2IsEnabled = true;
+                    /*
+                    graph1.YAxesInfo.Y1MaximumValue = 150;
+                    graph1.YAxesInfo.Y1MinimumValue = 0;
+                    graph1.YAxesInfo.Y1IsInverted = false;
                     graph1.Gridlines[(int)GridlineName.MajorHorizontal].Offset = 15;
                     graph1.Gridlines[(int)GridlineName.MinorHorizontal].Offset = 5;
+                    */
+                    graph1.Series.Add(on);
 
-                    graph2.Series.Add(on);
-
-                    graph3.Series.Add(off);
-
-                    graph1.XAxisInfo.IsEnabled = false;
-                    graph2.XAxisInfo.IsEnabled = false;
-                    graph3.XAxisInfo.IsEnabled = false;
+                    graph1.Series.Add(off);
 
                     var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
                     var graph1Measurement = new SplitContainerMeasurement(graph1)
@@ -102,7 +105,7 @@ namespace AFSTester
                     splitContainer.AddContainer(graph1Measurement);
                     splitContainer.AddContainer(graph2);
                     splitContainer.AddContainer(graph3);
-                    report.Container = splitContainer;
+                    report.Container = graph1;
                     var images = report.GetImages(allegroFile.StartFootage, allegroFile.EndFootage);
                     for (int i = 0; i < images.Count; ++i)
                     {
