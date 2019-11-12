@@ -16,19 +16,19 @@ namespace AccurateReportSystem
     public class XAxisInfo
     {
         // Label info
-        public double LabelHeight
+        public double LabelHeightInches
         {
             get
             {
-                return labelHeight ?? MasterInfo.LabelHeight;
+                return labelHeightInches ?? MasterInfo.LabelHeightInches;
             }
             set
             {
-                labelHeight = value;
+                labelHeightInches = value;
             }
         }
-        private double? labelHeight = null;
-        public double LabelHeightDIP => IsEnabled ? Math.Round(LabelHeight * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND) : 0.0;
+        private double? labelHeightInches = null;
+        public double LabelHeight => IsEnabled ? (Math.Round(LabelHeightInches * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND) + LabelTickLength) : 0;
         public double LabelTickLength
         {
             get
@@ -41,6 +41,18 @@ namespace AccurateReportSystem
             }
         }
         private double? labelTickLength = null;
+        public bool IsTickDrawn
+        {
+            get
+            {
+                return isTickDrawn ?? MasterInfo.IsTickDrawn;
+            }
+            set
+            {
+                isTickDrawn = value;
+            }
+        }
+        private bool? isTickDrawn = null;
         public float LabelFontSize
         {
             get
@@ -83,7 +95,7 @@ namespace AccurateReportSystem
         {
             get
             {
-                return IsEnabled ? titleFontSize ?? MasterInfo.TitleFontSize : 0f;
+                return titleFontSize ?? MasterInfo.TitleFontSize;
             }
             set
             {
@@ -94,13 +106,13 @@ namespace AccurateReportSystem
             }
         }
         private float? titleFontSize = null;
-        public double TotalHeight => LabelHeightDIP + TitleTotalHeight;
-        public float TitleTotalHeight => TitleFontSize + ExtraTitleHeight;
+        public double TotalHeight => LabelHeight + TitleTotalHeight;
+        public float TitleTotalHeight => IsEnabled ? (TitleFontSize + ExtraTitleHeight) : 0;
         public float ExtraTitleHeight
         {
             get
             {
-                return IsEnabled ? extraTitleHeight ?? MasterInfo.ExtraTitleHeight : 0;
+                return extraTitleHeight ?? MasterInfo.ExtraTitleHeight;
             }
             set
             {
@@ -113,32 +125,45 @@ namespace AccurateReportSystem
         private float? extraTitleHeight = null;
 
         // Minor gridlines
-        public GridlineInfo MinorGridlineInfo
+        public GridlineInfo MinorGridline
         {
             get
             {
-                return minorGridlineInfo ?? MasterInfo.MinorGridlineInfo;
+                return minorGridline ?? MasterInfo.MinorGridline;
             }
             set
             {
-                minorGridlineInfo = value;
+                minorGridline = value;
             }
         }
-        private GridlineInfo minorGridlineInfo = null;
+        private GridlineInfo minorGridline = null;
 
         // Major gridlines
-        public GridlineInfo MajorGridlineInfo
+        public GridlineInfo MajorGridline
         {
             get
             {
-                return majorGridlineInfo ?? MasterInfo.MajorGridlineInfo;
+                return majorGridline ?? MasterInfo.MajorGridline;
             }
             set
             {
-                majorGridlineInfo = value;
+                majorGridline = value;
             }
         }
-        private GridlineInfo majorGridlineInfo = null;
+        private GridlineInfo majorGridline = null;
+
+        public bool IsFlippedVertical
+        {
+            get
+            {
+                return isFlippedVertical ?? MasterInfo.IsFlippedVertical;
+            }
+            set
+            {
+                isFlippedVertical = value;
+            }
+        }
+        private bool? isFlippedVertical = null;
 
         public bool IsEnabled
         {
@@ -157,24 +182,28 @@ namespace AccurateReportSystem
         public XAxisInfo()
         {
             MasterInfo = null;
-            LabelHeight = 0.15;
-            LabelTickLength = 5;
+            LabelHeightInches = 0.15;
+            LabelTickLength = 2;
+            IsTickDrawn = false;
             LabelFontSize = 8f;
             LabelFormat = "F0";
             Title = "Footage";
             TitleFontSize = 10f;
             IsEnabled = true;
             ExtraTitleHeight = 2f;
-            MinorGridlineInfo = new GridlineInfo(100, Colors.Gray)
+            MinorGridline = new GridlineInfo(100, Colors.Gray)
             {
                 IsEnabled = false
             };
-            MajorGridlineInfo = new GridlineInfo(100, Colors.LightGray);
+            MajorGridline = new GridlineInfo(100, Colors.LightGray);
+            IsFlippedVertical = false;
         }
 
         public XAxisInfo(XAxisInfo master)
         {
             MasterInfo = master;
+            MinorGridline = new GridlineInfo(MasterInfo.MinorGridline);
+            MajorGridline = new GridlineInfo(MasterInfo.MajorGridline);
         }
 
         public void ResetIsEnabled()
@@ -182,49 +211,98 @@ namespace AccurateReportSystem
             isEnabled = null;
         }
 
-        public void DrawGridlines(CanvasDrawingSession session, Rect graphArea, TransformInformation transform)
+        public void DrawGridlines(CanvasDrawingSession session, PageInformation page, Rect graphBodyDrawArea, TransformInformation transform)
         {
-            if (MinorGridlineInfo.IsEnabled)
+            if (MinorGridline.IsEnabled)
             {
-                var numOffsetInStart = (int)(graphArea.Left / MinorGridlineInfo.Offset);
-                var start = numOffsetInStart * MinorGridlineInfo.Offset;
-                var curVal = start;
-                while (curVal <= graphArea.Right)
+                var values = GetGridlineValues(page, transform, MinorGridline.Offset);
+                foreach (var (x, _) in values)
                 {
-                    if (curVal >= graphArea.Left)
-                    {
-                        var (x, y1) = transform.ToDrawArea(curVal, graphArea.Bottom);
-                        var (_, y2) = transform.ToDrawArea(0, graphArea.Top);
-                        session.DrawLine(x, y1, x, y2, MinorGridlineInfo.Color);
-                    }
-                    curVal += MinorGridlineInfo.Offset;
+                    session.DrawLine(x, (float)graphBodyDrawArea.Top, x, (float)graphBodyDrawArea.Bottom, MinorGridline.Color);
                 }
             }
-            if (MajorGridlineInfo.IsEnabled)
+            if (MajorGridline.IsEnabled)
             {
-                var numOffsetInStart = (int)(graphArea.Left / MajorGridlineInfo.Offset);
-                var start = numOffsetInStart * MajorGridlineInfo.Offset;
-                var curVal = start;
-                while (curVal <= graphArea.Right)
+                var values = GetGridlineValues(page, transform, MajorGridline.Offset);
+                foreach (var (x, _) in values)
                 {
-                    if (curVal >= graphArea.Left)
+                    session.DrawLine(x, (float)graphBodyDrawArea.Top, x, (float)graphBodyDrawArea.Bottom, MinorGridline.Color);
+                }
+            }
+        }
+
+        private List<(float X, double Value)> GetGridlineValues(PageInformation page, TransformInformation transform, double offset)
+        {
+            var output = new List<(float X, double Value)>();
+
+            var numOffsetInStart = (int)(page.StartFootage / offset);
+            var start = numOffsetInStart * offset;
+            var curVal = start;
+            while (curVal <= page.EndFootage)
+            {
+                if (curVal >= page.StartFootage)
+                {
+                    var (x, _) = transform.ToDrawArea(curVal, 0);
+                    output.Add((x, curVal));
+                }
+                curVal += offset;
+            }
+
+            return output;
+        }
+
+        public void DrawInfo(CanvasDrawingSession session, PageInformation page, TransformInformation transform, Rect drawArea)
+        {
+            if (!IsEnabled)
+                return;
+            if (!IsFlippedVertical)
+            {
+                Rect labelDrawArea = new Rect(drawArea.Left, drawArea.Top, drawArea.Width, LabelHeight);
+                DrawLabels(session, page, transform, labelDrawArea);
+                Rect titleDrawArea = new Rect(drawArea.Left, drawArea.Top + LabelHeight, drawArea.Width, TitleTotalHeight);
+                DrawTitle(session, titleDrawArea);
+            }
+            else
+            {
+                Rect labelDrawArea = new Rect(drawArea.Left, drawArea.Top + TitleTotalHeight, drawArea.Width, LabelHeight);
+                DrawLabels(session, page, transform, labelDrawArea);
+                Rect titleDrawArea = new Rect(drawArea.Left, drawArea.Top, drawArea.Width, TitleTotalHeight);
+                DrawTitle(session, titleDrawArea);
+            }
+        }
+
+        public void DrawTitle(CanvasDrawingSession session, Rect drawArea)
+        {
+            //session.DrawRectangle(drawArea, Colors.Purple);
+            using (var format = new CanvasTextFormat())
+            {
+                format.HorizontalAlignment = CanvasHorizontalAlignment.Center;
+                format.WordWrapping = CanvasWordWrapping.WholeWord;
+                format.FontSize = TitleFontSize;
+                format.FontFamily = "Arial";
+                format.FontWeight = FontWeights.Thin;
+                format.FontStyle = FontStyle.Normal;
+                using (var layout = new CanvasTextLayout(session, Title, format, (float)drawArea.Width, (float)drawArea.Height))
+                {
+                    using (var geometry = CanvasGeometry.CreateText(layout))
                     {
-                        var (x, y1) = transform.ToDrawArea(curVal, graphArea.Bottom);
-                        var (_, y2) = transform.ToDrawArea(0, graphArea.Top);
-                        session.DrawLine(x, y1, x, y2, MajorGridlineInfo.Color);
+                        var bounds = layout.DrawBounds;
+                        var translateMatrix = bounds.CreateTranslateMiddleTo(drawArea);
+                        var rotationMatrix = drawArea.CreateRotationAroundMiddle(90);
+                        using (var rotatedGeo = geometry.Transform(translateMatrix))//.Transform(rotationMatrix))
+                        {
+                            session.FillGeometry(rotatedGeo, Colors.Black);
+                        }
                     }
-                    curVal += MajorGridlineInfo.Offset;
                 }
             }
         }
 
         public void DrawLabels(CanvasDrawingSession session, PageInformation page, TransformInformation transform, Rect drawArea)
         {
-            var numOffsetInStart = (int)(page.StartFootage / MajorGridlineInfo.Offset);
-            var start = numOffsetInStart * MajorGridlineInfo.Offset;
-            var curVal = start;
-            var tickColor = MajorGridlineInfo.Color;
-            var tickThickness = MajorGridlineInfo.Thickness;
+            //session.DrawRectangle(drawArea, Colors.Orange);
+            var tickColor = MajorGridline.Color;
+            var tickThickness = MajorGridline.Thickness;
             using (var format = new CanvasTextFormat())
             {
                 format.HorizontalAlignment = CanvasHorizontalAlignment.Left;
@@ -233,38 +311,39 @@ namespace AccurateReportSystem
                 format.FontFamily = "Arial";
                 format.FontWeight = FontWeights.Thin;
                 format.FontStyle = FontStyle.Normal;
-
-                while (curVal <= page.EndFootage)
+                var values = GetGridlineValues(page, transform, MajorGridline.Offset);
+                foreach (var (location, value) in values)
                 {
-                    if (curVal >= page.StartFootage)
+                    var endLocation = location;
+                    var label = value.ToString(LabelFormat);
+                    using (var layout = new CanvasTextLayout(session, label, format, 0, 0))
                     {
-                        var (location, _) = transform.ToDrawArea(curVal, 0);
-                        var endLocation = location;
-                        var label = curVal.ToString(LabelFormat);
-                        using (var layout = new CanvasTextLayout(session, label, format, 0, 0))
+                        var halfLayoutWidth = (float)Math.Round(layout.LayoutBounds.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
+                        var finalLocation = location - halfLayoutWidth;
+                        if (finalLocation < drawArea.Left)
                         {
-                            var layoutWidth = (float)Math.Round(layout.LayoutBounds.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
-                            var finalLocation = location - layoutWidth;
-                            if (finalLocation < drawArea.Left)
+                            endLocation = (float)drawArea.Left + halfLayoutWidth;
+                            finalLocation = (float)drawArea.Left;
+                        }
+                        else if (finalLocation + (2 * halfLayoutWidth) > drawArea.Right)
+                        {
+                            endLocation = (float)drawArea.Right - halfLayoutWidth;
+                            finalLocation = (float)Math.Round(drawArea.Right - (2 * halfLayoutWidth), GraphicalReport.DIGITS_TO_ROUND);
+                        }
+                        var height = layout.LayoutBounds.Height;
+                        var y = !IsFlippedVertical ? (float)(drawArea.Top + LabelTickLength) : (float)(drawArea.Bottom - LabelTickLength - height);
+                        var translate = Matrix3x2.CreateTranslation(finalLocation, y);
+                        using (var geo = CanvasGeometry.CreateText(layout))
+                        {
+                            using (var translatedGeo = geo.Transform(translate))
                             {
-                                endLocation = (float)drawArea.Left + layoutWidth;
-                                finalLocation = (float)drawArea.Left;
-                            }
-                            else if (finalLocation + (2 * layoutWidth) > drawArea.Right)
-                            {
-                                endLocation = (float)drawArea.Right - layoutWidth;
-                                finalLocation = (float)Math.Round(drawArea.Right - (2 * layoutWidth), GraphicalReport.DIGITS_TO_ROUND);
-                            }
-                            var translate = Matrix3x2.CreateTranslation(finalLocation, (float)(drawArea.Top + LabelTickLength));
-                            using (var geo = CanvasGeometry.CreateText(layout))
-                            {
-                                using (var translatedGeo = geo.Transform(translate))
-                                {
-                                    session.FillGeometry(translatedGeo, Colors.Black);
-                                }
+                                session.FillGeometry(translatedGeo, Colors.Black);
                             }
                         }
+                    }
 
+                    if (IsTickDrawn)
+                    {
                         using (var pathBuilder = new CanvasPathBuilder(session))
                         {
                             pathBuilder.BeginFigure(location, (float)drawArea.Top);
@@ -280,7 +359,6 @@ namespace AccurateReportSystem
                             }
                         }
                     }
-                    curVal += MajorGridlineInfo.Offset;
                 }
             }
         }

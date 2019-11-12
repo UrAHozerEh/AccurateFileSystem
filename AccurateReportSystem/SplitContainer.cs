@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Graphics.Canvas;
 using Windows.Foundation;
+using Windows.UI;
 
 namespace AccurateReportSystem
 {
@@ -24,6 +25,7 @@ namespace AccurateReportSystem
         public override void Draw(PageInformation pageInformation, CanvasDrawingSession session, Rect drawArea)
         {
             //TODO: Containers should probably have a "calculate" that is done once per session so I dont need to do all this each page.
+            //session.DrawRectangle(drawArea, Colors.Red);
             var size = IsHorizontal ? drawArea.Width : drawArea.Height;
             double requestedTotalPercent = 1;
             double countPercent = 0;
@@ -76,6 +78,7 @@ namespace AccurateReportSystem
                     }
                 }
                 rect = GetRect(offset, curSize, drawArea);
+                //session.DrawRectangle(rect, Colors.Blue);
                 measure.Container.Draw(pageInformation, session, rect);
                 offset += curSize;
             }
@@ -101,6 +104,15 @@ namespace AccurateReportSystem
         public void AddContainer(SplitContainerMeasurement measurement)
         {
             ContainerMeasurements.Add(measurement);
+        }
+
+        public void AddSelfSizedContainer(Container container)
+        {
+            var measure = new SplitContainerMeasurement(container)
+            {
+                IsSizeSelfAssigned = true
+            };
+            ContainerMeasurements.Add(measure);
         }
 
         public override double GetRequestedWidth()

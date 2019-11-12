@@ -26,7 +26,7 @@ namespace AccurateReportSystem
         public static int DEFAULT_DIP = 96;
         public static int DIGITS_TO_ROUND = 2;
 
-        public List<CanvasRenderTarget> GetImages(double startFootage, double endFootage, double overlap = 100, float dpi = 150)
+        public List<CanvasRenderTarget> GetImages(double startFootage, double endFootage, float dpi = 150)
         {
             var pageAreaWidth = Math.Round(DEFAULT_DIP * 11.0, DIGITS_TO_ROUND);
             var pageAreaHeight = Math.Round(DEFAULT_DIP * 8.5, DIGITS_TO_ROUND);

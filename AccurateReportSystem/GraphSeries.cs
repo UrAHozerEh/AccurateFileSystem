@@ -33,7 +33,7 @@ namespace AccurateReportSystem
             Values.Sort((first, second) => first.footage.CompareTo(second.footage));
         }
 
-        public void Draw(CanvasDrawingSession session, PageInformation page, TransformInformation transform)
+        public virtual void Draw(CanvasDrawingSession session, PageInformation page, TransformInformation transform)
         {
             if (Values == null || Values.Count == 0)
                 return;

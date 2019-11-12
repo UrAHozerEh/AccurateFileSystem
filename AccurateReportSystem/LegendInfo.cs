@@ -138,9 +138,9 @@ namespace AccurateReportSystem
 
         public LegendInfo()
         {
-            NameFontSize = 18f;
+            NameFontSize = 20f;
             NameColor = Colors.Black;
-            SeriesNameFontSize = 12f;
+            SeriesNameFontSize = 16f;
             SeriesNameColor = Colors.Black;
             SeriesSymbolWidth = 50;
             VerticalAlignment = CanvasVerticalAlignment.Center;

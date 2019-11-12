@@ -69,6 +69,8 @@ namespace AccurateFileSystem
             {
                 Depth = double.Parse(doc.Groups[1].Value);
                 OriginalComment = OriginalComment.Replace(doc.Value, "");
+                OriginalComment = Regex.Replace(OriginalComment, "^\\s*,\\s*", "");
+                OriginalComment = Regex.Replace(OriginalComment, "\\s*,\\s*$", "");
             }
 
             if (string.IsNullOrWhiteSpace(OriginalComment))

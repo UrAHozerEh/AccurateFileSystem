@@ -35,13 +35,31 @@ namespace AccurateReportSystem
             var y = (float)Math.Round(IsInverted ? DrawArea.Top + scaledValue : DrawArea.Bottom - scaledValue, GraphicalReport.DIGITS_TO_ROUND);
             return (x, y);
         }
+
         public (float X, float Y) ToDrawArea((double Footage, double Value) values)
         {
             return ToDrawArea(values.Footage, values.Value);
         }
+
         public (double Footage, double Value) ToGraphArea(float x, float y)
         {
-            return (0, 0);
+            var xScale = DrawArea.Width / GraphArea.Width;
+            var yScale = DrawArea.Height / GraphArea.Height;
+
+            var scaledFootage = x - DrawArea.X;
+            var footageInGraph = Math.Round(scaledFootage / xScale, GraphicalReport.DIGITS_TO_ROUND);
+            var footage = footageInGraph + GraphArea.X;
+
+            var scaledValue = (IsInverted ? y - DrawArea.Top : DrawArea.Bottom - y);
+            var valueInGraph = Math.Round(scaledValue / yScale, GraphicalReport.DIGITS_TO_ROUND);
+            var value = valueInGraph + GraphArea.Y;
+
+            return (footage, value);
+        }
+
+        public (double Footage, double Value) ToGraphArea((float X, float Y) values)
+        {
+            return ToGraphArea(values.X, values.Y);
         }
     }
 }

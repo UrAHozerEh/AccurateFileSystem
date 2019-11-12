@@ -41,9 +41,6 @@ namespace AFSTester
         public MainPage()
         {
             this.InitializeComponent();
-            Filter = new HttpBaseProtocolFilter();
-            //Filter.ServerCredential = new Windows.Security.Credentials.PasswordCredential("https://apps-secure.phoenix.gov", email, password);
-            Client = new HttpClient(Filter);
         }
 
         private async void Button_Click(object sender, RoutedEventArgs e)
@@ -62,6 +59,7 @@ namespace AFSTester
                 {
                     var allegroFile = newFile as AllegroCISFile;
                     var report = new GraphicalReport();
+                    var commentGraph = new Graph(report);
                     var graph1 = new Graph(report);
                     var graph2 = new Graph(report);
                     var graph3 = new Graph(report);
@@ -81,11 +79,20 @@ namespace AFSTester
                         PointShape = GraphSeries.Shape.Circle,
                         GraphType = GraphSeries.Type.Point
                     };
-                    var commentSeries = new CommentSeries { Values = allegroFile.GetStringData("Comment") };
+                    var redLine = new SingleValueGraphSeries("850 Line", -0.85);
+                    var commentSeries = new CommentSeries { Values = allegroFile.GetStringData("Comment"), PercentOfGraph = 1f, IsFlippedVertical = true };
 
-                    graph1.CommentSeries = commentSeries;
+                    commentGraph.CommentSeries = commentSeries;
+                    commentGraph.LegendInfo.Name = "CIS Comments";
+                    commentGraph.DrawTopBorder = false;
+
+                    commentGraph.XAxisInfo.MajorGridline.IsEnabled = false;
+                    commentGraph.YAxesInfo.MinorGridlines.IsEnabled = false;
+                    commentGraph.YAxesInfo.MajorGridlines.IsEnabled = false;
+                    commentGraph.YAxesInfo.Y1IsDrawn = false;
+
                     graph1.Series.Add(depth);
-                    graph1.YAxesInfo.Y2IsEnabled = true;
+                    graph1.YAxesInfo.Y2IsDrawn = true;
                     /*
                     graph1.YAxesInfo.Y1MaximumValue = 150;
                     graph1.YAxesInfo.Y1MinimumValue = 0;
@@ -96,16 +103,38 @@ namespace AFSTester
                     graph1.Series.Add(on);
 
                     graph1.Series.Add(off);
+                    graph1.Series.Add(redLine);
+                    //graph1.XAxisInfo.IsEnabled = false;
+
+
+                    graph2.Series.Add(depth);
+                    graph2.YAxesInfo.Y2IsDrawn = true;
+                    graph2.YAxesInfo.Y1IsDrawn = false;
+                    //graph2.XAxisInfo.IsEnabled = false;
+
+                    graph3.Series.Add(on);
+                    graph3.Series.Add(off);
+                    //graph3.XAxisInfo.IsEnabled = false;
+                    graph3.DrawBottomBorder = false;
+
+                    report.XAxisInfo.IsEnabled = false;
+
+                    var bottomGlobalXAxis = new GlobalXAxis(report);
+
+                    var topGlobalXAxis = new GlobalXAxis(report, true);
 
                     var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
                     var graph1Measurement = new SplitContainerMeasurement(graph1)
                     {
                         RequestedPercent = 0.5
                     };
+                    splitContainer.AddSelfSizedContainer(topGlobalXAxis);
+                    splitContainer.AddContainer(commentGraph);
                     splitContainer.AddContainer(graph1Measurement);
                     splitContainer.AddContainer(graph2);
                     splitContainer.AddContainer(graph3);
-                    report.Container = graph1;
+                    splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
+                    report.Container = splitContainer;
                     var images = report.GetImages(allegroFile.StartFootage, allegroFile.EndFootage);
                     for (int i = 0; i < images.Count; ++i)
                     {

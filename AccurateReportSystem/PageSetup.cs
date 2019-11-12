@@ -10,7 +10,8 @@ namespace AccurateReportSystem
     {
         public double FootagePerPage { get; set; }
         public double Overlap { get; set; }
-        public PageSetup(double footagePerPage = 1000, double overlap = 0)
+        //TODO: Remove default here. doesnt make sense.
+        public PageSetup(double footagePerPage = 1000, double overlap = 100)
         {
             FootagePerPage = footagePerPage;
             Overlap = overlap;

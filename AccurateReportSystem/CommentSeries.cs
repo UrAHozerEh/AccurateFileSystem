@@ -16,12 +16,15 @@ namespace AccurateReportSystem
     public class CommentSeries
     {
         public List<(double footage, string value)> Values { get; set; }
-        public double TopEdgePadding { get; set; } = 10; //TODO: Make this inches.
+        public float TopEdgePadding { get; set; } = 10f; //TODO: Make this inches.
         public Color LineColor { get; set; } = Colors.Black;
         public Color TextColor { get; set; } = Colors.Black;
+        public float LineBuffer { get; set; } = 2f;
         public double CommentBuffer { get; set; } = 5;
         public double EdgeBuffer { get; set; } = 3;
-        public BorderType BorderType { get; set; } = BorderType.Pegs;
+        public BorderType BorderType { get; set; } = BorderType.Full;
+        public float PercentOfGraph { get; set; } = 0.5f;
+        public bool IsFlippedVertical { get; set; } = false;
 
         public (GeometryInfo, GeometryInfo) GetGeometry(PageInformation page, Rect drawArea, CanvasDrawingSession session)
         {
@@ -47,9 +50,10 @@ namespace AccurateReportSystem
                         break;
                     if (string.IsNullOrWhiteSpace(comment))
                         continue;
-                    var layout = new CanvasTextLayout(session, comment, format, (float)drawArea.Height / 2, 0);
+                    var layout = new CanvasTextLayout(session, comment, format, (float)(drawArea.Height * PercentOfGraph) - TopEdgePadding - LineBuffer, 0);
                     Rect textBounds = layout.DrawBounds;
                     var height = textBounds.Height;
+                    var width = layout.LayoutBounds.Width;
                     var textMiddle = (float)(textBounds.Top + (textBounds.Height / 2));
                     var feetToPixels = drawArea.Width / page.Width;
                     var footageInPixels = (footage - page.StartFootage) * feetToPixels + drawArea.X;
@@ -57,7 +61,7 @@ namespace AccurateReportSystem
                     var distanceFromMiddleToFootage = footageInPixels + textMiddle;
                     var textTranslate = drawArea.Width - distanceFromMiddleToFootage;
                     textBounds.Y += textTranslate;
-                    textBounds.X += (float)(TopEdgePadding + drawArea.Y);
+                    textBounds.X += IsFlippedVertical ? (float)(drawArea.Bottom - TopEdgePadding - width) : (float)(TopEdgePadding + drawArea.Top);
                     var curBounds = new CommentBoundsInfo
                     {
                         Layout = layout,
@@ -102,15 +106,17 @@ namespace AccurateReportSystem
 
                 using (var path = new CanvasPathBuilder(session))
                 {
-                    var lineTopEdgePadding = (float)TopEdgePadding - 2f + (float)drawArea.Y;
-                    var lineTopEdgePaddingWithExtra = lineTopEdgePadding + 10f;
-                    var lineFull = (float)(lineTopEdgePadding + newBounds.Width + 4f);
+                    var yStart = (float)(IsFlippedVertical ? drawArea.Bottom : drawArea.Top);
+                    var linePadding = TopEdgePadding - LineBuffer;
+                    var lineTopEdgePadding = IsFlippedVertical ? (float)drawArea.Bottom - linePadding : linePadding + (float)drawArea.Top;
+                    var lineTopEdgePaddingWithExtra = lineTopEdgePadding + (IsFlippedVertical ? -10f : 10f);
+                    var lineFull = IsFlippedVertical ? ((float)(lineTopEdgePadding - newBounds.Width - (LineBuffer * 2))) : ((float)(lineTopEdgePadding + newBounds.Width + (LineBuffer * 2)));
                     var lineLengthFromMiddle = (float)first.Bounds.Height / 2f + 1.5f;
 
                     switch (BorderType)
                     {
                         case BorderType.Line:
-                            path.BeginFigure((float)drawArea.Y, first.FootageInPixels);
+                            path.BeginFigure(yStart, first.FootageInPixels);
                             path.AddLine(lineTopEdgePadding, first.CommentMiddle);
                             path.AddLine(lineTopEdgePadding, first.CommentMiddle + lineLengthFromMiddle);
                             path.AddLine(lineTopEdgePadding, first.CommentMiddle - lineLengthFromMiddle);
@@ -118,7 +124,7 @@ namespace AccurateReportSystem
                             path.EndFigure(CanvasFigureLoop.Open);
                             break;
                         case BorderType.Pegs:
-                            path.BeginFigure((float)drawArea.Y, first.FootageInPixels);
+                            path.BeginFigure(yStart, first.FootageInPixels);
                             path.AddLine(lineTopEdgePadding, first.CommentMiddle);
                             path.AddLine(lineTopEdgePadding, first.CommentMiddle + lineLengthFromMiddle);
                             path.AddLine(lineTopEdgePaddingWithExtra, first.CommentMiddle + lineLengthFromMiddle);
@@ -130,7 +136,7 @@ namespace AccurateReportSystem
                             path.EndFigure(CanvasFigureLoop.Open);
                             break;
                         case BorderType.Full:
-                            path.BeginFigure((float)drawArea.Y, first.FootageInPixels);
+                            path.BeginFigure(yStart, first.FootageInPixels);
                             path.AddLine(lineTopEdgePadding, first.CommentMiddle);
                             path.AddLine(lineTopEdgePadding, first.CommentMiddle + lineLengthFromMiddle);
                             path.AddLine(lineFull, first.CommentMiddle + lineLengthFromMiddle);
@@ -142,16 +148,6 @@ namespace AccurateReportSystem
                         default:
                             break;
                     }
-                    path.BeginFigure((float)drawArea.Y, first.FootageInPixels);
-                    path.AddLine(lineTopEdgePadding, first.CommentMiddle);
-                    path.AddLine(lineTopEdgePadding, first.CommentMiddle + lineLengthFromMiddle);
-                    //path.AddLine(lineTopEdgePaddingWithExtra, finalFootageInPixels + lineLengthFromMiddle);
-                    //path.AddLine(lineTopEdgePadding, finalFootageInPixels + lineLengthFromMiddle);
-                    path.AddLine(lineTopEdgePadding, first.CommentMiddle - lineLengthFromMiddle);
-                    //path.AddLine(lineTopEdgePaddingWithExtra, finalFootageInPixels - lineLengthFromMiddle);
-                    //path.AddLine(lineTopEdgePadding, finalFootageInPixels - lineLengthFromMiddle);
-                    path.AddLine(lineTopEdgePadding, first.CommentMiddle);
-                    path.EndFigure(CanvasFigureLoop.Open);
 
                     if (lineOutputGeo == null)
                     {

@@ -13,15 +13,26 @@ namespace AccurateReportSystem
         public GraphicalReport Report { get; set; }
         public XAxisInfo XAxisInfo { get; set; }
 
-        public GlobalXAxis(GraphicalReport report)
+        public GlobalXAxis(GraphicalReport report, bool isFlippedVertical = false)
         {
             Report = report;
             XAxisInfo = new XAxisInfo(report.XAxisInfo);
+            XAxisInfo.IsFlippedVertical = isFlippedVertical;
+            XAxisInfo.IsEnabled = true;
         }
 
-        public override void Draw(PageInformation pageInformation, CanvasDrawingSession session, Rect drawArea)
+        public override void Draw(PageInformation page, CanvasDrawingSession session, Rect drawArea)
         {
-            throw new NotImplementedException();
+            var graphArea = new Rect(page.StartFootage, 0, page.Width, 0);
+
+            var leftSpace = Report.LegendInfo.WidthDIP + Report.YAxesInfo.Y1TotalHeight;
+            var rightSpace = Report.YAxesInfo.Y2TotalHeight;
+            var width = drawArea.Width - leftSpace - rightSpace;
+            var realDrawArea = new Rect(drawArea.Left + leftSpace, drawArea.Top, width, drawArea.Height);
+
+            var transform = new TransformInformation(realDrawArea, graphArea, false);
+
+            XAxisInfo.DrawInfo(session, page, transform, realDrawArea);
         }
 
         public override double GetRequestedWidth()
