@@ -15,6 +15,7 @@ namespace AccurateReportSystem
 {
     public class XAxisInfo
     {
+        // Label info
         public double LabelHeight
         {
             get
@@ -64,6 +65,8 @@ namespace AccurateReportSystem
             }
         }
         private string labelFormat = null;
+
+        // Title info
         public string Title
         {
             get
@@ -108,6 +111,35 @@ namespace AccurateReportSystem
             }
         }
         private float? extraTitleHeight = null;
+
+        // Minor gridlines
+        public GridlineInfo MinorGridlineInfo
+        {
+            get
+            {
+                return minorGridlineInfo ?? MasterInfo.MinorGridlineInfo;
+            }
+            set
+            {
+                minorGridlineInfo = value;
+            }
+        }
+        private GridlineInfo minorGridlineInfo = null;
+
+        // Major gridlines
+        public GridlineInfo MajorGridlineInfo
+        {
+            get
+            {
+                return majorGridlineInfo ?? MasterInfo.MajorGridlineInfo;
+            }
+            set
+            {
+                majorGridlineInfo = value;
+            }
+        }
+        private GridlineInfo majorGridlineInfo = null;
+
         public bool IsEnabled
         {
             get
@@ -121,30 +153,6 @@ namespace AccurateReportSystem
         }
         private bool? isEnabled = null;
         public XAxisInfo MasterInfo { get; set; }
-        public GridlineInfo MinorGridlineInfo
-        {
-            get
-            {
-                return minorGridlineInfo ?? MasterInfo.MinorGridlineInfo;
-            }
-            set
-            {
-                minorGridlineInfo = value;
-            }
-        }
-        private GridlineInfo minorGridlineInfo = null;
-        public GridlineInfo MajorGridlineInfo
-        {
-            get
-            {
-                return majorGridlineInfo ?? MasterInfo.MajorGridlineInfo;
-            }
-            set
-            {
-                majorGridlineInfo = value;
-            }
-        }
-        private GridlineInfo majorGridlineInfo = null;
 
         public XAxisInfo()
         {
@@ -272,6 +280,7 @@ namespace AccurateReportSystem
                             }
                         }
                     }
+                    curVal += MajorGridlineInfo.Offset;
                 }
             }
         }

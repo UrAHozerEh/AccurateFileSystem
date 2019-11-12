@@ -25,15 +25,12 @@ namespace AccurateReportSystem
         public CommentSeries CommentSeries { get; set; }
         public GridlineInfo[] Gridlines { get; set; }
 
-
         public XAxisInfo XAxisInfo { get; set; }
         public LegendInfo LegendInfo { get; set; }
         public YAxesInfo YAxesInfo { get; set; }
         private double TotalXValueShift => LegendInfo.WidthDIP + YAxesInfo.Y1TotalHeight;
         private double TotalWidthShift => TotalXValueShift + YAxesInfo.Y2TotalHeight;
         private double TotalYValueShift => 0;
-
-
 
         public Graph(GraphicalReport report)
         {
@@ -82,6 +79,10 @@ namespace AccurateReportSystem
                 };
                 //session.DrawGeometry(graphBodyBorder, Colors.Green, 1, style);
             }
+            Rect y1GraphArea = new Rect(page.StartFootage, YAxesInfo.Y1MinimumValue, page.Width, YAxesInfo.Y1ValuesHeight);
+            Rect y2GraphArea = new Rect(page.StartFootage, YAxesInfo.Y2MinimumValue, page.Width, YAxesInfo.Y2ValuesHeight);
+            TransformInformation y1Transform = new TransformInformation(graphBodyDrawArea, y1GraphArea, YAxesInfo.Y1IsInverted);
+            TransformInformation y2Transform = new TransformInformation(graphBodyDrawArea, y2GraphArea, YAxesInfo.Y2IsInverted);
 
             //Draw everything in the graph body layer. Should prevent bleed over.
             using (var layer = session.CreateLayer(1f, graphBodyDrawArea))
@@ -89,10 +90,7 @@ namespace AccurateReportSystem
                 //TODO: Simplify getting geometries from the graph series. Should only be done once before getting all the pages.
                 //TODO: Maybe it should actually be drawn per page.
                 Geometries = new List<GeometryInfo>();
-                Rect y1GraphArea = new Rect(page.StartFootage, YAxesInfo.Y1MinimumValue, page.Width, YAxesInfo.Y1ValuesHeight);
-                Rect y2GraphArea = new Rect(page.StartFootage, YAxesInfo.Y2MinimumValue, page.Width, YAxesInfo.Y2ValuesHeight);
-                TransformInformation y1Transform = new TransformInformation(graphBodyDrawArea, y1GraphArea, YAxesInfo.Y1IsInverted);
-                TransformInformation y2Transform = new TransformInformation(graphBodyDrawArea, y2GraphArea, YAxesInfo.Y2IsInverted);
+                
 
                 var clipRect = new Rect(page.StartFootage, (float)YAxesInfo.Y1MinimumValue, page.Width, (float)YAxesInfo.Y1ValuesHeight);
                 var widthScalar = graphBodyDrawArea.Width / page.Width;
@@ -107,13 +105,9 @@ namespace AccurateReportSystem
                 var translateMatrix = Matrix3x2.CreateTranslation(new Vector2((float)xTranslate, (float)yTranslate));
                 var scaleMatrix = Matrix3x2.CreateScale((float)widthScalar, (float)heightScalar, new Vector2((float)graphBodyDrawArea.X, (float)graphBodyDrawArea.Y));
 
-                DrawGridLines(page, graphBodyDrawArea, session, translateMatrix, scaleMatrix);
+                //DrawGridLines(page, graphBodyDrawArea, session, translateMatrix, scaleMatrix);
 
-                if (XAxisInfo.IsEnabled)
-                {
-                    var xAxisDrawArea = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Bottom, graphBodyDrawArea.Width, XAxisInfo.TotalHeight);
-                    XAxisInfo.DrawLabels(session, page, y1Transform, y1GraphArea);
-                }
+                
 
                 foreach (var series in Series)
                 {
@@ -133,6 +127,12 @@ namespace AccurateReportSystem
                         session.FillGeometry(commentGeoInfo.Geometry, commentGeoInfo.Color);
                     //TODO: Canvas Stroke Style should be in Geo Info. Also should have different styles for text and the indicators.
                 }
+            }
+
+            if (XAxisInfo.IsEnabled)
+            {
+                var xAxisDrawArea = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Bottom, graphBodyDrawArea.Width, XAxisInfo.TotalHeight);
+                XAxisInfo.DrawLabels(session, page, y1Transform, xAxisDrawArea);
             }
 
             DrawAxisLabels(page, session, graphBodyDrawArea);
