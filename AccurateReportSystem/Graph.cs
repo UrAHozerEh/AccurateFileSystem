@@ -129,7 +129,7 @@ namespace AccurateReportSystem
             //DrawAxisTitles(session, graphBodyDrawArea);
             DrawOverlapShadow(page, session, graphBodyDrawArea);
             var legendDrawArea = new Rect(DrawArea.X, DrawArea.Y, LegendInfo.WidthDIP, graphBodyDrawArea.Height);
-            DrawLegend(legendDrawArea, session);
+            LegendInfo.Draw(session, Series, legendDrawArea);
 
             if (DrawTopBorder)
                 session.DrawLine((float)DrawArea.Left, (float)DrawArea.Top, (float)DrawArea.Right, (float)DrawArea.Top, Colors.Black, 1);
@@ -149,68 +149,6 @@ namespace AccurateReportSystem
             {
                 session.FillRectangle(startRect, color);
                 session.FillRectangle(endRect, color);
-            }
-        }
-
-        private void DrawLegend(Rect legendDrawArea, CanvasDrawingSession session)
-        {
-            //session.DrawRectangle(legendDrawArea, Colors.Orange);
-            var height = LegendInfo.NameFontSize + LegendInfo.SeriesNameFontSize * Series.Count;
-            var exampleRect = new Rect(legendDrawArea.X, legendDrawArea.Y, legendDrawArea.Width, height);
-            //session.DrawRectangle(exampleRect, Colors.Orange);
-
-
-            var nextHeight = 0f;
-            if (LegendInfo.VerticalAlignment == CanvasVerticalAlignment.Center)
-                nextHeight = (float)Math.Round(legendDrawArea.Height / 2 - height / 2, GraphicalReport.DIGITS_TO_ROUND);
-            else if (LegendInfo.VerticalAlignment == CanvasVerticalAlignment.Bottom)
-                nextHeight = (float)(legendDrawArea.Bottom - height);
-            using (var format = new CanvasTextFormat())
-            {
-                format.HorizontalAlignment = LegendInfo.HorizontalAlignment;
-                format.FontSize = LegendInfo.NameFontSize;
-                format.FontFamily = "Arial";
-                format.FontWeight = FontWeights.Bold;
-                format.FontStyle = FontStyle.Normal;
-                using (var layout = new CanvasTextLayout(session, LegendInfo.Name, format, (float)legendDrawArea.Width, 0))
-                {
-                    //var translateX = (float)Math.Round(legendDrawArea.X, GraphicalReport.DIGITS_TO_ROUND);
-                    //var translateY = (float)Math.Round(legendDrawArea.Y, GraphicalReport.DIGITS_TO_ROUND);
-                    //var translate = Matrix3x2.CreateTranslation(translateX, translateY);
-                    using (var geo = CanvasGeometry.CreateText(layout))
-                    {
-                        session.FillGeometry(geo, (float)legendDrawArea.X, (float)legendDrawArea.Y + nextHeight, LegendInfo.NameColor);
-                    }
-                    nextHeight += LegendInfo.NameFontSize;
-                }
-            }
-            using (var format = new CanvasTextFormat())
-            {
-                format.HorizontalAlignment = LegendInfo.HorizontalAlignment;
-                format.FontSize = LegendInfo.SeriesNameFontSize;
-                format.FontFamily = "Arial";
-                format.FontWeight = FontWeights.Bold;
-                format.FontStyle = FontStyle.Normal;
-                foreach (var series in Series)
-                {
-                    using (var layout = new CanvasTextLayout(session, series.Name, format, (float)legendDrawArea.Width, 0))
-                    {
-                        //var translateX = (float)Math.Round(legendDrawArea.X, GraphicalReport.DIGITS_TO_ROUND);
-                        //var translateY = (float)Math.Round(legendDrawArea.Y, GraphicalReport.DIGITS_TO_ROUND);
-                        //var translate = Matrix3x2.CreateTranslation(translateX, translateY);
-                        using (var geo = CanvasGeometry.CreateText(layout))
-                        {
-                            session.FillGeometry(geo, (float)legendDrawArea.X, (float)legendDrawArea.Y + nextHeight, series.LineColor);
-                            using(var strokeStyle = new CanvasStrokeStyle())
-                            {
-                                strokeStyle.TransformBehavior = CanvasStrokeTransformBehavior.Hairline;
-                                session.DrawGeometry(geo, (float)legendDrawArea.X, (float)legendDrawArea.Y + nextHeight, Colors.Black, 1, strokeStyle);
-                            }
-
-                        }
-                        nextHeight += LegendInfo.SeriesNameFontSize;
-                    }
-                }
             }
         }
 

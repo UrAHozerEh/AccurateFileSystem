@@ -13,22 +13,23 @@ namespace AccurateReportSystem
 {
     public class SurveyDirectionSeries : ChartSeries
     {
+        public override float Height => ArrowInfo.Height;
         public List<(double, bool)> DirectionData { get; set; }
-        public float ArrowWidthInches { get; set; } = 0.45f;
-        public float ArrowWidth => (float)Math.Round(ArrowWidthInches * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public bool FancySingleMiddle { get; set; } = false;
-        public float FinWidthPercent { get; set; } = 0.25f;
-        public float FinHeightPercent { get; set; } = 0.95f;
-        public float TailPercent { get; set; } = 0.5f;
+        public ArrowInfo ArrowInfo { get; set; }
 
-        private float FinXShift => (float)Math.Round(ArrowWidth * FinWidthPercent, GraphicalReport.DIGITS_TO_ROUND);
-        private float FinYShift => (float)Math.Round(Height * FinHeightPercent / 2, GraphicalReport.DIGITS_TO_ROUND);
-        private float TailYShift => (float)Math.Round(TailPercent * FinYShift, GraphicalReport.DIGITS_TO_ROUND);
+        public override bool IsDrawnInLegend
+        {
+            get { return false; }
+            set { throw new InvalidOperationException(); }
+        }
+        public override Color LegendNameColor { get => throw new ArgumentException(); set => throw new InvalidOperationException(); }
 
         public SurveyDirectionSeries(List<(double, bool)> directionData)
         {
             DirectionData = directionData;
-            HeightInches = 0.25f;
+
+            ArrowInfo = new ArrowInfo(0.45f, 0.25f, Colors.Black, Colors.White);
         }
 
         public override void Draw(PageInformation page, CanvasDrawingSession session, Rect drawArea, TransformInformation1d transform)
@@ -41,7 +42,7 @@ namespace AccurateReportSystem
                 double lastFootage = 0;
                 foreach (var (footage, isReverseRun) in DirectionData)
                 {
-                    
+
                     if (footage < page.StartFootage)
                         continue;
                     if (footage > page.EndFootage)
@@ -54,9 +55,15 @@ namespace AccurateReportSystem
                     foundOther = true;
                     var x = transform.ToDrawArea(footage);
                     if (firstVal.Value)
-                        DrawArrowsAway(session, x, y);
+                    {
+                        ArrowInfo.DrawLeftOf(session, x, y, ArrowInfo.Direction.Left);
+                        ArrowInfo.DrawRightOf(session, x, y, ArrowInfo.Direction.Right);
+                    }
                     else
-                        DrawArrowsTowards(session, x, y);
+                    {
+                        ArrowInfo.DrawLeftOf(session, x, y, ArrowInfo.Direction.Right);
+                        ArrowInfo.DrawRightOf(session, x, y, ArrowInfo.Direction.Left);
+                    }
                     firstVal = isReverseRun;
                 }
                 var middleFoot = page.StartFootage + (lastFootage - page.StartFootage) / 2;
@@ -64,130 +71,7 @@ namespace AccurateReportSystem
                 if (!FancySingleMiddle)
                     middleX = drawArea.GetMiddlePoint().X;
                 if (!foundOther)
-                    DrawSingleArrow(session, middleX, y, firstVal.Value);
-            }
-        }
-
-        private void DrawArrowsTowards(CanvasDrawingSession session, float x, float y)
-        {
-            using (var pathBuilder = new CanvasPathBuilder(session))
-            {
-                pathBuilder.BeginFigure(x, y);
-                pathBuilder.AddLine(x - FinXShift, y - FinYShift);
-                pathBuilder.AddLine(x - FinXShift, y - TailYShift);
-                pathBuilder.AddLine(x - ArrowWidth, y - TailYShift);
-                pathBuilder.AddLine(x - ArrowWidth, y + TailYShift);
-                pathBuilder.AddLine(x - FinXShift, y + TailYShift);
-                pathBuilder.AddLine(x - FinXShift, y + FinYShift);
-                pathBuilder.AddLine(x, y);
-
-                pathBuilder.AddLine(x + FinXShift, y - FinYShift);
-                pathBuilder.AddLine(x + FinXShift, y - TailYShift);
-                pathBuilder.AddLine(x + ArrowWidth, y - TailYShift);
-                pathBuilder.AddLine(x + ArrowWidth, y + TailYShift);
-                pathBuilder.AddLine(x + FinXShift, y + TailYShift);
-                pathBuilder.AddLine(x + FinXShift, y + FinYShift);
-                pathBuilder.AddLine(x, y);
-                pathBuilder.EndFigure(CanvasFigureLoop.Closed);
-                using (var geo = CanvasGeometry.CreatePath(pathBuilder))
-                {
-                    session.DrawGeometry(geo, Colors.Black);
-                    session.FillGeometry(geo, Colors.White);
-                }
-            }
-        }
-
-        private void DrawArrowsAway(CanvasDrawingSession session, float x, float y)
-        {
-            using (var pathBuilder = new CanvasPathBuilder(session))
-            {
-                x -= ArrowWidth;
-                --x;
-                pathBuilder.BeginFigure(x, y);
-                pathBuilder.AddLine(x + FinXShift, y - FinYShift);
-                pathBuilder.AddLine(x + FinXShift, y - TailYShift);
-                pathBuilder.AddLine(x + ArrowWidth, y - TailYShift);
-                pathBuilder.AddLine(x + ArrowWidth, y + TailYShift);
-                pathBuilder.AddLine(x + FinXShift, y + TailYShift);
-                pathBuilder.AddLine(x + FinXShift, y + FinYShift);
-                pathBuilder.AddLine(x, y);
-                pathBuilder.EndFigure(CanvasFigureLoop.Closed);
-                ++x;
-
-                x += 2 * ArrowWidth;
-                ++x;
-                pathBuilder.BeginFigure(x, y);
-                pathBuilder.AddLine(x - FinXShift, y - FinYShift);
-                pathBuilder.AddLine(x - FinXShift, y - TailYShift);
-                pathBuilder.AddLine(x - ArrowWidth, y - TailYShift);
-                pathBuilder.AddLine(x - ArrowWidth, y + TailYShift);
-                pathBuilder.AddLine(x - FinXShift, y + TailYShift);
-                pathBuilder.AddLine(x - FinXShift, y + FinYShift);
-                pathBuilder.AddLine(x, y);
-                pathBuilder.EndFigure(CanvasFigureLoop.Closed);
-
-                using (var geo = CanvasGeometry.CreatePath(pathBuilder))
-                {
-                    session.DrawGeometry(geo, Colors.Black);
-                    session.FillGeometry(geo, Colors.White);
-                }
-            }
-        }
-
-        private void DrawSingleArrow(CanvasDrawingSession session, float x, float y, bool isReverse)
-        {
-            var points = new List<Vector2>();
-            using (var pathBuilder = new CanvasPathBuilder(session))
-            {
-                if (isReverse)
-                {
-                    x -= ArrowWidth / 2;
-                    points.Add(new Vector2(x, y));
-                    pathBuilder.BeginFigure(x, y);
-                    points.Add(new Vector2(x, y));
-                    pathBuilder.AddLine(x + FinXShift, y - FinYShift);
-                    points.Add(new Vector2(x + FinXShift, y - FinYShift));
-                    pathBuilder.AddLine(x + FinXShift, y - TailYShift);
-                    points.Add(new Vector2(x + FinXShift, y - TailYShift));
-                    pathBuilder.AddLine(x + ArrowWidth, y - TailYShift);
-                    points.Add(new Vector2(x + ArrowWidth, y - TailYShift));
-                    pathBuilder.AddLine(x + ArrowWidth, y + TailYShift);
-                    points.Add(new Vector2(x + ArrowWidth, y + TailYShift));
-                    pathBuilder.AddLine(x + FinXShift, y + TailYShift);
-                    points.Add(new Vector2(x + FinXShift, y + TailYShift));
-                    pathBuilder.AddLine(x + FinXShift, y + FinYShift);
-                    points.Add(new Vector2(x + FinXShift, y + FinYShift));
-                    pathBuilder.AddLine(x, y);
-                    points.Add(new Vector2(x, y));
-                    pathBuilder.EndFigure(CanvasFigureLoop.Closed);
-                }
-                else
-                {
-                    x += ArrowWidth / 2;
-                    pathBuilder.BeginFigure(x, y);
-                    points.Add(new Vector2(x, y));
-                    pathBuilder.AddLine(x - FinXShift, y - FinYShift);
-                    points.Add(new Vector2(x - FinXShift, y - FinYShift));
-                    pathBuilder.AddLine(x - FinXShift, y - TailYShift);
-                    points.Add(new Vector2(x - FinXShift, y - TailYShift));
-                    pathBuilder.AddLine(x - ArrowWidth, y - TailYShift);
-                    points.Add(new Vector2(x - ArrowWidth, y - TailYShift));
-                    pathBuilder.AddLine(x - ArrowWidth, y + TailYShift);
-                    points.Add(new Vector2(x - ArrowWidth, y + TailYShift));
-                    pathBuilder.AddLine(x - FinXShift, y + TailYShift);
-                    points.Add(new Vector2(x - FinXShift, y + TailYShift));
-                    pathBuilder.AddLine(x - FinXShift, y + FinYShift);
-                    points.Add(new Vector2(x - FinXShift, y + FinYShift));
-                    pathBuilder.AddLine(x, y);
-                    points.Add(new Vector2(x, y));
-                    pathBuilder.EndFigure(CanvasFigureLoop.Closed);
-                }
-
-                using (var geo = CanvasGeometry.CreatePolygon(session, points.ToArray()))
-                {
-                    session.DrawGeometry(geo, Colors.Black);
-                    session.FillGeometry(geo, Colors.White);
-                }
+                    ArrowInfo.DrawOnTopOf(session, middleX, y, firstVal.Value ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right);
             }
         }
     }

@@ -132,28 +132,34 @@ namespace AFSTester
                     //    RequestedPercent = 0.5
                     //};
                     var chart1 = new Chart(report, "Survey Direction");
+                    var chart2 = new Chart(report, "MIR Info");
+                    var mirSeries = new MirDirection(allegroFile.GetReconnects());
+                    chart2.Series.Add(mirSeries);
+                    //chart1.LegendInfo.NameFontSize = 18f;
+
                     var chart1Series = new SurveyDirectionSeries(allegroFile.GetDirectionData());
                     chart1.Series.Add(chart1Series);
 
                     splitContainer.AddSelfSizedContainer(topGlobalXAxis);
                     splitContainer.AddContainer(commentGraphMeasurement);
                     splitContainer.AddContainer(graph1);
+                    splitContainer.AddSelfSizedContainer(chart2);
                     splitContainer.AddSelfSizedContainer(chart1);
                     //splitContainer.AddContainer(graph2);
                     //splitContainer.AddContainer(graph3);
                     splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
                     report.Container = splitContainer;
-                    var images = report.GetImages(allegroFile.StartFootage, allegroFile.EndFootage);
-                    for (int i = 0; i < images.Count; ++i)
-                    {
-                        var page = $"{i + 1}".PadLeft(3, '0');
-                        var image = images[i];
-                        var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {page}" + ".png", CreationCollisionOption.ReplaceExisting);
-                        using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
-                        {
-                            await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
-                        }
-                    }
+                    //var images = report.GetImages(allegroFile.StartFootage, allegroFile.EndFootage);
+                    //for (int i = 0; i < images.Count; ++i)
+                    //{
+                        //var page = $"{i + 1}".PadLeft(3, '0');
+                        //var image = images[i];
+                        //var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {page}" + ".png", CreationCollisionOption.ReplaceExisting);
+                        //using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
+                        //{
+                            //await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
+                        //}
+                    //}
                 }
                 if (newFile != null)
                     newFiles.Add(newFile);
@@ -173,11 +179,6 @@ namespace AFSTester
                         --j;
                     }
                 }
-            }
-            if (Windows.Graphics.Printing.PrintManager.IsSupported())
-            {
-                var report = new GraphicalReport();
-                await Windows.Graphics.Printing.PrintManager.ShowPrintUIAsync();
             }
             /*
             var picker = new FileOpenPicker();

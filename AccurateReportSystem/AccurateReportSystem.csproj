@@ -132,6 +132,8 @@
     <Compile Include="GraphSeries.cs" />
     <Compile Include="GridlineInfo.cs" />
     <Compile Include="LegendInfo.cs" />
+    <Compile Include="MirDirection.cs" />
+    <Compile Include="Series.cs" />
     <Compile Include="SingleValueGraphSeries.cs" />
     <Compile Include="SplitContainer.cs" />
     <Compile Include="PageInformation.cs" />

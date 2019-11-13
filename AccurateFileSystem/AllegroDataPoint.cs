@@ -23,7 +23,7 @@ namespace AccurateFileSystem
         public bool HasGPS => !GPS.Equals(new BasicGeoposition());
         public List<DateTime> Times { get; private set; }
         public bool HasTime => Times.Count != 0;
-        public int? NextReconnect { get; set; }
+        public ReconnectTestStationRead NextReconnect { get; set; }
         public bool IsReverseRun { get; set; } = false;
         public DateTime? OnTime
         {

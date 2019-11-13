@@ -52,7 +52,7 @@ namespace AccurateFileSystem
                 return;
             int incVal = int.Parse(Header["autoincval"]);
             int startIndex = 0;
-            for (int i = 1; i < Points.Count - 1; ++i)
+            for (int i = 1; i < Points.Count; ++i)
             {
                 var cur = Points[i];
                 if (cur.HasReconnect)
@@ -77,7 +77,8 @@ namespace AccurateFileSystem
                 var footDist = endPoint.Footage - startPoint.Footage;
 
                 ReconnectTestStationRead reconnect = endPoint.GetReconnect();
-                reconnect.ReconnectDistance = footDist;
+                reconnect.StartPoint = startPoint;
+                reconnect.EndPoint = endPoint;
 
                 var mirOnPerFoot = reconnect.MirOn / footDist;
                 var mirOffPerFoot = reconnect.MirOff / footDist;
@@ -85,7 +86,7 @@ namespace AccurateFileSystem
                 for (int i = start; i < end; ++i)
                 {
                     var curPoint = Points[i];
-                    curPoint.NextReconnect = end;
+                    curPoint.NextReconnect = reconnect;
                     var curDist = curPoint.Footage - startPoint.Footage;
 
                     curPoint.MIROn = curPoint.On + Math.Round(mirOnPerFoot * curDist, 4);
@@ -208,6 +209,20 @@ namespace AccurateFileSystem
                     list.Add((Points[i].Footage, Points[i].Depth.Value));
             }
             return list;
+        }
+
+        public List<ReconnectTestStationRead> GetReconnects()
+        {
+            var output = new List<ReconnectTestStationRead>();
+            foreach (var point in Points.Values)
+            {
+                if (!point.HasReconnect)
+                    continue;
+                var reconnect = point.GetReconnect();
+                if (reconnect != null)
+                    output.Add(reconnect);
+            }
+            return output;
         }
 
         public List<(double footage, string value)> GetStringData(string fieldName)

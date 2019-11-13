@@ -106,7 +106,7 @@ namespace AccurateFileSystem
         public double RightOn { get; }
         public double RightOff { get; }
 
-        public SideDrainTestStationRead(string original, string replaceId) : base (original, replaceId)
+        public SideDrainTestStationRead(string original, string replaceId) : base(original, replaceId)
         {
             Match onOffMatch = Regex.Match(original, OnOffRegexPattern);
             Match onMatch = Regex.Match(original, OnRegexPattern);
@@ -147,9 +147,11 @@ namespace AccurateFileSystem
         public double MirOff { get; }
         public double NGOn { get; }
         public double NGOff { get; }
-        public double ReconnectDistance { get; set; }
+        public double ReconnectDistance => Math.Abs(EndPoint.Footage - StartPoint.Footage);
         public double MirOnPerFoot => MirOn / ReconnectDistance;
         public double MirOffPerFoot => MirOff / ReconnectDistance;
+        public AllegroDataPoint StartPoint { get; set; }
+        public AllegroDataPoint EndPoint { get; set; }
 
         public ReconnectTestStationRead(string original, string replaceId) : base(original, replaceId)
         {

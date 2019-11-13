@@ -1,10 +1,14 @@
-﻿using Microsoft.Graphics.Canvas.Text;
+﻿using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Geometry;
+using Microsoft.Graphics.Canvas.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Foundation;
 using Windows.UI;
+using Windows.UI.Text;
 
 namespace AccurateReportSystem
 {
@@ -154,6 +158,98 @@ namespace AccurateReportSystem
         {
             Master = master;
             Name = name;
+        }
+
+        public void Draw(CanvasDrawingSession session, IEnumerable<Series> series, Rect drawArea)
+        {
+            var height = 0f;
+            var filteredSeries = series.Where(s => s.IsDrawnInLegend).ToList();
+
+            using (var format = new CanvasTextFormat())
+            {
+                format.HorizontalAlignment = HorizontalAlignment;
+                format.FontSize = NameFontSize;
+                format.FontFamily = "Arial";
+                format.FontWeight = FontWeights.Bold;
+                format.FontStyle = FontStyle.Normal;
+                using (var layout = new CanvasTextLayout(session, Name, format, (float)drawArea.Width, 0))
+                {
+                    var curHeight = (float)layout.LayoutBounds.Height;
+                    height += curHeight;
+                }
+            }
+            using (var format = new CanvasTextFormat())
+            {
+                format.HorizontalAlignment = HorizontalAlignment;
+                format.FontSize = SeriesNameFontSize;
+                format.FontFamily = "Arial";
+                format.FontWeight = FontWeights.Bold;
+                format.FontStyle = FontStyle.Normal;
+                foreach (var curSeries in filteredSeries)
+                {
+                    using (var layout = new CanvasTextLayout(session, curSeries.Name, format, (float)drawArea.Width, 0))
+                    {
+                        var curHeight = (float)layout.LayoutBounds.Height;
+                        height += curHeight;
+                    }
+                }
+            }
+
+            //session.DrawRectangle(legendDrawArea, Colors.Orange);
+            using (var layer = session.CreateLayer(1f, drawArea))
+            {
+                var offset = 0f;
+                if (VerticalAlignment == CanvasVerticalAlignment.Center)
+                    offset = (float)Math.Round(drawArea.Height / 2 - height / 2, GraphicalReport.DIGITS_TO_ROUND);
+                else if (VerticalAlignment == CanvasVerticalAlignment.Bottom)
+                    offset = (float)(drawArea.Bottom - height);
+                using (var format = new CanvasTextFormat())
+                {
+                    format.HorizontalAlignment = HorizontalAlignment;
+                    format.FontSize = NameFontSize;
+                    format.FontFamily = "Arial";
+                    format.FontWeight = FontWeights.Bold;
+                    format.FontStyle = FontStyle.Normal;
+                    using (var layout = new CanvasTextLayout(session, Name, format, (float)drawArea.Width, 0))
+                    {
+                        using (var geo = CanvasGeometry.CreateText(layout))
+                        {
+                            session.FillGeometry(geo, (float)drawArea.X, (float)drawArea.Y + offset, NameColor);
+                        }
+                        var curHeight = (float)layout.LayoutBounds.Height;
+                        offset += curHeight;
+                    }
+                }
+                using (var format = new CanvasTextFormat())
+                {
+                    format.HorizontalAlignment = HorizontalAlignment;
+                    format.FontSize = SeriesNameFontSize;
+                    format.FontFamily = "Arial";
+                    format.FontWeight = FontWeights.Bold;
+                    format.FontStyle = FontStyle.Normal;
+                    foreach (var curSeries in filteredSeries)
+                    {
+                        using (var layout = new CanvasTextLayout(session, curSeries.Name, format, (float)drawArea.Width, 0))
+                        {
+                            using (var geo = CanvasGeometry.CreateText(layout))
+                            {
+                                if (SeriesNameUsesSeriesColor)
+                                    session.FillGeometry(geo, (float)drawArea.X, (float)drawArea.Y + offset, curSeries.LegendNameColor);
+                                else
+                                    session.FillGeometry(geo, (float)drawArea.X, (float)drawArea.Y + offset, SeriesNameColor);
+                                using (var strokeStyle = new CanvasStrokeStyle())
+                                {
+                                    strokeStyle.TransformBehavior = CanvasStrokeTransformBehavior.Hairline;
+                                    session.DrawGeometry(geo, (float)drawArea.X, (float)drawArea.Y + offset, Colors.Black, 1, strokeStyle);
+                                }
+
+                            }
+                            var curHeight = (float)layout.LayoutBounds.Height;
+                            offset += curHeight;
+                        }
+                    }
+                }
+            }
         }
     }
 }

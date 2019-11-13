@@ -14,9 +14,9 @@ using Point = Windows.Foundation.Point;
 
 namespace AccurateReportSystem
 {
-    public class GraphSeries
+    public class GraphSeries : Series
     {
-        public string Name { get; set; }
+        public Color FillColor { get; set; } = Colors.Black;
         public Color LineColor { get; set; } = Colors.Black;
         public int LineThickness { get; set; } = 2;
         public Color PointColor { get; set; } = Colors.Black;
@@ -25,6 +25,31 @@ namespace AccurateReportSystem
         public Type GraphType { get; set; } = Type.Line;
         public double MaxDrawDistance { get; set; } = 10;
         public bool IsY1Axis { get; set; } = true;
+        public override bool IsDrawnInLegend { get; set; } = true;
+        public override Color LegendNameColor
+        {
+            get
+            {
+                if (legendNameColor.HasValue)
+                    return legendNameColor.Value;
+                switch (GraphType)
+                {
+                    case Type.Line:
+                        return LineColor;
+                    case Type.Bar:
+                        return FillColor;
+                    case Type.Point:
+                        return PointColor;
+                    default:
+                        return Colors.Black;
+                }
+            }
+            set
+            {
+                legendNameColor = value;
+            }
+        }
+        private Color? legendNameColor = null;
 
         public GraphSeries(string name, List<(double footage, double value)> values)
         {

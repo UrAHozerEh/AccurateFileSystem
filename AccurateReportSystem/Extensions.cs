@@ -1,4 +1,5 @@
-﻿using Microsoft.Graphics.Canvas.Geometry;
+﻿using AccurateFileSystem;
+using Microsoft.Graphics.Canvas.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -47,6 +48,36 @@ namespace AccurateReportSystem
             var (x, y) = rect.GetMiddlePoint();
             var rotationMatrix = Matrix3x2.CreateRotation((float)(rotationDegrees * Math.PI / 180), new Vector2(x, y));
             return rotationMatrix;
+        }
+
+        public static bool DoesIntersectPage(this ReconnectTestStationRead reconnect, PageInformation page)
+        {
+            var reconStart = reconnect.StartPoint.Footage;
+            var reconEnd = reconnect.EndPoint.Footage;
+            var pageStart = page.StartFootage;
+            var pageEnd = page.EndFootage;
+
+            if(reconStart >= pageStart && reconStart <= pageEnd)
+                return true;
+            if (pageStart >= reconStart && pageStart <= reconEnd)
+                return true;
+            return false;
+        }
+
+        public static (double Footage1, double Footage2) GetClosestFootages(this ReconnectTestStationRead recon1, ReconnectTestStationRead recon2)
+        {
+            var startStartDiff = Math.Abs(recon1.StartPoint.Footage - recon2.StartPoint.Footage);
+            var startEndDiff = Math.Abs(recon1.StartPoint.Footage - recon2.EndPoint.Footage);
+            var endStartDiff = Math.Abs(recon1.EndPoint.Footage - recon2.StartPoint.Footage);
+            var endEndDiff = Math.Abs(recon1.EndPoint.Footage - recon2.EndPoint.Footage);
+
+            if (startStartDiff < startEndDiff && startStartDiff < endStartDiff && startStartDiff < endEndDiff)
+                return (recon1.StartPoint.Footage, recon2.StartPoint.Footage);
+            else if (startEndDiff < endStartDiff && startEndDiff < endEndDiff)
+                return (recon1.StartPoint.Footage, recon2.EndPoint.Footage);
+            else if(endStartDiff < endEndDiff)
+                return (recon1.EndPoint.Footage, recon2.StartPoint.Footage);
+            return (recon1.EndPoint.Footage, recon2.EndPoint.Footage);
         }
     }
 }
