@@ -211,7 +211,7 @@ namespace AccurateReportSystem
             isEnabled = null;
         }
 
-        public void DrawGridlines(CanvasDrawingSession session, PageInformation page, Rect graphBodyDrawArea, TransformInformation transform)
+        public void DrawGridlines(CanvasDrawingSession session, PageInformation page, Rect graphBodyDrawArea, TransformInformation1d transform)
         {
             if (MinorGridline.IsEnabled)
             {
@@ -231,7 +231,7 @@ namespace AccurateReportSystem
             }
         }
 
-        private List<(float X, double Value)> GetGridlineValues(PageInformation page, TransformInformation transform, double offset)
+        private List<(float X, double Value)> GetGridlineValues(PageInformation page, TransformInformation1d transform, double offset)
         {
             var output = new List<(float X, double Value)>();
 
@@ -242,7 +242,7 @@ namespace AccurateReportSystem
             {
                 if (curVal >= page.StartFootage)
                 {
-                    var (x, _) = transform.ToDrawArea(curVal, 0);
+                    var x = transform.ToDrawArea(curVal);
                     output.Add((x, curVal));
                 }
                 curVal += offset;
@@ -251,7 +251,7 @@ namespace AccurateReportSystem
             return output;
         }
 
-        public void DrawInfo(CanvasDrawingSession session, PageInformation page, TransformInformation transform, Rect drawArea)
+        public void DrawInfo(CanvasDrawingSession session, PageInformation page, TransformInformation1d transform, Rect drawArea)
         {
             if (!IsEnabled)
                 return;
@@ -298,7 +298,7 @@ namespace AccurateReportSystem
             }
         }
 
-        public void DrawLabels(CanvasDrawingSession session, PageInformation page, TransformInformation transform, Rect drawArea)
+        public void DrawLabels(CanvasDrawingSession session, PageInformation page, TransformInformation1d transform, Rect drawArea)
         {
             //session.DrawRectangle(drawArea, Colors.Orange);
             var tickColor = MajorGridline.Color;

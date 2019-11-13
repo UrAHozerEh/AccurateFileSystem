@@ -33,7 +33,7 @@ namespace AccurateReportSystem
             Values.Sort((first, second) => first.footage.CompareTo(second.footage));
         }
 
-        public virtual void Draw(CanvasDrawingSession session, PageInformation page, TransformInformation transform)
+        public virtual void Draw(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
         {
             if (Values == null || Values.Count == 0)
                 return;
@@ -44,7 +44,7 @@ namespace AccurateReportSystem
                 DrawPoints(session, page, transform);
         }
 
-        private void DrawLineGeometry(CanvasDrawingSession session, PageInformation page, TransformInformation transform)
+        private void DrawLineGeometry(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
         {
             if (Values == null || Values.Count == 0)
                 return;
@@ -148,7 +148,7 @@ namespace AccurateReportSystem
             }
         }
 
-        private void DrawPoints(CanvasDrawingSession session, PageInformation page, TransformInformation transform)
+        private void DrawPoints(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
         {
             if (Values == null || Values.Count == 0 || PointShape == Shape.None)
                 return;

@@ -67,8 +67,8 @@ namespace AccurateReportSystem
             }
             Rect y1GraphArea = new Rect(page.StartFootage, YAxesInfo.Y1MinimumValue, page.Width, YAxesInfo.Y1ValuesHeight);
             Rect y2GraphArea = new Rect(page.StartFootage, YAxesInfo.Y2MinimumValue, page.Width, YAxesInfo.Y2ValuesHeight);
-            TransformInformation y1Transform = new TransformInformation(graphBodyDrawArea, y1GraphArea, YAxesInfo.Y1IsInverted);
-            TransformInformation y2Transform = new TransformInformation(graphBodyDrawArea, y2GraphArea, YAxesInfo.Y2IsInverted);
+            TransformInformation2d y1Transform = new TransformInformation2d(graphBodyDrawArea, y1GraphArea, YAxesInfo.Y1IsInverted);
+            TransformInformation2d y2Transform = new TransformInformation2d(graphBodyDrawArea, y2GraphArea, YAxesInfo.Y2IsInverted);
 
             var (x1, y1) = y1Transform.ToDrawArea(page.StartFootage, -3);
             var (x2, y2) = y1Transform.ToDrawArea(page.EndFootage, 0);
@@ -80,7 +80,7 @@ namespace AccurateReportSystem
             {
                 //TODO: Simplify getting geometries from the graph series. Should only be done once before getting all the pages.
                 //TODO: Maybe it should actually be drawn per page.
-                XAxisInfo.DrawGridlines(session, page, graphBodyDrawArea, y1Transform);
+                XAxisInfo.DrawGridlines(session, page, graphBodyDrawArea, y1Transform.GetXTransform());
                 YAxesInfo.DrawGridlines(session, graphBodyDrawArea, y1Transform);
 
                 var clipRect = new Rect(page.StartFootage, (float)YAxesInfo.Y1MinimumValue, page.Width, (float)YAxesInfo.Y1ValuesHeight);
@@ -121,7 +121,7 @@ namespace AccurateReportSystem
             }
             var xAxisY = XAxisInfo.IsFlippedVertical ? (graphBodyDrawArea.Top - XAxisInfo.TotalHeight) : graphBodyDrawArea.Bottom;
             var xAxisDrawArea = new Rect(graphBodyDrawArea.Left, xAxisY, graphBodyDrawArea.Width, XAxisInfo.TotalHeight);
-            XAxisInfo.DrawInfo(session, page, y1Transform, xAxisDrawArea);
+            XAxisInfo.DrawInfo(session, page, y1Transform.GetXTransform(), xAxisDrawArea);
             YAxesInfo.DrawInfo(session, page, y1Transform, y2Transform, graphBodyDrawArea);
 
 

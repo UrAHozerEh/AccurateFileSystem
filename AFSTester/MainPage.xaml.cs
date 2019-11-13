@@ -36,8 +36,6 @@ namespace AFSTester
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        private HttpBaseProtocolFilter Filter;
-        private HttpClient Client;
         public MainPage()
         {
             this.InitializeComponent();
@@ -105,6 +103,7 @@ namespace AFSTester
                     graph1.Series.Add(off);
                     graph1.Series.Add(redLine);
                     //graph1.XAxisInfo.IsEnabled = false;
+                    graph1.DrawBottomBorder = true;
 
 
                     graph2.Series.Add(depth);
@@ -124,15 +123,24 @@ namespace AFSTester
                     var topGlobalXAxis = new GlobalXAxis(report, true);
 
                     var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
-                    var graph1Measurement = new SplitContainerMeasurement(graph1)
+                    var commentGraphMeasurement = new SplitContainerMeasurement(commentGraph)
                     {
-                        RequestedPercent = 0.5
+                        FixedInchSize = 1f
                     };
+                    //var graph1Measurement = new SplitContainerMeasurement(graph1)
+                    //{
+                    //    RequestedPercent = 0.5
+                    //};
+                    var chart1 = new Chart(report, "Survey Direction");
+                    var chart1Series = new SurveyDirectionSeries(allegroFile.GetDirectionData());
+                    chart1.Series.Add(chart1Series);
+
                     splitContainer.AddSelfSizedContainer(topGlobalXAxis);
-                    splitContainer.AddContainer(commentGraph);
-                    splitContainer.AddContainer(graph1Measurement);
-                    splitContainer.AddContainer(graph2);
-                    splitContainer.AddContainer(graph3);
+                    splitContainer.AddContainer(commentGraphMeasurement);
+                    splitContainer.AddContainer(graph1);
+                    splitContainer.AddSelfSizedContainer(chart1);
+                    //splitContainer.AddContainer(graph2);
+                    //splitContainer.AddContainer(graph3);
                     splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
                     report.Container = splitContainer;
                     var images = report.GetImages(allegroFile.StartFootage, allegroFile.EndFootage);

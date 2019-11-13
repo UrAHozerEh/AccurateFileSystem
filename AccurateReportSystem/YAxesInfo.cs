@@ -450,6 +450,11 @@ namespace AccurateReportSystem
             };
         }
 
+        public YAxesInfo(YAxesInfo master) : this(master, "N/A", "N/A")
+        {
+
+        }
+
         public YAxesInfo(YAxesInfo master, string y1Name)
         {
             Master = master;
@@ -464,7 +469,7 @@ namespace AccurateReportSystem
             Y2Title = y2Name;
         }
 
-        public void DrawGridlines(CanvasDrawingSession session, Rect graphBodyDrawArea, TransformInformation y1Transform)
+        public void DrawGridlines(CanvasDrawingSession session, Rect graphBodyDrawArea, TransformInformation2d y1Transform)
         {
             if (MinorGridlines.IsEnabled)
             {
@@ -484,7 +489,7 @@ namespace AccurateReportSystem
             }
         }
 
-        private List<(float Y, double Value)> GetGridlineValues(TransformInformation transform, double offset)
+        private List<(float Y, double Value)> GetGridlineValues(TransformInformation2d transform, double offset)
         {
             var output = new List<(float Y, double Value)>();
 
@@ -504,7 +509,7 @@ namespace AccurateReportSystem
             return output;
         }
 
-        public void DrawInfo(CanvasDrawingSession session, PageInformation page, TransformInformation y1Transform, TransformInformation y2Transform, Rect graphBodyDrawArea)
+        public void DrawInfo(CanvasDrawingSession session, PageInformation page, TransformInformation2d y1Transform, TransformInformation2d y2Transform, Rect graphBodyDrawArea)
         {
             var gridlineValues = GetGridlineValues(y1Transform, MajorGridlines.Offset);
             if (Y1IsDrawn)
@@ -550,7 +555,7 @@ namespace AccurateReportSystem
             }
         }
 
-        public void DrawY1Labels(CanvasDrawingSession session, TransformInformation transform, Rect drawArea)
+        public void DrawY1Labels(CanvasDrawingSession session, TransformInformation2d transform, Rect drawArea)
         {
             //session.DrawRectangle(drawArea, Colors.Orange);
             var tickColor = MajorGridlines.Color;
@@ -614,7 +619,7 @@ namespace AccurateReportSystem
             }
         }
 
-        public void DrawY2Labels(CanvasDrawingSession session, List<(float Y, double _)> values, TransformInformation y2Transform, Rect drawArea)
+        public void DrawY2Labels(CanvasDrawingSession session, List<(float Y, double _)> values, TransformInformation2d y2Transform, Rect drawArea)
         {
             //session.DrawRectangle(drawArea, Colors.Orange);
             var tickColor = MajorGridlines.Color;

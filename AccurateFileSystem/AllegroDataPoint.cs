@@ -13,9 +13,9 @@ namespace AccurateFileSystem
         public int Id { get; }
         public double Footage { get; private set; }
         public double On { get; private set; }
-        public double MIROn { get; private set; }
+        public double MIROn { get; set; }
         public double Off { get; private set; }
-        public double MIROff { get; private set; }
+        public double MIROff { get; set; }
         public double? Depth { get; private set; }
         public string OriginalComment { get; private set; }
         public string CommentTemplate { get; private set; }
@@ -23,6 +23,8 @@ namespace AccurateFileSystem
         public bool HasGPS => !GPS.Equals(new BasicGeoposition());
         public List<DateTime> Times { get; private set; }
         public bool HasTime => Times.Count != 0;
+        public int? NextReconnect { get; set; }
+        public bool IsReverseRun { get; set; } = false;
         public DateTime? OnTime
         {
             get

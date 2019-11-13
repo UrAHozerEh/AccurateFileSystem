@@ -143,10 +143,13 @@ namespace AccurateFileSystem
         public bool IsOnOff { get; }
         public double FGOn { get; }
         public double FGOff { get; }
-        public double MIROn { get; }
-        public double MIROff { get; }
+        public double MirOn { get; }
+        public double MirOff { get; }
         public double NGOn { get; }
         public double NGOff { get; }
+        public double ReconnectDistance { get; set; }
+        public double MirOnPerFoot => MirOn / ReconnectDistance;
+        public double MirOffPerFoot => MirOff / ReconnectDistance;
 
         public ReconnectTestStationRead(string original, string replaceId) : base(original, replaceId)
         {
@@ -161,8 +164,8 @@ namespace AccurateFileSystem
                 FGOn = double.Parse(onOffMatch.Groups[count - 6].Value);
                 FGOff = double.Parse(onOffMatch.Groups[count - 5].Value);
 
-                MIROn = double.Parse(onOffMatch.Groups[count - 4].Value);
-                MIROff = double.Parse(onOffMatch.Groups[count - 3].Value);
+                MirOn = double.Parse(onOffMatch.Groups[count - 4].Value);
+                MirOff = double.Parse(onOffMatch.Groups[count - 3].Value);
 
                 NGOn = double.Parse(onOffMatch.Groups[count - 2].Value);
                 NGOff = double.Parse(onOffMatch.Groups[count - 1].Value);

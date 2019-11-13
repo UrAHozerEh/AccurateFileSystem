@@ -21,7 +21,7 @@ namespace AccurateReportSystem
             LineThickness = 1;
         }
 
-        public override void Draw(CanvasDrawingSession session, PageInformation page, TransformInformation transform)
+        public override void Draw(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
         {
             using (var strokeStyle = new CanvasStrokeStyle())
             {

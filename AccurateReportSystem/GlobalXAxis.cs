@@ -30,9 +30,10 @@ namespace AccurateReportSystem
             var width = drawArea.Width - leftSpace - rightSpace;
             var realDrawArea = new Rect(drawArea.Left + leftSpace, drawArea.Top, width, drawArea.Height);
 
-            var transform = new TransformInformation(realDrawArea, graphArea, false);
+            //TODO: No need to make a 2d transform.
+            var transform = new TransformInformation2d(realDrawArea, graphArea, false);
 
-            XAxisInfo.DrawInfo(session, page, transform, realDrawArea);
+            XAxisInfo.DrawInfo(session, page, transform.GetXTransform(), realDrawArea);
         }
 
         public override double GetRequestedWidth()

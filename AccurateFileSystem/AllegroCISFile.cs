@@ -31,6 +31,16 @@ namespace AccurateFileSystem
             return $"'{Name}' cis with {Points.Count} points";
         }
 
+        public List<(double Footage, bool IsReverseRun)> GetDirectionData()
+        {
+            var output = new List<(double, bool)>();
+            foreach (var point in Points.Values)
+            {
+                output.Add((point.Footage, point.IsReverseRun));
+            }
+            return output;
+        }
+
         /// <summary>
         /// Function used to clean up the data points in a file. This will also compute the MIR and related data for each point.
         /// This will also clear any duplicated more than once GPS points. May leave many blank GPS points, so you should do something to correct for those.
@@ -42,33 +52,44 @@ namespace AccurateFileSystem
                 return;
             int incVal = int.Parse(Header["autoincval"]);
             int startIndex = 0;
-            for(int i = 1; i < Points.Count - 1; ++i)
+            for (int i = 1; i < Points.Count - 1; ++i)
             {
                 var cur = Points[i];
-                if(cur.HasReconnect)
+                if (cur.HasReconnect)
                 {
                     Reconnects.Add((startIndex, i));
                     startIndex = i;
                 }
+                if (cur.Footage >= 200)
+                    cur.IsReverseRun = true;
+                if (cur.Footage >= 950)
+                    cur.IsReverseRun = false;
+                if (cur.Footage >= 2000)
+                    cur.IsReverseRun = true;
+                if (cur.Footage >= 2900)
+                    cur.IsReverseRun = false;
             }
 
-            foreach(var (start, end) in Reconnects)
+            foreach (var (start, end) in Reconnects)
             {
                 var startPoint = Points[start];
                 var endPoint = Points[end];
                 var footDist = endPoint.Footage - startPoint.Footage;
 
                 ReconnectTestStationRead reconnect = endPoint.GetReconnect();
+                reconnect.ReconnectDistance = footDist;
 
-                var mirOnPerFoot = reconnect.MIROn / footDist;
-                var mirOffPerFoot = reconnect.MIROff / footDist;
+                var mirOnPerFoot = reconnect.MirOn / footDist;
+                var mirOffPerFoot = reconnect.MirOff / footDist;
 
-                for(int i = start; i < end; ++i)
+                for (int i = start; i < end; ++i)
                 {
                     var curPoint = Points[i];
+                    curPoint.NextReconnect = end;
                     var curDist = curPoint.Footage - startPoint.Footage;
 
-
+                    curPoint.MIROn = curPoint.On + Math.Round(mirOnPerFoot * curDist, 4);
+                    curPoint.MIROff = curPoint.Off + Math.Round(mirOffPerFoot * curDist, 4);
                 }
             }
         }
@@ -161,7 +182,7 @@ namespace AccurateFileSystem
         private List<(double footage, double value)> GetOnData()
         {
             var list = new List<(double, double)>();
-            for(int i = 0; i < Points.Count; ++i)
+            for (int i = 0; i < Points.Count; ++i)
             {
                 list.Add((Points[i].Footage, Points[i].On));
             }
@@ -183,7 +204,7 @@ namespace AccurateFileSystem
             var list = new List<(double, double)>();
             for (int i = 0; i < Points.Count; ++i)
             {
-                if(Points[i].Depth.HasValue)
+                if (Points[i].Depth.HasValue)
                     list.Add((Points[i].Footage, Points[i].Depth.Value));
             }
             return list;
