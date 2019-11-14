@@ -144,8 +144,9 @@ namespace AccurateFileSystem
 
         public ReconnectTestStationRead GetReconnect()
         {
-            foreach (ReconnectTestStationRead read in TestStationReads)
-                return read;
+            foreach (var read in TestStationReads)
+                if(read is ReconnectTestStationRead)
+                return read as ReconnectTestStationRead;
             return null;
         }
     }

@@ -69,7 +69,9 @@ namespace AccurateReportSystem
             if (DrawBottomBorder)
                 session.DrawLine((float)drawArea.Left, (float)drawArea.Bottom, (float)drawArea.Right, (float)drawArea.Bottom, Colors.Black, 1);
             DrawOverlapShadow(page, session, transform, gridlineDrawArea);
-            var legendDrawArea = new Rect(drawArea.X, drawArea.Y, LegendInfo.WidthDIP, drawArea.Height);
+
+            var legendWidth = LegendInfo.WidthDIP + (YAxesInfo.Y1IsDrawn ? 0 : YAxesInfo.Y1TotalHeight);
+            var legendDrawArea = new Rect(drawArea.X, drawArea.Y, legendWidth, drawArea.Height);
             LegendInfo.Draw(session, Series, legendDrawArea);
         }
 

@@ -128,7 +128,8 @@ namespace AccurateReportSystem
             //DrawAxisLabels(page, session, graphBodyDrawArea);
             //DrawAxisTitles(session, graphBodyDrawArea);
             DrawOverlapShadow(page, session, graphBodyDrawArea);
-            var legendDrawArea = new Rect(DrawArea.X, DrawArea.Y, LegendInfo.WidthDIP, graphBodyDrawArea.Height);
+            var legendWidth = LegendInfo.WidthDIP + (YAxesInfo.Y1IsDrawn ? 0 : YAxesInfo.Y1TotalHeight);
+            var legendDrawArea = new Rect(DrawArea.X, DrawArea.Y, legendWidth, graphBodyDrawArea.Height);
             LegendInfo.Draw(session, Series, legendDrawArea);
 
             if (DrawTopBorder)

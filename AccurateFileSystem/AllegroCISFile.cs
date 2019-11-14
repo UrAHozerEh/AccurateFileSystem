@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
+using Windows.Foundation;
 
 namespace AccurateFileSystem
 {
@@ -15,14 +16,18 @@ namespace AccurateFileSystem
         public double StartFootage { get; private set; }
         public double EndFootage { get; private set; }
         public List<(int start, int end)> Reconnects { get; private set; }
+        public bool IsReverseRun { get; set; }
 
         public AllegroCISFile(string name, string extension, Dictionary<string, string> header, Dictionary<int, AllegroDataPoint> points, FileType type) : base(name, type)
         {
             Header = header;
             Points = points;
             Extension = extension;
+            if (Points.Count == 0)
+                return;
             StartFootage = points[0].Footage;
             EndFootage = points[points.Count - 1].Footage;
+            IsReverseRun = Name.ToLower().Contains("rev");
             ProcessPoints();
         }
 
@@ -60,14 +65,6 @@ namespace AccurateFileSystem
                     Reconnects.Add((startIndex, i));
                     startIndex = i;
                 }
-                if (cur.Footage >= 200)
-                    cur.IsReverseRun = true;
-                if (cur.Footage >= 950)
-                    cur.IsReverseRun = false;
-                if (cur.Footage >= 2000)
-                    cur.IsReverseRun = true;
-                if (cur.Footage >= 2900)
-                    cur.IsReverseRun = false;
             }
 
             foreach (var (start, end) in Reconnects)
@@ -238,6 +235,42 @@ namespace AccurateFileSystem
         public List<(double footage, string value)> GetStringData(string fieldName, double startFootage, double endFootage)
         {
             throw new NotImplementedException();
+        }
+
+        public GeoboundingBox GetGpsArea()
+        {
+            double minLat = double.MaxValue;
+            double minLong = double.MaxValue;
+            double maxLat = double.MinValue;
+            double maxLong = double.MinValue;
+
+            foreach(var point in Points.Values)
+            {
+                if(point.HasGPS)
+                {
+                    var gps = point.GPS;
+                    if (gps.Latitude < minLat)
+                        minLat = gps.Latitude;
+                    if (gps.Longitude < minLong)
+                        minLong = gps.Longitude;
+                    if (gps.Latitude > maxLat)
+                        maxLat = gps.Latitude;
+                    if (gps.Longitude > maxLong)
+                        maxLong = gps.Longitude;
+                }
+            }
+
+            var nwPoint = new BasicGeoposition()
+            {
+                Latitude = maxLat,
+                Longitude = minLong
+            };
+            var sePoint = new BasicGeoposition()
+            {
+                Latitude = minLat,
+                Longitude = maxLong
+            };
+            return new GeoboundingBox(nwPoint, sePoint);
         }
     }
 }

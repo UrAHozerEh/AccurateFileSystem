@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
+using Windows.Foundation;
 
 namespace AccurateFileSystem
 {
@@ -25,6 +26,26 @@ namespace AccurateFileSystem
         private static double ToRadian(double value)
         {
             return Math.PI * value / 180.0; ;
+        }
+
+        public static GeoboundingBox CombineAreas (this GeoboundingBox rect1, GeoboundingBox rect2)
+        {
+            var minLong = Math.Min(rect1.NorthwestCorner.Longitude, rect2.NorthwestCorner.Longitude);
+            var maxLat = Math.Max(rect1.NorthwestCorner.Latitude, rect2.NorthwestCorner.Latitude);
+            var maxLong = Math.Max(rect1.SoutheastCorner.Longitude, rect2.SoutheastCorner.Longitude);
+            var minLat = Math.Min(rect1.SoutheastCorner.Latitude, rect2.SoutheastCorner.Latitude);
+
+            var nwPoint = new BasicGeoposition()
+            {
+                Latitude = maxLat,
+                Longitude = minLong
+            };
+            var sePoint = new BasicGeoposition()
+            {
+                Latitude = minLat,
+                Longitude = maxLong
+            };
+            return new GeoboundingBox(nwPoint, sePoint);
         }
     }
 }

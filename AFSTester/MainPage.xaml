@@ -5,11 +5,36 @@
     xmlns:local="using:AFSTester"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:Maps="using:Windows.UI.Xaml.Controls.Maps"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
     <Grid>
-        <Button Content="Button" Click="Button_Click"/>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="100"/>
+            <ColumnDefinition Width="1*"/>
+            <ColumnDefinition Width="0.25*"/>
+        </Grid.ColumnDefinitions>
+        <Grid HorizontalAlignment="Center">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+            </Grid.RowDefinitions>
+            <Button Content="Import" Click="Button_Click" Grid.Row="0" HorizontalAlignment="Center"/>
+            <Button Content="Do Map" Click="Button_Click_1" Grid.Row="1" HorizontalAlignment="Center"/>
+            <Button Content="Hide Map" Click="Button_Click_2" Grid.Row="2" HorizontalAlignment="Center"/>
+            <Button Content="Zoom Map" Click="Button_Click_3" Grid.Row="3" HorizontalAlignment="Center"/>
+            <Button Content="Combine" Click="CombineButtonClick" Grid.Row="4" HorizontalAlignment="Center"/>
+            <Button Content="Hide" Click="HideButtonClick" Grid.Row="5" HorizontalAlignment="Center"/>
+        </Grid>
 
+        <Maps:MapControl x:Name="MapControl" Grid.Column="1"/>
+        <ScrollViewer VerticalScrollMode="Disabled" HorizontalScrollMode="Enabled">
+            <TreeView Name="FileTreeView" Grid.Column="2" DoubleTapped="FileTreeView_DoubleTapped" SelectionMode="Multiple"/>
+        </ScrollViewer>
     </Grid>
 </Page>
