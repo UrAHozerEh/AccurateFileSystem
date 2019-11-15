@@ -272,5 +272,77 @@ namespace AccurateFileSystem
             };
             return new GeoboundingBox(nwPoint, sePoint);
         }
+
+        public double OffsetDistance(int myIndex, AllegroCISFile otherFile, int otherIndex, double roundTo)
+        {
+            var prevPoint = otherFile.Points[otherIndex];
+            int prevOffset = 1;
+            double offsetShift = 0;
+            while (!otherFile.Points[otherIndex].HasGPS)
+            {
+                var leftCheck = otherIndex - prevOffset;
+                var leftPoint = leftCheck >= 0 ? otherFile.Points[leftCheck] : null;
+                var leftDist = prevPoint.Footage - (leftPoint?.Footage ?? double.MinValue);
+                var rightCheck = otherIndex - prevOffset;
+                var rightPoint = rightCheck < otherFile.Points.Count ? otherFile.Points[rightCheck] : null;
+                var rightDist = (rightPoint?.Footage ?? double.MaxValue) - prevPoint.Footage;
+                if (leftPoint != null || rightPoint != null)
+                {
+                    if (leftDist < rightDist)
+                    {
+                        otherIndex = leftCheck;
+                        offsetShift = -leftDist;
+                    }
+                    else
+                    {
+                        otherIndex = rightCheck;
+                        offsetShift = +rightDist;
+                    }
+                }
+                if (leftCheck < 0 && rightCheck > otherFile.Points.Count)
+                    throw new InvalidOperationException("There is no GPS to calculate offset with!");
+                ++prevOffset;
+            }
+            var prevGps = otherFile.Points[otherIndex].GPS;
+
+            var myPoint = Points[myIndex];
+            int myOffset = 1;
+            double myOffsetShift = 0;
+            while (!Points[myIndex].HasGPS)
+            {
+                var leftCheck = myIndex - myOffset;
+                var leftPoint = leftCheck >= 0 ? Points[leftCheck] : null;
+                var leftDist = myPoint.Footage - (leftPoint?.Footage ?? double.MinValue);
+                var rightCheck = myIndex - myOffset;
+                var rightPoint = rightCheck < Points.Count ? Points[rightCheck] : null;
+                var rightDist = (rightPoint?.Footage ?? double.MaxValue) - myPoint.Footage;
+                if (leftPoint != null || rightPoint != null)
+                {
+                    if (leftDist < rightDist)
+                    {
+                        myIndex = leftCheck;
+                        myOffsetShift = leftDist;
+                    }
+                    else
+                    {
+                        myIndex = rightCheck;
+                        myOffsetShift = -rightDist;
+                    }
+                }
+                if (leftCheck < 0 && rightCheck > Points.Count)
+                    throw new InvalidOperationException("There is no GPS to calculate offset with!");
+                ++myOffset;
+            }
+            var myGps = Points[myIndex].GPS;
+
+            var dist = myGps.Distance(prevGps) + offsetShift + myOffsetShift;
+            int mult = (int)(dist / roundTo);
+
+            var floor = mult * roundTo;
+            var floorDist = Math.Abs(floor - dist);
+            var ceil = (mult + 1) * roundTo;
+            var ceilDist = Math.Abs(ceil - dist);
+            return floorDist < ceilDist ? floor : ceil;
+        }
     }
 }

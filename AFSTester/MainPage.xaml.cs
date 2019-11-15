@@ -45,6 +45,7 @@ namespace AFSTester
         public MainPage()
         {
             this.InitializeComponent();
+            Button_Click(null, null);
         }
 
         private async void Button_Click(object sender, RoutedEventArgs e)
@@ -431,6 +432,7 @@ namespace AFSTester
             foreach (var node in fileNodes)
                 files.Add(node.Content as AllegroCISFile);
 
+            var test = CombinedAllegroCISFile.CombineFiles("Testing", files);
         }
 
         private void HideButtonClick(object sender, RoutedEventArgs e)

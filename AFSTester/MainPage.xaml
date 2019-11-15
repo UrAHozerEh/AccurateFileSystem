@@ -33,8 +33,8 @@
         </Grid>
 
         <Maps:MapControl x:Name="MapControl" Grid.Column="1"/>
-        <ScrollViewer VerticalScrollMode="Disabled" HorizontalScrollMode="Enabled">
-            <TreeView Name="FileTreeView" Grid.Column="2" DoubleTapped="FileTreeView_DoubleTapped" SelectionMode="Multiple"/>
+        <ScrollViewer VerticalScrollMode="Disabled" HorizontalScrollMode="Enabled" Grid.Column="2">
+            <TreeView Name="FileTreeView" DoubleTapped="FileTreeView_DoubleTapped" SelectionMode="Multiple"/>
         </ScrollViewer>
     </Grid>
 </Page>
