@@ -15,25 +15,28 @@ namespace AccurateReportSystem
         public override float Height => OnArrowInfo.Height + GapBetween + OffArrowInfo.Height;
         public override bool IsDrawnInLegend { get => false; set => throw new InvalidOperationException(); }
         public override Color LegendNameColor { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-        public List<ReconnectTestStationRead> Data { get; set; }
+        public List<(double Footage, double OnMirPerFoot, double OffMirPerFoot, bool IsReverse)> Data { get; set; }
 
         public ArrowInfo OnArrowInfo { get; set; }
+        public ArrowInfo OnArrowInfoZero { get; set; }
         public ArrowInfo OffArrowInfo { get; set; }
+        public ArrowInfo OffArrowInfoZero { get; set; }
         public float GapBetweenInches { get; set; } = 0.05f;
         public float GapBetween => (float)Math.Round(GapBetweenInches * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
+        public Color EdgeLineColor { get; set; } = Colors.Black;
 
-        public MirDirection(List<ReconnectTestStationRead> data)
+        public MirDirection(List<(double Footage, double OnMirPerFoot, double OffMirPerFoot, bool IsReverse)> data)
         {
             Data = data;
 
             OnArrowInfo = new ArrowInfo(0.45f, 0.25f, Colors.Black, Colors.White);
+            OnArrowInfoZero = new ArrowInfo(0.45f, 0.25f, Colors.Black, Colors.White, finWidthPercent: 0f, finHeightPercent: 0.425f, tailPercent: 1f);
             OffArrowInfo = new ArrowInfo(0.45f, 0.25f, Colors.Black, Colors.White);
+            OffArrowInfoZero = new ArrowInfo(0.45f, 0.25f, Colors.Black, Colors.White, finWidthPercent: 0f, finHeightPercent: 0.425f, tailPercent: 1f);
         }
 
         public override void Draw(PageInformation page, CanvasDrawingSession session, Rect drawArea, TransformInformation1d transform)
         {
-            //session.DrawRectangle(drawArea, Colors.Orange);
-            var filtered = Data.Where(r => r.DoesIntersectPage(page)).ToList();
 
             var onHalfHeight = Math.Round(OnArrowInfo.Height / 2, GraphicalReport.DIGITS_TO_ROUND);
             var onY = (float)(drawArea.Top + onHalfHeight);
@@ -41,61 +44,114 @@ namespace AccurateReportSystem
             var offHalfHeight = Math.Round(OffArrowInfo.Height / 2, GraphicalReport.DIGITS_TO_ROUND);
             var offY = (float)(drawArea.Top + GapBetween + OnArrowInfo.Height + offHalfHeight);
 
-            if (filtered.Count == 0)
-                return;
-            if (filtered.Count == 1)
+            var values = new List<(double Start, double End, double OnMirPerFoot, double OffMirPerFoot, bool IsReverse)>();
+            double? start = null;
+            (double On, double Off) startValue = (0, 0);
+            double lastFootage = 0;
+            bool lastIsReverse = false;
+            for (int i = 0; i < Data.Count; ++i)
             {
-                var reconnect = filtered.First();
-                var positiveDirection = !reconnect.EndPoint.IsReverseRun ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right;
-                var negativeDirection = !reconnect.EndPoint.IsReverseRun ? ArrowInfo.Direction.Right : ArrowInfo.Direction.Left;
+                var (footage, on, off, isReverse) = Data[i];
 
-                var onMirPerFoot = Math.Abs(reconnect.MirOnPerFoot) * 1000;
-                var onDirection = reconnect.MirOnPerFoot < 0 ? negativeDirection : positiveDirection;
-
-                var offMirPerFoot = Math.Abs(reconnect.MirOffPerFoot) * 1000;
-                var offDirection = reconnect.MirOffPerFoot < 0 ? negativeDirection : positiveDirection;
-
-                var middleX = drawArea.GetMiddlePoint().X;
-                var halfOnWidth = (float)Math.Round(OnArrowInfo.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
-                var halfOffWidth = (float)Math.Round(OffArrowInfo.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
-
-                OnArrowInfo.DrawOnTopOf(session, middleX, onY, onDirection, onMirPerFoot.ToString("F3"));
-                OffArrowInfo.DrawOnTopOf(session, middleX, offY, offDirection, offMirPerFoot.ToString("F3"));
-            }
-            else
-            {
-                for (int i = 0; i < filtered.Count - 1; ++i)
+                if (footage < page.StartFootage)
+                    continue;
+                if (footage > page.EndFootage)
+                    break;
+                if (start == null)
                 {
-                    var recon1 = filtered[i];
-                    var recon2 = filtered[i + 1];
+                    start = footage;
+                    startValue = (on, off);
+                    lastFootage = footage;
+                    lastIsReverse = isReverse;
+                    continue;
+                }
+                if (on != startValue.On || off != startValue.Off)
+                {
+                    values.Add((start.Value, lastFootage, startValue.On, startValue.Off, isReverse));
+                    start = footage;
+                    startValue = (on, off);
+                }
+                lastFootage = footage;
+                lastIsReverse = isReverse;
+            }
+            if(start.HasValue && start.Value != lastFootage)
+            {
+                values.Add((start.Value, lastFootage, startValue.On, startValue.Off, lastIsReverse));
+            }
 
-                    var (foot1, foot2) = recon1.GetClosestFootages(recon2);
-                    var x1 = transform.ToDrawArea(foot1);
-                    var x2 = transform.ToDrawArea(foot2);
+            if (values.Count == 0)
+                return;
+            using (var _ = session.CreateLayer(1f, drawArea))
+            {
+                if (values.Count == 1)
+                {
+                    var (curStart, curEnd, on, off, isReverse) = values.First();
+                    if (curStart <= page.StartFootage && curEnd >= page.EndFootage)
+                    {
+                        var positiveDirection = !isReverse ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right;
+                        var negativeDirection = !isReverse ? ArrowInfo.Direction.Right : ArrowInfo.Direction.Left;
+
+                        var onDirection = on < 0 ? negativeDirection : positiveDirection;
+                        var mirOn = on * 1000;
+                        var offDirection = off < 0 ? negativeDirection : positiveDirection;
+                        var mirOff = off * 1000;
+
+                        var middleX = drawArea.GetMiddlePoint().X;
+
+                        if (Math.Round(mirOn, 3) != 0)
+                            OnArrowInfo.DrawOnTopOf(session, middleX, onY, onDirection, mirOn.ToString("F3"));
+                        else
+                            OnArrowInfoZero.DrawOnTopOf(session, middleX, onY, onDirection, mirOn.ToString("F3"));
+
+                        if (Math.Round(mirOff, 3) != 0)
+                            OffArrowInfo.DrawOnTopOf(session, middleX, offY, offDirection, mirOff.ToString("F3"));
+                        else
+                            OffArrowInfoZero.DrawOnTopOf(session, middleX, offY, offDirection, mirOff.ToString("F3"));
+                        return;
+                    }
+                }
+
+                foreach (var (curStart, curEnd, on, off, isReverse) in values)
+                {
+                    var realStart = curStart;
+                    var realEnd = curEnd;
+                    if (curStart <= page.StartFootage)
+                        realStart = page.StartFootage - page.Width;
+                    if (curEnd >= page.EndFootage)
+                        realEnd = page.EndFootage + page.Width;
+
+                    var x1 = transform.ToDrawArea(realStart);
+                    var x2 = transform.ToDrawArea(realEnd);
 
 
-                    var positiveDirection = !recon1.EndPoint.IsReverseRun ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right;
-                    var negativeDirection = !recon1.EndPoint.IsReverseRun ? ArrowInfo.Direction.Right : ArrowInfo.Direction.Left;
+                    var positiveDirection = !isReverse ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right;
+                    var negativeDirection = !isReverse ? ArrowInfo.Direction.Right : ArrowInfo.Direction.Left;
 
-                    var onMirPerFoot = Math.Abs(recon1.MirOnPerFoot) * 1000;
-                    var onDirection = recon1.MirOnPerFoot < 0 ? negativeDirection : positiveDirection;
-
-                    var offMirPerFoot = Math.Abs(recon1.MirOffPerFoot) * 1000;
-                    var offDirection = recon1.MirOffPerFoot < 0 ? negativeDirection : positiveDirection;
-                    OnArrowInfo.DrawLeftOf(session, x1, onY, onDirection, onMirPerFoot.ToString("F3"));
-                    OffArrowInfo.DrawLeftOf(session, x1, offY, offDirection, offMirPerFoot.ToString("F3"));
+                    var onDirection = on < 0 ? negativeDirection : positiveDirection;
+                    var mirOn = on * 1000;
+                    var offDirection = off < 0 ? negativeDirection : positiveDirection;
+                    var mirOff = off * 1000;
 
 
-                    positiveDirection = !recon2.EndPoint.IsReverseRun ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right;
-                    negativeDirection = !recon2.EndPoint.IsReverseRun ? ArrowInfo.Direction.Right : ArrowInfo.Direction.Left;
+                    if (Math.Round(mirOn, 3) != 0)
+                        OnArrowInfo.DrawRightOf(session, x1, onY, onDirection, mirOn.ToString("F3"));
+                    else
+                        OnArrowInfoZero.DrawRightOf(session, x1, onY, onDirection, mirOn.ToString("F3"));
 
-                    onMirPerFoot = Math.Abs(recon2.MirOnPerFoot) * 1000;
-                    onDirection = recon2.MirOnPerFoot < 0 ? negativeDirection : positiveDirection;
+                    if (Math.Round(mirOff, 3) != 0)
+                        OffArrowInfo.DrawRightOf(session, x1, offY, offDirection, mirOff.ToString("F3"));
+                    else
+                        OffArrowInfoZero.DrawRightOf(session, x1, offY, offDirection, mirOff.ToString("F3"));
 
-                    offMirPerFoot = Math.Abs(recon2.MirOffPerFoot) * 1000;
-                    offDirection = recon2.MirOffPerFoot < 0 ? negativeDirection : positiveDirection;
-                    OnArrowInfo.DrawRightOf(session, x2, onY, onDirection, onMirPerFoot.ToString("F3"));
-                    OffArrowInfo.DrawRightOf(session, x2, offY, offDirection, offMirPerFoot.ToString("F3"));
+                    if (Math.Round(mirOn, 3) != 0)
+                        OnArrowInfo.DrawLeftOf(session, x2, onY, onDirection, mirOn.ToString("F3"));
+                    else
+                        OnArrowInfoZero.DrawLeftOf(session, x2, onY, onDirection, mirOn.ToString("F3"));
+
+                    if (Math.Round(mirOff, 3) != 0)
+                        OffArrowInfo.DrawLeftOf(session, x2, offY, offDirection, mirOff.ToString("F3"));
+                    else
+                        OffArrowInfoZero.DrawLeftOf(session, x2, offY, offDirection, mirOff.ToString("F3"));
                 }
             }
         }

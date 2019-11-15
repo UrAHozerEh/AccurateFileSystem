@@ -41,11 +41,12 @@ namespace AFSTester
         List<File> NewFiles;
         Dictionary<AllegroCISFile, MapLayer> Layers = new Dictionary<AllegroCISFile, MapLayer>();
         private Random Random = new Random();
+        TreeViewNode HiddenNode = new TreeViewNode() { Content = "Hidden Files" };
 
         public MainPage()
         {
             this.InitializeComponent();
-            Button_Click(null, null);
+            FileTreeView.RootNodes.Add(HiddenNode);
         }
 
         private async void Button_Click(object sender, RoutedEventArgs e)
@@ -53,6 +54,8 @@ namespace AFSTester
             var folderPicker = new FolderPicker();
             folderPicker.FileTypeFilter.Add(".");
             var folder = await folderPicker.PickSingleFolderAsync();
+            if (folder == null)
+                return;
             var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
             var makeGraphs = false;
             NewFiles = new List<File>();
@@ -61,114 +64,6 @@ namespace AFSTester
             {
                 var factory = new FileFactory(file);
                 var newFile = await factory.GetFile();
-                if (newFile is AllegroCISFile && makeGraphs)
-                {
-                    var allegroFile = newFile as AllegroCISFile;
-                    var report = new GraphicalReport();
-                    var commentGraph = new Graph(report);
-                    var graph1 = new Graph(report);
-                    var graph2 = new Graph(report);
-                    var graph3 = new Graph(report);
-                    var on = new GraphSeries("On", allegroFile.GetDoubleData("On"))
-                    {
-                        LineColor = Colors.Green
-                    };
-                    var off = new GraphSeries("Off", allegroFile.GetDoubleData("Off"))
-                    {
-                        LineColor = Colors.Blue
-                    };
-                    var depth = new GraphSeries("Depth", allegroFile.GetDoubleData("Depth"))
-                    {
-                        LineColor = Colors.Orange,
-                        PointColor = Colors.Orange,
-                        IsY1Axis = false,
-                        PointShape = GraphSeries.Shape.Circle,
-                        GraphType = GraphSeries.Type.Point
-                    };
-                    var redLine = new SingleValueGraphSeries("850 Line", -0.85);
-                    var commentSeries = new CommentSeries { Values = allegroFile.GetStringData("Comment"), PercentOfGraph = 1f, IsFlippedVertical = true };
-
-                    commentGraph.CommentSeries = commentSeries;
-                    commentGraph.LegendInfo.Name = "CIS Comments";
-                    commentGraph.DrawTopBorder = false;
-
-                    commentGraph.XAxisInfo.MajorGridline.IsEnabled = false;
-                    commentGraph.YAxesInfo.MinorGridlines.IsEnabled = false;
-                    commentGraph.YAxesInfo.MajorGridlines.IsEnabled = false;
-                    commentGraph.YAxesInfo.Y1IsDrawn = false;
-
-                    graph1.Series.Add(depth);
-                    graph1.YAxesInfo.Y2IsDrawn = true;
-                    /*
-                    graph1.YAxesInfo.Y1MaximumValue = 150;
-                    graph1.YAxesInfo.Y1MinimumValue = 0;
-                    graph1.YAxesInfo.Y1IsInverted = false;
-                    graph1.Gridlines[(int)GridlineName.MajorHorizontal].Offset = 15;
-                    graph1.Gridlines[(int)GridlineName.MinorHorizontal].Offset = 5;
-                    */
-                    graph1.Series.Add(on);
-
-                    graph1.Series.Add(off);
-                    graph1.Series.Add(redLine);
-                    //graph1.XAxisInfo.IsEnabled = false;
-                    graph1.DrawBottomBorder = true;
-
-
-                    graph2.Series.Add(depth);
-                    graph2.YAxesInfo.Y2IsDrawn = true;
-                    graph2.YAxesInfo.Y1IsDrawn = false;
-                    //graph2.XAxisInfo.IsEnabled = false;
-
-                    graph3.Series.Add(on);
-                    graph3.Series.Add(off);
-                    //graph3.XAxisInfo.IsEnabled = false;
-                    graph3.DrawBottomBorder = false;
-
-                    report.XAxisInfo.IsEnabled = false;
-
-                    var bottomGlobalXAxis = new GlobalXAxis(report);
-
-                    var topGlobalXAxis = new GlobalXAxis(report, true);
-
-                    var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
-                    var commentGraphMeasurement = new SplitContainerMeasurement(commentGraph)
-                    {
-                        FixedInchSize = 1f
-                    };
-                    //var graph1Measurement = new SplitContainerMeasurement(graph1)
-                    //{
-                    //    RequestedPercent = 0.5
-                    //};
-                    var chart1 = new Chart(report, "Survey Direction");
-                    var chart2 = new Chart(report, "MIR Info");
-                    var mirSeries = new MirDirection(allegroFile.GetReconnects());
-                    chart2.Series.Add(mirSeries);
-                    //chart1.LegendInfo.NameFontSize = 18f;
-
-                    var chart1Series = new SurveyDirectionSeries(allegroFile.GetDirectionData());
-                    chart1.Series.Add(chart1Series);
-
-                    splitContainer.AddSelfSizedContainer(topGlobalXAxis);
-                    splitContainer.AddContainer(commentGraphMeasurement);
-                    splitContainer.AddContainer(graph1);
-                    splitContainer.AddSelfSizedContainer(chart2);
-                    splitContainer.AddSelfSizedContainer(chart1);
-                    //splitContainer.AddContainer(graph2);
-                    //splitContainer.AddContainer(graph3);
-                    splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
-                    report.Container = splitContainer;
-                    var images = report.GetImages(allegroFile.StartFootage, allegroFile.EndFootage);
-                    for (int i = 0; i < images.Count; ++i)
-                    {
-                        var page = $"{i + 1}".PadLeft(3, '0');
-                        var image = images[i];
-                        var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {page}" + ".png", CreationCollisionOption.ReplaceExisting);
-                        using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
-                        {
-                            await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
-                        }
-                    }
-                }
                 if (newFile != null)
                     NewFiles.Add(newFile);
             }
@@ -196,6 +91,114 @@ namespace AFSTester
             var newFile = await factory.GetFile();
             */
             FillTreeView();
+        }
+
+        private async void MakeGraphs(CombinedAllegroCISFile allegroFile)
+        {
+            var report = new GraphicalReport();
+            var commentGraph = new Graph(report);
+            var graph1 = new Graph(report);
+            var graph2 = new Graph(report);
+            var graph3 = new Graph(report);
+            var on = new GraphSeries("On", allegroFile.GetDoubleData("On"))
+            {
+                LineColor = Colors.Green
+            };
+            var off = new GraphSeries("Off", allegroFile.GetDoubleData("Off"))
+            {
+                LineColor = Colors.Blue
+            };
+            var depth = new GraphSeries("Depth", allegroFile.GetDoubleData("Depth"))
+            {
+                LineColor = Colors.Orange,
+                PointColor = Colors.Orange,
+                IsY1Axis = false,
+                PointShape = GraphSeries.Shape.Circle,
+                GraphType = GraphSeries.Type.Point
+            };
+            var redLine = new SingleValueGraphSeries("850 Line", -0.85);
+            var commentSeries = new CommentSeries { Values = allegroFile.GetCommentData("Comment"), PercentOfGraph = 1f, IsFlippedVertical = true };
+
+            commentGraph.CommentSeries = commentSeries;
+            commentGraph.LegendInfo.Name = "CIS Comments";
+            commentGraph.DrawTopBorder = false;
+
+            commentGraph.XAxisInfo.MajorGridline.IsEnabled = false;
+            commentGraph.YAxesInfo.MinorGridlines.IsEnabled = false;
+            commentGraph.YAxesInfo.MajorGridlines.IsEnabled = false;
+            commentGraph.YAxesInfo.Y1IsDrawn = false;
+
+            graph1.Series.Add(depth);
+            graph1.YAxesInfo.Y2IsDrawn = true;
+            /*
+            graph1.YAxesInfo.Y1MaximumValue = 150;
+            graph1.YAxesInfo.Y1MinimumValue = 0;
+            graph1.YAxesInfo.Y1IsInverted = false;
+            graph1.Gridlines[(int)GridlineName.MajorHorizontal].Offset = 15;
+            graph1.Gridlines[(int)GridlineName.MinorHorizontal].Offset = 5;
+            */
+            graph1.Series.Add(on);
+
+            graph1.Series.Add(off);
+            graph1.Series.Add(redLine);
+            //graph1.XAxisInfo.IsEnabled = false;
+            graph1.DrawBottomBorder = true;
+
+
+            graph2.Series.Add(depth);
+            graph2.YAxesInfo.Y2IsDrawn = true;
+            graph2.YAxesInfo.Y1IsDrawn = false;
+            //graph2.XAxisInfo.IsEnabled = false;
+
+            graph3.Series.Add(on);
+            graph3.Series.Add(off);
+            //graph3.XAxisInfo.IsEnabled = false;
+            graph3.DrawBottomBorder = false;
+
+            report.XAxisInfo.IsEnabled = false;
+
+            var bottomGlobalXAxis = new GlobalXAxis(report);
+
+            var topGlobalXAxis = new GlobalXAxis(report, true);
+
+            var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
+            var commentGraphMeasurement = new SplitContainerMeasurement(commentGraph)
+            {
+                FixedInchSize = 1f
+            };
+            //var graph1Measurement = new SplitContainerMeasurement(graph1)
+            //{
+            //    RequestedPercent = 0.5
+            //};
+            var chart1 = new Chart(report, "Survey Direction");
+            var chart2 = new Chart(report, "MIR Info");
+            var mirSeries = new MirDirection(allegroFile.GetReconnects());
+            chart2.Series.Add(mirSeries);
+            //chart1.LegendInfo.NameFontSize = 18f;
+
+            var chart1Series = new SurveyDirectionSeries(allegroFile.GetDirectionData());
+            chart1.Series.Add(chart1Series);
+
+            splitContainer.AddSelfSizedContainer(topGlobalXAxis);
+            splitContainer.AddContainer(commentGraphMeasurement);
+            splitContainer.AddContainer(graph1);
+            splitContainer.AddSelfSizedContainer(chart2);
+            splitContainer.AddSelfSizedContainer(chart1);
+            //splitContainer.AddContainer(graph2);
+            //splitContainer.AddContainer(graph3);
+            splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
+            report.Container = splitContainer;
+            var images = report.GetImages(0, allegroFile.FileInfos.TotalFootage);
+            for (int i = 0; i < images.Count; ++i)
+            {
+                var page = $"{i + 1}".PadLeft(3, '0');
+                var image = images[i];
+                var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {page}" + ".png", CreationCollisionOption.ReplaceExisting);
+                using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
+                {
+                    await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
+                }
+            }
         }
 
         private void FillTreeView()
@@ -249,6 +252,12 @@ namespace AFSTester
                 }
             }
             FileTreeView.SelectedNodes.Clear();
+        }
+
+        private void HideFileOnMap(AllegroCISFile file)
+        {
+            if (Layers.ContainsKey(file))
+                Layers[file].Visible = false;
         }
 
         private void ToggleFileOnMap(AllegroCISFile file)
@@ -396,9 +405,16 @@ namespace AFSTester
                     ToggleFileOnMap(file.Content as AllegroCISFile);
             else
             {
-                var allegroFiles = NewFiles.Where(file => file is AllegroCISFile);
-                foreach (AllegroCISFile file in allegroFiles)
-                    ToggleFileOnMap(file);
+                foreach (var folderNode in FileTreeView.RootNodes)
+                {
+                    if (folderNode == HiddenNode)
+                        continue;
+                    foreach (var fileNode in folderNode.Children)
+                    {
+                        if (fileNode.Content is AllegroCISFile file)
+                            ToggleFileOnMap(file);
+                    }
+                }
             }
         }
 
@@ -411,15 +427,15 @@ namespace AFSTester
         private void Button_Click_3(object sender, RoutedEventArgs e)
         {
             GeoboundingBox area = null;
-            foreach(var (file, layer) in Layers)
+            foreach (var (file, layer) in Layers)
             {
-                if(layer.Visible)
+                if (layer.Visible)
                 {
                     var rect = file.GetGpsArea();
                     area = area?.CombineAreas(rect) ?? rect;
                 }
             }
-            if(area != null)
+            if (area != null)
             {
                 _ = MapControl.TrySetViewBoundsAsync(area, new Thickness(10), MapAnimationKind.None);
             }
@@ -433,11 +449,20 @@ namespace AFSTester
                 files.Add(node.Content as AllegroCISFile);
 
             var test = CombinedAllegroCISFile.CombineFiles("Testing", files);
+            MakeGraphs(test);
         }
 
         private void HideButtonClick(object sender, RoutedEventArgs e)
         {
-
+            var fileNodes = FileTreeView.SelectedNodes.Where(node => node.Content is AllegroCISFile).ToList();
+            for (int i = 0; i < fileNodes.Count; ++i)
+            {
+                var file = fileNodes[i];
+                file.Parent.Children.Remove(file);
+                HiddenNode.Children.Add(file);
+                HideFileOnMap(file.Content as AllegroCISFile);
+            }
+            FileTreeView.SelectedNodes.Clear();
         }
     }
 }

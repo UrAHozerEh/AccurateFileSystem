@@ -88,6 +88,9 @@ namespace AccurateFileSystem
 
                     curPoint.MIROn = curPoint.On + Math.Round(mirOnPerFoot * curDist, 4);
                     curPoint.MIROff = curPoint.Off + Math.Round(mirOffPerFoot * curDist, 4);
+
+                    curPoint.MirOnPerFoot = mirOnPerFoot;
+                    curPoint.MirOffPerFoot = mirOffPerFoot;
                 }
             }
         }

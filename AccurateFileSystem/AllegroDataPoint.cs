@@ -14,8 +14,10 @@ namespace AccurateFileSystem
         public double Footage { get; private set; }
         public double On { get; private set; }
         public double MIROn { get; set; }
+        public double? MirOnPerFoot { get; set; } = null;
         public double Off { get; private set; }
         public double MIROff { get; set; }
+        public double? MirOffPerFoot { get; set; } = null;
         public double? Depth { get; private set; }
         public string OriginalComment { get; private set; }
         public string CommentTemplate { get; private set; }

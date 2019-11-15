@@ -11,11 +11,11 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="100"/>
             <ColumnDefinition Width="1*"/>
+            <ColumnDefinition Width="100"/>
             <ColumnDefinition Width="0.25*"/>
         </Grid.ColumnDefinitions>
-        <Grid HorizontalAlignment="Center">
+        <Grid HorizontalAlignment="Center" Grid.Column="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="1*"/>
                 <RowDefinition Height="1*"/>
@@ -32,8 +32,8 @@
             <Button Content="Hide" Click="HideButtonClick" Grid.Row="5" HorizontalAlignment="Center"/>
         </Grid>
 
-        <Maps:MapControl x:Name="MapControl" Grid.Column="1"/>
-        <ScrollViewer VerticalScrollMode="Disabled" HorizontalScrollMode="Enabled" Grid.Column="2">
+        <Maps:MapControl x:Name="MapControl" Grid.Column="0"/>
+        <ScrollViewer VerticalScrollMode="Enabled" HorizontalScrollMode="Enabled" Grid.Column="2">
             <TreeView Name="FileTreeView" DoubleTapped="FileTreeView_DoubleTapped" SelectionMode="Multiple"/>
         </ScrollViewer>
     </Grid>
