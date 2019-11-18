@@ -186,6 +186,7 @@ namespace AccurateReportSystem
                     break;
                 var (x, y) = transform.ToDrawArea(footage, value);
                 session.FillCircle(x, y, 3, PointColor);
+                session.DrawCircle(x, y, 3, Colors.Black);
             }
         }
 

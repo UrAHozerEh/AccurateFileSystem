@@ -12,11 +12,13 @@ namespace AccurateFileSystem
     {
         public int Id { get; }
         public double Footage { get; private set; }
-        public double On { get; private set; }
-        public double MIROn { get; set; }
+        public double On { get; set; }
+        public double MirOnOffset { get; set; }
+        public double MirOn => On - MirOnOffset;
         public double? MirOnPerFoot { get; set; } = null;
-        public double Off { get; private set; }
-        public double MIROff { get; set; }
+        public double Off { get; set; }
+        public double MirOffOffset { get; set; }
+        public double MirOff => Off - MirOffOffset;
         public double? MirOffPerFoot { get; set; } = null;
         public double? Depth { get; private set; }
         public string OriginalComment { get; private set; }
@@ -54,9 +56,9 @@ namespace AccurateFileSystem
             Id = id;
             Footage = footage;
             On = on;
-            MIROn = on;
+            MirOnOffset = 0;
             Off = off;
-            MIROff = off;
+            MirOffOffset = 0;
             OriginalComment = comment;
             GPS = gps;
             Times = times;
@@ -67,7 +69,7 @@ namespace AccurateFileSystem
         {
             if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
-            string docPattern = "DOC (\\d+)(in)?";
+            string docPattern = "(?i)DOC (\\d+)(in)?";
             var doc = Regex.Match(OriginalComment, docPattern);
             if (doc.Success)
             {
@@ -80,15 +82,15 @@ namespace AccurateFileSystem
             if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
             string testStationPattern = @"\([^\)]+\)";
-            
+
             var matches = Regex.Matches(OriginalComment, testStationPattern);
             CommentTemplate = OriginalComment;
-            
+
             int count = 0;
             foreach (Match match in matches)
             {
                 string tsString = match.Value;
-                if(tsString == "(HILO)")
+                if (tsString == "(HILO)")
                 {
                     IsHiLo = true;
                     continue;
@@ -147,8 +149,8 @@ namespace AccurateFileSystem
         public ReconnectTestStationRead GetReconnect()
         {
             foreach (var read in TestStationReads)
-                if(read is ReconnectTestStationRead)
-                return read as ReconnectTestStationRead;
+                if (read is ReconnectTestStationRead)
+                    return read as ReconnectTestStationRead;
             return null;
         }
     }

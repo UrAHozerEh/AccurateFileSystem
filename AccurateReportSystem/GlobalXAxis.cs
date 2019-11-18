@@ -4,7 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Geometry;
+using Microsoft.Graphics.Canvas.Text;
 using Windows.Foundation;
+using Windows.UI;
+using Windows.UI.Text;
 
 namespace AccurateReportSystem
 {
@@ -12,6 +16,7 @@ namespace AccurateReportSystem
     {
         public GraphicalReport Report { get; set; }
         public XAxisInfo XAxisInfo { get; set; }
+        public bool DrawPageInfo { get; set; } = false;
 
         public GlobalXAxis(GraphicalReport report, bool isFlippedVertical = false)
         {
@@ -34,6 +39,35 @@ namespace AccurateReportSystem
             var transform = new TransformInformation2d(realDrawArea, graphArea, false);
 
             XAxisInfo.DrawInfo(session, page, transform.GetXTransform(), realDrawArea);
+            var pageRect = new Rect(drawArea.Left, drawArea.Top + XAxisInfo.LabelHeight, leftSpace, XAxisInfo.TitleTotalHeight);
+            if (DrawPageInfo)
+                DrawPageCount(page, session, pageRect);
+        }
+
+        private void DrawPageCount(PageInformation page, CanvasDrawingSession session, Rect drawArea)
+        {
+            using (var format = new CanvasTextFormat())
+            {
+                format.HorizontalAlignment = CanvasHorizontalAlignment.Center;
+                format.WordWrapping = CanvasWordWrapping.WholeWord;
+                format.FontSize = XAxisInfo.TitleFontSize;
+                format.FontFamily = "Arial";
+                format.FontWeight = FontWeights.Thin;
+                format.FontStyle = FontStyle.Normal;
+                var text = $"Page {page.PageNumber} of {page.TotalPages}";
+                using (var layout = new CanvasTextLayout(session, text, format, (float)drawArea.Width, (float)drawArea.Height))
+                {
+                    using (var geometry = CanvasGeometry.CreateText(layout))
+                    {
+                        var bounds = layout.DrawBounds;
+                        var translateMatrix = bounds.CreateTranslateMiddleTo(drawArea);
+                        using (var rotatedGeo = geometry.Transform(translateMatrix))//.Transform(rotationMatrix))
+                        {
+                            session.FillGeometry(rotatedGeo, Colors.Black);
+                        }
+                    }
+                }
+            }
         }
 
         public override double GetRequestedWidth()

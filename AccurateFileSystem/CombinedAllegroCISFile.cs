@@ -12,24 +12,35 @@ namespace AccurateFileSystem
         public FileInfoLinkedList FileInfos { get; set; }
         public FileType Type { get; set; }
         public string Name { get; set; }
+        public List<(double Footage, bool IsReverse, AllegroDataPoint Point)> Points = null;
 
         private CombinedAllegroCISFile(string name, FileType type, FileInfoLinkedList fileInfos)
         {
             Type = type;
             Name = name;
             FileInfos = fileInfos;
+            UpdatePoints();
         }
 
         public List<(string fieldName, Type fieldType)> GetFields()
         {
-            var list = new List<(string fieldName, Type fieldType)>();
-            list.Add(("On", typeof(double)));
-            list.Add(("Off", typeof(double)));
-            list.Add(("On Compensated", typeof(double)));
-            list.Add(("Off Compensated", typeof(double)));
-            list.Add(("Depth", typeof(double)));
-            list.Add(("Comment", typeof(string)));
+            var list = new List<(string fieldName, Type fieldType)>
+            {
+                ("On", typeof(double)),
+                ("Off", typeof(double)),
+                ("On Compensated", typeof(double)),
+                ("Off Compensated", typeof(double)),
+                ("Depth", typeof(double)),
+                ("Comment", typeof(string))
+            };
             return list;
+        }
+
+        public void Reverse()
+        {
+            FileInfos = FileInfos.Reverse();
+            FileInfos.CalculateOffset(10);
+            UpdatePoints();
         }
 
         public List<(double footage, double value)> GetDoubleData(string fieldName)
@@ -38,8 +49,12 @@ namespace AccurateFileSystem
             {
                 case "On":
                     return GetOnData();
+                case "On Compensated":
+                    return GetOnCompensatedData();
                 case "Off":
                     return GetOffData();
+                case "Off Compensated":
+                    return GetOffCompensatedData();
                 case "Depth":
                     return GetDepthData();
                 default:
@@ -47,7 +62,7 @@ namespace AccurateFileSystem
             }
         }
 
-        private List<(double Footage, bool IsReverse, AllegroDataPoint Point)> GetPoints()
+        public void UpdatePoints()
         {
             var list = new List<(double Footage, bool IsReverse, AllegroDataPoint Point)>();
             var tempFileInfoNode = FileInfos;
@@ -69,74 +84,98 @@ namespace AccurateFileSystem
                 offset += info.TotalFootage;
                 tempFileInfoNode = tempFileInfoNode.Next;
             }
+            Points = list;
+        }
+
+        public List<(double Footage, double On, double Off)> GetCombinedMirData()
+        {
+            var list = new List<(double, double, double)>();
+            for (int i = 0; i < Points.Count; ++i)
+            {
+                list.Add((Points[i].Footage, Points[i].Point.MirOn, Points[i].Point.MirOff));
+            }
             return list;
         }
 
         private List<(double footage, double value)> GetOnData()
         {
-            var points = GetPoints();
             var list = new List<(double, double)>();
-            for (int i = 0; i < points.Count; ++i)
+            for (int i = 0; i < Points.Count; ++i)
             {
-                list.Add((points[i].Footage, points[i].Point.On));
+                list.Add((Points[i].Footage, Points[i].Point.On));
+            }
+            return list;
+        }
+
+        private List<(double footage, double value)> GetOnCompensatedData()
+        {
+            var list = new List<(double, double)>();
+            for (int i = 0; i < Points.Count; ++i)
+            {
+                list.Add((Points[i].Footage, Points[i].Point.MirOn));
             }
             return list;
         }
 
         private List<(double footage, double value)> GetOffData()
         {
-            var points = GetPoints();
             var list = new List<(double, double)>();
-            for (int i = 0; i < points.Count; ++i)
+            for (int i = 0; i < Points.Count; ++i)
             {
-                list.Add((points[i].Footage, points[i].Point.Off));
+                list.Add((Points[i].Footage, Points[i].Point.Off));
+            }
+            return list;
+        }
+
+        private List<(double footage, double value)> GetOffCompensatedData()
+        {
+            var list = new List<(double, double)>();
+            for (int i = 0; i < Points.Count; ++i)
+            {
+                list.Add((Points[i].Footage, Points[i].Point.MirOff));
             }
             return list;
         }
 
         private List<(double footage, double value)> GetDepthData()
         {
-            var points = GetPoints();
             var list = new List<(double, double)>();
-            for (int i = 0; i < points.Count; ++i)
+            for (int i = 0; i < Points.Count; ++i)
             {
-                if (points[i].Point.Depth.HasValue)
-                    list.Add((points[i].Footage, points[i].Point.Depth.Value));
+                if (Points[i].Point.Depth.HasValue)
+                    list.Add((Points[i].Footage, Points[i].Point.Depth.Value));
             }
             return list;
         }
 
         public List<(double Footage, double OnMirPerFoot, double OffMirPerFoot, bool IsReverse)> GetReconnects()
         {
-            var points = GetPoints();
             var list = new List<(double, double, double, bool)>();
-            for (int i = 0; i < points.Count; ++i)
+            for (int i = 0; i < Points.Count; ++i)
             {
-                var point = points[i].Point;
-                if (points[i].Point.MirOnPerFoot.HasValue)
-                    list.Add((points[i].Footage, point.MirOnPerFoot.Value, point.MirOffPerFoot.Value, points[i].IsReverse));
+                var point = Points[i].Point;
+                if (Points[i].Point.MirOnPerFoot.HasValue)
+                    list.Add((Points[i].Footage, point.MirOnPerFoot.Value, point.MirOffPerFoot.Value, Points[i].IsReverse));
             }
             return list;
         }
 
         public List<(double footage, string value)> GetCommentData(string fieldName)
         {
-            var points = GetPoints();
             var list = new List<(double, string)>();
-            for (int i = 0; i < points.Count; ++i)
+            for (int i = 0; i < Points.Count; ++i)
             {
-                list.Add((points[i].Footage, points[i].Point.OriginalComment));
+                list.Add((Points[i].Footage, Points[i].Point.OriginalComment));
             }
             return list;
         }
 
         public List<(double Footage, bool IsReverseRun)> GetDirectionData()
         {
-            var points = GetPoints();
             var output = new List<(double, bool)>();
-            foreach (var point in points)
+            foreach (var point in Points)
             {
-                output.Add((point.Footage, point.Point.IsReverseRun));
+                output.Add((point.Footage, point.IsReverse));
             }
             return output;
         }
@@ -144,12 +183,12 @@ namespace AccurateFileSystem
         public static CombinedAllegroCISFile CombineFiles(string name, List<AllegroCISFile> files)
         {
             var first = files.First();
-            var header = first.Header;
             var type = first.Type;
 
             var calc = new OrderCalculator(files);
             calc.Solve();
-            var allSolution = calc.GetAllUsedSolution();
+            //TODO: Maybe look at TS MP to determine if we should reverse the new file.
+            var allSolution = calc.GetAllUsedSolution().Reverse();
             allSolution.CalculateOffset(10);
             var solString = allSolution.ToString();
             var combined = new CombinedAllegroCISFile(name, type, allSolution);
@@ -267,10 +306,25 @@ namespace AccurateFileSystem
                     var otherEnd = info.End;
                     var myFile = Info.File;
                     var myStart = Info.Start;
-                    Info.Offset = myFile.OffsetDistance(myStart, otherFile, otherEnd, roundTo);
+                    Info.Offset = Math.Max(myFile.OffsetDistance(myStart, otherFile, otherEnd, roundTo), roundTo);
                 }
                 if (Next != null)
                     Next.CalculateOffset(roundTo);
+            }
+
+            public FileInfoLinkedList Reverse()
+            {
+                var tempPrev = Prev;
+                var tempNext = Next;
+                var tempStart = Info.Start;
+                var tempEnd = Info.End;
+                Info.Start = tempEnd;
+                Info.End = tempStart;
+                Prev = tempNext;
+                Next = tempPrev;
+                if (Prev == null)
+                    return this;
+                return Prev.Reverse();
             }
         }
 
@@ -292,11 +346,11 @@ namespace AccurateFileSystem
                 foreach (var file in files)
                 {
                     var testStations = new List<int>();
-                    if (file.Points[0].TestStationReads.Count == 0)
+                    if (file.Points[0].TestStationReads.Count == 0 || file.Name.ToLower().Contains("redo"))
                         testStations.Add(0);
                     for (int i = 0; i < file.Points.Count; ++i)
                     {
-                        if (file.Points[i].TestStationReads.Count != 0)
+                        if (file.Points[i].TestStationReads.Count != 0 && !file.Name.ToLower().Contains("redo"))
                             testStations.Add(i);
                     }
                     var lastIndex = file.Points.Count - 1;

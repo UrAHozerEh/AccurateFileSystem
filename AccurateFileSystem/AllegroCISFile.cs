@@ -57,9 +57,32 @@ namespace AccurateFileSystem
                 return;
             int incVal = int.Parse(Header["autoincval"]);
             int startIndex = 0;
+            double? prevOn = null;
+            double? prevOff = null;
             for (int i = 1; i < Points.Count; ++i)
             {
                 var cur = Points[i];
+                if(cur.On == 0)
+                {
+                    if (cur.HasReconnect)
+                    {
+                        var recon = cur.GetReconnect();
+                        cur.On = recon.NGOn;
+                        cur.Off = recon.NGOff;
+                    }
+                    else if(prevOn.HasValue)
+                    {
+                        cur.On = prevOn.Value;
+                        cur.Off = prevOff.Value;
+                    }
+                    else if(i + 1 < Points.Count)
+                    {
+                        cur.On = Points[i + 1].On;
+                        cur.Off = Points[i + 1].Off;
+                    }
+                }
+                prevOn = cur.On;
+                prevOff = cur.Off;
                 if (cur.HasReconnect)
                 {
                     Reconnects.Add((startIndex, i));
@@ -86,8 +109,8 @@ namespace AccurateFileSystem
                     curPoint.NextReconnect = reconnect;
                     var curDist = curPoint.Footage - startPoint.Footage;
 
-                    curPoint.MIROn = curPoint.On + Math.Round(mirOnPerFoot * curDist, 4);
-                    curPoint.MIROff = curPoint.Off + Math.Round(mirOffPerFoot * curDist, 4);
+                    curPoint.MirOnOffset = Math.Round(mirOnPerFoot * curDist, 4);
+                    curPoint.MirOffOffset = Math.Round(mirOffPerFoot * curDist, 4);
 
                     curPoint.MirOnPerFoot = mirOnPerFoot;
                     curPoint.MirOffPerFoot = mirOffPerFoot;

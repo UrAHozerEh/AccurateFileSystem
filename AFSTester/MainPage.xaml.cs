@@ -102,11 +102,19 @@ namespace AFSTester
             var graph3 = new Graph(report);
             var on = new GraphSeries("On", allegroFile.GetDoubleData("On"))
             {
-                LineColor = Colors.Green
+                LineColor = Colors.Blue
             };
             var off = new GraphSeries("Off", allegroFile.GetDoubleData("Off"))
             {
-                LineColor = Colors.Blue
+                LineColor = Colors.Green
+            };
+            var onMir = new GraphSeries("On MIR Compensated", allegroFile.GetDoubleData("On Compensated"))
+            {
+                LineColor = Colors.Maroon
+            };
+            var offMir = new GraphSeries("Off MIR Compensated", allegroFile.GetDoubleData("Off Compensated"))
+            {
+                LineColor = Colors.Navy
             };
             var depth = new GraphSeries("Depth", allegroFile.GetDoubleData("Depth"))
             {
@@ -116,8 +124,18 @@ namespace AFSTester
                 PointShape = GraphSeries.Shape.Circle,
                 GraphType = GraphSeries.Type.Point
             };
-            var redLine = new SingleValueGraphSeries("850 Line", -0.85);
-            var commentSeries = new CommentSeries { Values = allegroFile.GetCommentData("Comment"), PercentOfGraph = 1f, IsFlippedVertical = true };
+            var redLine = new SingleValueGraphSeries("850 Line", -0.85)
+            {
+                IsDrawnInLegend = false
+            };
+            var commentSeries = new CommentSeries { Values = allegroFile.GetCommentData("Comment"), PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs };
+            var seperateComment = false;
+            if (seperateComment)
+            {
+                commentSeries.PercentOfGraph = 1f;
+                commentSeries.IsFlippedVertical = true;
+                commentSeries.BorderType = BorderType.Full;
+            }
 
             commentGraph.CommentSeries = commentSeries;
             commentGraph.LegendInfo.Name = "CIS Comments";
@@ -130,6 +148,8 @@ namespace AFSTester
 
             graph1.Series.Add(depth);
             graph1.YAxesInfo.Y2IsDrawn = true;
+            if (!seperateComment)
+                graph1.CommentSeries = commentSeries;
             /*
             graph1.YAxesInfo.Y1MaximumValue = 150;
             graph1.YAxesInfo.Y1MinimumValue = 0;
@@ -140,6 +160,8 @@ namespace AFSTester
             graph1.Series.Add(on);
 
             graph1.Series.Add(off);
+            graph1.Series.Add(onMir);
+            graph1.Series.Add(offMir);
             graph1.Series.Add(redLine);
             //graph1.XAxisInfo.IsEnabled = false;
             graph1.DrawBottomBorder = true;
@@ -157,30 +179,38 @@ namespace AFSTester
 
             report.XAxisInfo.IsEnabled = false;
 
-            var bottomGlobalXAxis = new GlobalXAxis(report);
+            var bottomGlobalXAxis = new GlobalXAxis(report)
+            {
+                DrawPageInfo = true
+            };
 
             var topGlobalXAxis = new GlobalXAxis(report, true);
 
             var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
-            var commentGraphMeasurement = new SplitContainerMeasurement(commentGraph)
-            {
-                FixedInchSize = 1f
-            };
+
             //var graph1Measurement = new SplitContainerMeasurement(graph1)
             //{
             //    RequestedPercent = 0.5
             //};
             var chart1 = new Chart(report, "Survey Direction");
-            var chart2 = new Chart(report, "MIR Info");
+            var chart2 = new Chart(report, "850 Data");
             var mirSeries = new MirDirection(allegroFile.GetReconnects());
-            chart2.Series.Add(mirSeries);
+            var exceptions = new ExceptionsChartSeries(allegroFile.GetCombinedMirData(), chart2.LegendInfo, chart2.YAxesInfo);
+            chart2.Series.Add(exceptions);
             //chart1.LegendInfo.NameFontSize = 18f;
 
             var chart1Series = new SurveyDirectionSeries(allegroFile.GetDirectionData());
             chart1.Series.Add(chart1Series);
 
             splitContainer.AddSelfSizedContainer(topGlobalXAxis);
-            splitContainer.AddContainer(commentGraphMeasurement);
+            if (seperateComment)
+            {
+                var commentGraphMeasurement = new SplitContainerMeasurement(commentGraph)
+                {
+                    FixedInchSize = 1f
+                };
+                splitContainer.AddContainer(commentGraphMeasurement);
+            }
             splitContainer.AddContainer(graph1);
             splitContainer.AddSelfSizedContainer(chart2);
             splitContainer.AddSelfSizedContainer(chart1);
@@ -188,7 +218,7 @@ namespace AFSTester
             //splitContainer.AddContainer(graph3);
             splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
             report.Container = splitContainer;
-            var images = report.GetImages(0, allegroFile.FileInfos.TotalFootage);
+            var images = report.GetImages(0, allegroFile.Points.Last().Footage);
             for (int i = 0; i < images.Count; ++i)
             {
                 var page = $"{i + 1}".PadLeft(3, '0');
@@ -208,7 +238,8 @@ namespace AFSTester
             {
                 if (file is AllegroCISFile allegroFile && allegroFile.Header.ContainsKey("segment"))
                 {
-                    var segmentName = allegroFile.Header["segment"];
+                    
+                    var segmentName = Regex.Replace(Regex.Replace(allegroFile.Header["segment"], "\\s+", ""), "(?i)ls", "");
                     if (!treeNodes.ContainsKey(segmentName))
                     {
                         var newSegmentNode = new TreeViewNode() { Content = segmentName };
