@@ -23,6 +23,7 @@ namespace AccurateFileSystem
         public double? Depth { get; private set; }
         public string OriginalComment { get; private set; }
         public string CommentTemplate { get; private set; }
+        public string StrippedComment { get; set; }
         public BasicGeoposition GPS { get; private set; }
         public bool HasGPS => !GPS.Equals(new BasicGeoposition());
         public List<DateTime> Times { get; private set; }
@@ -69,7 +70,7 @@ namespace AccurateFileSystem
         {
             if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
-            string docPattern = "(?i)DOC (\\d+)(in)?";
+            string docPattern = @"(?i)DOC:?\s?(\d+)(in)?";
             var doc = Regex.Match(OriginalComment, docPattern);
             if (doc.Success)
             {
@@ -108,6 +109,7 @@ namespace AccurateFileSystem
                     ++count;
                 }
             }
+            StrippedComment = Regex.Replace(CommentTemplate, @"\$\$\d*\$\$", "");
         }
 
         public bool Equals(AllegroDataPoint other)

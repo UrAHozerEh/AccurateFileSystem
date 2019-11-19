@@ -26,7 +26,7 @@ namespace AccurateReportSystem
         public static int DEFAULT_DIP = 96;
         public static int DIGITS_TO_ROUND = 2;
 
-        public List<CanvasRenderTarget> GetImages(double startFootage, double endFootage, float dpi = 150)
+        public List<CanvasRenderTarget> GetImages(double startFootage, double endFootage, float dpi = 1200)
         {
             var pageAreaWidth = Math.Round(DEFAULT_DIP * 11.0, DIGITS_TO_ROUND);
             var pageAreaHeight = Math.Round(DEFAULT_DIP * 8.5, DIGITS_TO_ROUND);
@@ -52,6 +52,24 @@ namespace AccurateReportSystem
             }
 
             return list;
+        }
+
+        public CanvasRenderTarget GetImage(PageInformation page, float dpi = 300)
+        {
+            var pageAreaWidth = Math.Round(DEFAULT_DIP * 11.0, DIGITS_TO_ROUND);
+            var pageAreaHeight = Math.Round(DEFAULT_DIP * 8.5, DIGITS_TO_ROUND);
+            var pageArea = new Rect(0, 0, pageAreaWidth, pageAreaHeight);
+            var drawArea = new Rect(MarginInfo.LeftDip, MarginInfo.TopDip, pageAreaWidth - MarginInfo.MarginWidthDip, pageAreaHeight - MarginInfo.MarginHeightDip);
+
+            CanvasDevice device = CanvasDevice.GetSharedDevice();
+            CanvasRenderTarget offscreen = new CanvasRenderTarget(device, (float)pageArea.Width, (float)pageArea.Height, dpi);
+            using (CanvasDrawingSession session = offscreen.CreateDrawingSession())
+            {
+                session.Clear(Colors.White);
+                session.TextRenderingParameters = new CanvasTextRenderingParameters(CanvasTextRenderingMode.NaturalSymmetric, CanvasTextGridFit.Default);
+                Container.Draw(page, session, drawArea);
+            }
+            return offscreen;
         }
     }
 

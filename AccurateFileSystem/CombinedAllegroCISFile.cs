@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
 
@@ -12,7 +13,7 @@ namespace AccurateFileSystem
         public FileInfoLinkedList FileInfos { get; set; }
         public FileType Type { get; set; }
         public string Name { get; set; }
-        public List<(double Footage, bool IsReverse, AllegroDataPoint Point)> Points = null;
+        public List<(double Footage, bool IsReverse, AllegroDataPoint Point, bool UseMir, AllegroCISFile File)> Points = null;
 
         private CombinedAllegroCISFile(string name, FileType type, FileInfoLinkedList fileInfos)
         {
@@ -20,6 +21,7 @@ namespace AccurateFileSystem
             Name = name;
             FileInfos = fileInfos;
             UpdatePoints();
+            var output = FilterMir(new List<string>() { "anode", "rectifier" });
         }
 
         public List<(string fieldName, Type fieldType)> GetFields()
@@ -43,6 +45,216 @@ namespace AccurateFileSystem
             UpdatePoints();
         }
 
+        public string GetTabularData(int readDecimals = 4)
+        {
+            var output = new StringBuilder();
+            var readFormat = $"F{readDecimals}";
+            var curLine = new string[30];
+            curLine[0] = "Footage";
+            curLine[1] = "Compensated On";
+            curLine[2] = "Compensated Off";
+            curLine[3] = "On";
+            curLine[4] = "Off";
+            curLine[5] = "Date";
+            curLine[6] = "Latitude";
+            curLine[7] = "Longitude";
+            curLine[8] = "Remarks";
+            curLine[9] = "Near Ground On";
+            curLine[10] = "Near Ground Off";
+            curLine[11] = "Left On";
+            curLine[12] = "Left Off";
+            curLine[13] = "Right On";
+            curLine[14] = "Right Off";
+            curLine[15] = "Far Ground On";
+            curLine[16] = "Far Ground Off";
+            curLine[17] = "MIR On";
+            curLine[18] = "MIR Off";
+            curLine[19] = "Reconnect Distance";
+            curLine[20] = "Reconnect Direction";
+            curLine[21] = "Coupon On";
+            curLine[22] = "Coupon Off";
+            curLine[23] = "Coupon Native";
+            curLine[24] = "Casing On";
+            curLine[25] = "Casing Off";
+            curLine[26] = "Foreign On";
+            curLine[27] = "Foreign Off";
+            curLine[28] = "ACV";
+            curLine[29] = "Full Comment";
+            output.AppendLine(string.Join("\t", curLine));
+
+            foreach (var (footage, isReverse, point, useMir, file) in Points)
+            {
+                curLine = new string[30];
+                curLine[0] = footage.ToString("F0");
+                curLine[1] = point.MirOn.ToString(readFormat);
+                curLine[2] = point.MirOff.ToString(readFormat);
+                curLine[3] = point.On.ToString(readFormat);
+                curLine[4] = point.Off.ToString(readFormat);
+                if (point.HasTime)
+                    curLine[5] = point.Times[0].ToString("MM/dd/yyyy");
+                else
+                    curLine[5] = "N/A";
+                if (point.HasGPS)
+                {
+                    curLine[6] = point.GPS.Latitude.ToString("F8");
+                    curLine[7] = point.GPS.Longitude.ToString("F8");
+                }
+                else
+                {
+                    curLine[6] = "N/A";
+                    curLine[7] = "N/A";
+                }
+                curLine[8] = point.StrippedComment ?? "";
+                curLine[29] = point.OriginalComment ?? "";
+                if (point.TestStationReads.Count > 0)
+                {
+                    foreach (TestStationRead read in point.TestStationReads)
+                    {
+                        if (read is ReconnectTestStationRead reconnect)
+                        {
+                            curLine[9] = reconnect.NGOn.ToString(readFormat);
+                            curLine[10] = reconnect.NGOff.ToString(readFormat);
+
+                            curLine[15] = reconnect.FGOn.ToString(readFormat);
+                            curLine[16] = reconnect.FGOff.ToString(readFormat);
+
+                            curLine[17] = reconnect.MirOn.ToString(readFormat);
+                            curLine[18] = reconnect.MirOff.ToString(readFormat);
+
+                            curLine[19] = reconnect.ReconnectDistance.ToString("F0");
+                            curLine[20] = isReverse ? "Downstream" : "Upstream";
+                        }
+                        else if (read is SingleTestStationRead single)
+                        {
+                            var lowerTag = single.Tag?.ToLower() ?? "";
+                            if (lowerTag.Contains("coup"))
+                            {
+                                if (lowerTag.Contains("off"))
+                                {
+                                    curLine[22] = single.Off.ToString(readFormat);
+                                }
+                                else
+                                {
+                                    curLine[21] = single.On.ToString(readFormat);
+                                }
+                            }
+                            else if (lowerTag.Contains("nat"))
+                            {
+                                curLine[23] = single.Off.ToString(readFormat);
+                            }
+                            else
+                            {
+                                if (string.IsNullOrEmpty(curLine[9]))
+                                {
+                                    curLine[9] = single.On.ToString(readFormat);
+                                    curLine[10] = single.Off.ToString(readFormat);
+                                }
+                            }
+                        }
+                        else if (read is SideDrainTestStationRead sideDrain)
+                        {
+                            curLine[11] = sideDrain.LeftOn.ToString(readFormat);
+                            curLine[12] = sideDrain.LeftOff.ToString(readFormat);
+
+                            curLine[13] = sideDrain.RightOn.ToString(readFormat);
+                            curLine[14] = sideDrain.RightOff.ToString(readFormat);
+                        }
+                        else if (read is CasingTestStationRead casing)
+                        {
+                            if (string.IsNullOrEmpty(curLine[9]))
+                            {
+                                curLine[9] = casing.StructOn.ToString(readFormat);
+                                curLine[10] = casing.StructOff.ToString(readFormat);
+                            }
+                            curLine[24] = casing.CasingOn.ToString(readFormat);
+                            curLine[25] = casing.CasingOff.ToString(readFormat);
+                        }
+                        else if (read is CrossingTestStationRead crossing)
+                        {
+                            if (string.IsNullOrEmpty(curLine[9]))
+                            {
+                                curLine[9] = crossing.StructOn.ToString(readFormat);
+                                curLine[10] = crossing.StructOff.ToString(readFormat);
+                            }
+                            curLine[26] = crossing.ForeignOn.ToString(readFormat);
+                            curLine[27] = crossing.ForeignOff.ToString(readFormat);
+                        }
+                        else if (read is ACTestStationRead ac)
+                        {
+                            curLine[28] = ac.Value.ToString(readFormat);
+                        }
+                    }
+                    for (int i = 9; i <= 28; ++i)
+                    {
+                        if (string.IsNullOrEmpty(curLine[i]))
+                            curLine[i] = "N/A";
+                    }
+                }
+
+                output.AppendLine(string.Join("\t", curLine));
+            }
+
+            return output.ToString();
+        }
+
+        public string FilterMir(List<string> blacklist)
+        {
+            StringBuilder output = new StringBuilder();
+            var alreadyFound = new Dictionary<ReconnectTestStationRead, (bool UseMir, double Start, double End, string Reason)>();
+            for (int i = 0; i < Points.Count; ++i)
+            {
+                var (footage, isReverse, point, _, file) = Points[i];
+                if (point.NextReconnect != null)
+                {
+                    var recon = point.NextReconnect;
+                    if (!alreadyFound.ContainsKey(recon))
+                    {
+                        alreadyFound.Add(recon, (true, footage, footage, null));
+                        for (int j = recon.StartPoint.Id; j <= recon.EndPoint.Id; ++j)
+                        {
+                            var curPoint = file.Points[j];
+                            var (contains, rea) = ContainsFromList(curPoint.OriginalComment, blacklist);
+                            if (contains)
+                            {
+                                alreadyFound[recon] = (false, footage, footage, rea);
+                                break;
+                            }
+                        }
+                    }
+                    var (useMir, start, end, reason) = alreadyFound[recon];
+                    Points[i] = (footage, isReverse, point, useMir, file);
+                    if (footage < start)
+                        alreadyFound[recon] = (useMir, footage, end, reason);
+                    if (footage > end)
+                        alreadyFound[recon] = (useMir, start, footage, reason);
+                }
+            }
+
+            foreach (var (useMir, start, end, curReason) in alreadyFound.Values)
+            {
+                if (!useMir)
+                {
+                    var reasonCaps = (curReason == "anode" ? "Anode" : "Rectifier");
+                    output.AppendLine($"{start},{end},{reasonCaps}");
+                }
+            }
+
+            return output.ToString();
+        }
+
+        private (bool, string) ContainsFromList(string comment, List<string> list)
+        {
+            var commentToLower = comment.ToLower();
+            foreach (string s in list)
+            {
+                if (commentToLower.Contains(s.ToLower()))
+                {
+                    return (true, s);
+                }
+            }
+            return (false, null);
+        }
+
         public List<(double footage, double value)> GetDoubleData(string fieldName)
         {
             switch (fieldName)
@@ -64,7 +276,7 @@ namespace AccurateFileSystem
 
         public void UpdatePoints()
         {
-            var list = new List<(double Footage, bool IsReverse, AllegroDataPoint Point)>();
+            var list = new List<(double Footage, bool IsReverse, AllegroDataPoint Point, bool UseMir, AllegroCISFile File)>();
             var tempFileInfoNode = FileInfos;
             var offset = 0.0;
             while (tempFileInfoNode != null)
@@ -79,7 +291,7 @@ namespace AccurateFileSystem
                 {
                     var curPoint = file.Points[i];
                     var footage = Math.Abs(curPoint.Footage - fileOffset) + offset;
-                    list.Add((footage, isReverse, curPoint));
+                    list.Add((footage, isReverse, curPoint, true, file));
                 }
                 offset += info.TotalFootage;
                 tempFileInfoNode = tempFileInfoNode.Next;
@@ -92,7 +304,11 @@ namespace AccurateFileSystem
             var list = new List<(double, double, double)>();
             for (int i = 0; i < Points.Count; ++i)
             {
-                list.Add((Points[i].Footage, Points[i].Point.MirOn, Points[i].Point.MirOff));
+                var (footage, _, point, useMir, _) = Points[i];
+                if (useMir)
+                    list.Add((footage, point.MirOn, point.MirOff));
+                else
+                    list.Add((footage, point.On, point.Off));
             }
             return list;
         }
@@ -112,7 +328,11 @@ namespace AccurateFileSystem
             var list = new List<(double, double)>();
             for (int i = 0; i < Points.Count; ++i)
             {
-                list.Add((Points[i].Footage, Points[i].Point.MirOn));
+                var (footage, _, point, useMir, _) = Points[i];
+                if (useMir)
+                    list.Add((footage, point.MirOn));
+                else
+                    list.Add((footage, point.On));
             }
             return list;
         }
@@ -132,7 +352,11 @@ namespace AccurateFileSystem
             var list = new List<(double, double)>();
             for (int i = 0; i < Points.Count; ++i)
             {
-                list.Add((Points[i].Footage, Points[i].Point.MirOff));
+                var (footage, _, point, useMir, _) = Points[i];
+                if (useMir)
+                    list.Add((footage, point.MirOff));
+                else
+                    list.Add((footage, point.Off));
             }
             return list;
         }
@@ -186,9 +410,23 @@ namespace AccurateFileSystem
             var type = first.Type;
 
             var calc = new OrderCalculator(files);
-            calc.Solve();
+            calc.AsyncSolve();
             //TODO: Maybe look at TS MP to determine if we should reverse the new file.
-            var allSolution = calc.GetAllUsedSolution().Reverse();
+            var allSolution = calc.GetAllUsedSolution();
+            var startTS = allSolution.First.Info.File.Points.First().Value;
+            var endTS = allSolution.Last.Info.File.Points.Last().Value;
+
+            var startTSMatch = Regex.Match(startTS.OriginalComment, @"(?i)mp ?([^\s]+)");
+            var endTSMatch = Regex.Match(endTS.OriginalComment, @"(?i)mp ?([^\s]+)");
+
+            if (startTSMatch.Success && endTSMatch.Success)
+            {
+                var startMp = double.Parse(startTSMatch.Groups[1].Value);
+                var endMp = double.Parse(endTSMatch.Groups[1].Value);
+                if (endMp < startMp)
+                    allSolution = allSolution.Reverse();
+            }
+
             allSolution.CalculateOffset(10);
             var solString = allSolution.ToString();
             var combined = new CombinedAllegroCISFile(name, type, allSolution);
@@ -346,16 +584,34 @@ namespace AccurateFileSystem
                 foreach (var file in files)
                 {
                     var testStations = new List<int>();
-                    if (file.Points[0].TestStationReads.Count == 0 || file.Name.ToLower().Contains("redo"))
-                        testStations.Add(0);
-                    for (int i = 0; i < file.Points.Count; ++i)
+                    testStations.Add(0);
+                    var lastFoot = file.Points[0].Footage;
+                    for (int i = 1; i < file.Points.Count - 1; ++i)
                     {
-                        if (file.Points[i].TestStationReads.Count != 0 && !file.Name.ToLower().Contains("redo"))
+                        var curPoint = file.Points[i];
+                        if (curPoint.TestStationReads.Count != 0 && !file.Name.ToLower().Contains("redo"))
+                        {
+                            if (i == 1 && curPoint.Footage - lastFoot <= 10)
+                                continue;
+                            if (i < file.Points.Count)
+                            {
+                                var nextPoint = file.Points[i + 1];
+                                if (nextPoint.TestStationReads.Count != 0)
+                                {
+                                    if (nextPoint.Footage - curPoint.Footage <= 10)
+                                        continue;
+                                }
+                            }
                             testStations.Add(i);
+                        }
+                        if (curPoint.Footage - lastFoot > (5 * 10) && !testStations.Contains(i - 1))
+                        {
+                            testStations.Add(i - 1);
+                        }
+                        lastFoot = curPoint.Footage;
                     }
                     var lastIndex = file.Points.Count - 1;
-                    if (file.Points[lastIndex].TestStationReads.Count == 0)
-                        testStations.Add(lastIndex);
+                    testStations.Add(lastIndex);
                     numTestStations += (ulong)testStations.Count;
                     Files.Add((file, testStations));
                 }
@@ -379,7 +635,19 @@ namespace AccurateFileSystem
                 MaxFootages.Add(AllUsed, double.MinValue);
             }
 
-            public void Solve(string currentActive = null, List<(int Index, int Start, int End)> values = null, (int Index, int Start, int End)? newValue = null, double curOffset = 0, double footCovered = 0, double roundTo = 10)
+            public void AsyncSolve()
+            {
+                var tasks = new List<Task>();
+                for (int i = 0; i < BaseUsings.Length; ++i)
+                {
+                    var curRequired = i;
+                    var task = Task.Run(() => Solve(required: curRequired));
+                    tasks.Add(task);
+                }
+                Task.WaitAll(tasks.ToArray());
+            }
+
+            public void Solve(string currentActive = null, List<(int Index, int Start, int End)> values = null, (int Index, int Start, int End)? newValue = null, double curOffset = 0, double footCovered = 0, double roundTo = 10, int? required = null)
             {
                 ++NumberOfChecks;
                 if (currentActive == null)
@@ -388,42 +656,46 @@ namespace AccurateFileSystem
                     values = new List<(int Index, int Start, int End)>();
                 else
                     values = new List<(int Index, int Start, int End)>(values);
-                if (!MinimumValues.ContainsKey(currentActive))
+                lock (MinimumValues)
                 {
-                    MinimumValues.Add(currentActive, double.MaxValue);
-                    MaxFootages.Add(currentActive, double.MinValue);
-                    Solutions.Add(currentActive, null);
-                }
-                if (newValue.HasValue)
-                    values.Add(newValue.Value);
-                var curMin = MinimumValues[currentActive];
-                var curMaxFoot = MaxFootages[currentActive];
-                if (curOffset > curMin || curOffset > MinimumValues[AllUsed])
-                    return;
+                    if (!MinimumValues.ContainsKey(currentActive))
+                    {
+                        MinimumValues.Add(currentActive, double.MaxValue);
+                        MaxFootages.Add(currentActive, double.MinValue);
+                        Solutions.Add(currentActive, null);
+                    }
+                    if (newValue.HasValue)
+                        values.Add(newValue.Value);
+                    var curMin = MinimumValues[currentActive];
+                    var curMaxFoot = MaxFootages[currentActive];
+                    if (curOffset > curMin || curOffset > MinimumValues[AllUsed])
+                        return;
 
-                if (curOffset == curMin)
-                {
-                    if (values.Count < Solutions[currentActive].Count)
+                    if (curOffset == curMin)
+                    {
+                        if (values.Count < Solutions[currentActive].Count)
+                        {
+                            MinimumValues[currentActive] = curOffset;
+                            Solutions[currentActive] = values;
+                            MaxFootages[currentActive] = footCovered;
+                        }
+                    }
+                    else if (curOffset < curMin)
                     {
                         MinimumValues[currentActive] = curOffset;
                         Solutions[currentActive] = values;
-                        MaxFootages[currentActive] = footCovered;
+                    }
+                    if (currentActive.Equals(AllUsed))
+                    {
+                        return;
                     }
                 }
-                else if (curOffset < curMin)
-                {
-                    MinimumValues[currentActive] = curOffset;
-                    Solutions[currentActive] = values;
-                }
-                if (currentActive.Equals(AllUsed))
-                {
-                    return;
-                }
-
                 var (Index, _, End) = values.Count > 0 ? values.Last() : (-1, 0, 0);
                 var lastIndicies = Index != -1 ? Files[Index].Indicies : null;
                 var lastFile = Index != -1 ? Files[Index].File : null;
-                for (int i = 0; i < currentActive.Length; ++i)
+                var indexStart = required ?? 0;
+                var indexLength = required ?? (currentActive.Length - 1);
+                for (int i = indexStart; i <= indexLength; ++i)
                 {
                     if (currentActive[i] == '1')
                         continue;
@@ -445,16 +717,19 @@ namespace AccurateFileSystem
                                 if (end != lastIndicies[0] && end != lastIndicies[lastIndicies.Count - 1])
                                     continue;
                             }
-                            if (curOffset + newOffset > MinimumValues[AllUsed])
-                                continue;
-                            var newActive = ActivateUsing(currentActive, i);
-                            Solve(newActive, values, (i, start, end), curOffset + newOffset, footCovered + newFootage, roundTo);
-                            if (curOffset > MinimumValues[AllUsed])
-                                return;
+                            lock (MinimumValues)
+                            {
+                                if (curOffset + newOffset > MinimumValues[AllUsed])
+                                    continue;
+                                var newActive = ActivateUsing(currentActive, i);
+                                Solve(newActive, values, (i, start, end), curOffset + newOffset, footCovered + newFootage, roundTo);
+                                if (curOffset > MinimumValues[AllUsed])
+                                    return;
+                            }
                         }
                     }
                 }
-                for (int i = 0; i < currentActive.Length; ++i)
+                for (int i = indexStart; i <= indexLength; ++i)
                 {
                     if (currentActive[i] == '0' || i == Index)
                         continue;
@@ -472,11 +747,14 @@ namespace AccurateFileSystem
                         }
                         if (curOffset + newOffset > MinimumValues[AllUsed])
                             continue;
-                        var newActive = ActivateUsing(currentActive, i);
-                        var newFootage = Math.Abs(file.File.Points[start].Footage - file.File.Points[end].Footage);
-                        Solve(newActive, values, (i, start, end), curOffset + newOffset, footCovered + newFootage, roundTo);
-                        if (curOffset > MinimumValues[AllUsed])
-                            return;
+                        lock (MinimumValues)
+                        {
+                            var newActive = ActivateUsing(currentActive, i);
+                            var newFootage = Math.Abs(file.File.Points[start].Footage - file.File.Points[end].Footage);
+                            Solve(newActive, values, (i, start, end), curOffset + newOffset, footCovered + newFootage, roundTo);
+                            if (curOffset > MinimumValues[AllUsed])
+                                return;
+                        }
                     }
                 }
             }

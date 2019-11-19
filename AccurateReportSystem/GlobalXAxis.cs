@@ -17,6 +17,8 @@ namespace AccurateReportSystem
         public GraphicalReport Report { get; set; }
         public XAxisInfo XAxisInfo { get; set; }
         public bool DrawPageInfo { get; set; } = false;
+        public string Title { get; set; } = null;
+        public float TitleFontSize { get; set; } = 24f;
 
         public GlobalXAxis(GraphicalReport report, bool isFlippedVertical = false)
         {
@@ -40,8 +42,36 @@ namespace AccurateReportSystem
 
             XAxisInfo.DrawInfo(session, page, transform.GetXTransform(), realDrawArea);
             var pageRect = new Rect(drawArea.Left, drawArea.Top + XAxisInfo.LabelHeight, leftSpace, XAxisInfo.TitleTotalHeight);
+            var titleRect = new Rect(drawArea.Left, drawArea.Top - TitleFontSize - 5, drawArea.Width, TitleFontSize);
             if (DrawPageInfo)
                 DrawPageCount(page, session, pageRect);
+            if(Title != null)
+                DrawTitle(page, session, titleRect);
+        }
+
+        private void DrawTitle(PageInformation page, CanvasDrawingSession session, Rect drawArea)
+        {
+            using (var format = new CanvasTextFormat())
+            {
+                format.HorizontalAlignment = CanvasHorizontalAlignment.Center;
+                format.WordWrapping = CanvasWordWrapping.WholeWord;
+                format.FontSize = TitleFontSize;
+                format.FontFamily = "Arial";
+                format.FontWeight = FontWeights.Bold;
+                format.FontStyle = FontStyle.Normal;
+                using (var layout = new CanvasTextLayout(session, Title, format, (float)drawArea.Width, (float)drawArea.Height))
+                {
+                    using (var geometry = CanvasGeometry.CreateText(layout))
+                    {
+                        var bounds = layout.DrawBounds;
+                        var translateMatrix = bounds.CreateTranslateMiddleTo(drawArea);
+                        using (var rotatedGeo = geometry.Transform(translateMatrix))//.Transform(rotationMatrix))
+                        {
+                            session.FillGeometry(rotatedGeo, Colors.Black);
+                        }
+                    }
+                }
+            }
         }
 
         private void DrawPageCount(PageInformation page, CanvasDrawingSession session, Rect drawArea)

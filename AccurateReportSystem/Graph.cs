@@ -110,7 +110,7 @@ namespace AccurateReportSystem
                     var (commentGeoInfo, lineGeoInfo) = CommentSeries.GetGeometry(page, graphBodyDrawArea, session);
                     var style = new CanvasStrokeStyle
                     {
-                        TransformBehavior = CanvasStrokeTransformBehavior.Hairline
+                        
                     };
                     if (lineGeoInfo != null)
                         session.DrawGeometry(lineGeoInfo.Geometry, lineGeoInfo.Color, 1, style);

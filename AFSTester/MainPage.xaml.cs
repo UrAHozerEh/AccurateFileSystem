@@ -178,13 +178,18 @@ namespace AFSTester
             graph3.DrawBottomBorder = false;
 
             report.XAxisInfo.IsEnabled = false;
+            report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
+            report.LegendInfo.SeriesNameFontSize = report.YAxesInfo.Y1LabelFontSize;
 
             var bottomGlobalXAxis = new GlobalXAxis(report)
             {
                 DrawPageInfo = true
             };
 
-            var topGlobalXAxis = new GlobalXAxis(report, true);
+            var topGlobalXAxis = new GlobalXAxis(report, true)
+            {
+                Title = "PG&E LS 3002-01 MP 0 to MP 5.8688"
+            };
 
             var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
 
@@ -218,12 +223,14 @@ namespace AFSTester
             //splitContainer.AddContainer(graph3);
             splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
             report.Container = splitContainer;
-            var images = report.GetImages(0, allegroFile.Points.Last().Footage);
-            for (int i = 0; i < images.Count; ++i)
+            var pages = report.PageSetup.GetAllPages(0, allegroFile.Points.Last().Footage);
+            var tabular = allegroFile.GetTabularData();
+            for (int i = 0; i < pages.Count; ++i)
             {
-                var page = $"{i + 1}".PadLeft(3, '0');
-                var image = images[i];
-                var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {page}" + ".png", CreationCollisionOption.ReplaceExisting);
+                var page = pages[i];
+                var pageString = $"{i + 1}".PadLeft(3, '0');
+                var image = report.GetImage(page, 600);
+                var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {pageString}" + ".png", CreationCollisionOption.ReplaceExisting);
                 using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
                 {
                     await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
@@ -476,8 +483,16 @@ namespace AFSTester
         {
             var fileNodes = FileTreeView.SelectedNodes.Where(node => node.Content is AllegroCISFile).ToList();
             var files = new List<AllegroCISFile>();
+            var fileNames = new HashSet<string>();
             foreach (var node in fileNodes)
-                files.Add(node.Content as AllegroCISFile);
+            {
+                var file = node.Content as AllegroCISFile;
+                if (!fileNames.Contains(file.Name))
+                {
+                    files.Add(file);
+                    fileNames.Add(file.Name);
+                }
+            }
 
             var test = CombinedAllegroCISFile.CombineFiles("Testing", files);
             MakeGraphs(test);

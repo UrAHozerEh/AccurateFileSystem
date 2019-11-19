@@ -64,6 +64,14 @@ namespace AccurateFileSystem
                 var cur = Points[i];
                 if(cur.On == 0)
                 {
+                    if(string.IsNullOrWhiteSpace(cur.OriginalComment))
+                    {
+                        if(i == Points.Count -1)
+                        {
+                            Points.Remove(i);
+                            EndFootage = Points[Points.Count - 1].Footage;
+                        }
+                    }
                     if (cur.HasReconnect)
                     {
                         var recon = cur.GetReconnect();
