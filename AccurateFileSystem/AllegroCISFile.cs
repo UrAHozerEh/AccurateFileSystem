@@ -62,7 +62,7 @@ namespace AccurateFileSystem
             for (int i = 1; i < Points.Count; ++i)
             {
                 var cur = Points[i];
-                if(cur.On == 0)
+                if(cur.On == 0 || cur.Off == 0)
                 {
                     if(string.IsNullOrWhiteSpace(cur.OriginalComment))
                     {

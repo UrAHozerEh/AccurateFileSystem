@@ -188,7 +188,9 @@ namespace AFSTester
 
             var topGlobalXAxis = new GlobalXAxis(report, true)
             {
-                Title = "PG&E LS 3002-01 MP 0 to MP 5.8688"
+                //Title = "PG&E LS 3002-01 MP 0 to MP 5.8688"
+                //Title = "PG&E LS 3008-01 MP 6.58 to MP 8.01"
+                Title = "PG&E LS 191-1 MP 16.79 to MP 30.1000"
             };
 
             var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
@@ -229,7 +231,7 @@ namespace AFSTester
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
-                var image = report.GetImage(page, 600);
+                var image = report.GetImage(page, 300);
                 var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {pageString}" + ".png", CreationCollisionOption.ReplaceExisting);
                 using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
                 {
@@ -246,7 +248,7 @@ namespace AFSTester
                 if (file is AllegroCISFile allegroFile && allegroFile.Header.ContainsKey("segment"))
                 {
                     
-                    var segmentName = Regex.Replace(Regex.Replace(allegroFile.Header["segment"], "\\s+", ""), "(?i)ls", "");
+                    var segmentName = Regex.Replace(Regex.Replace(allegroFile.Header["segment"], "\\s+", ""), "(?i)ls", "").Replace('.','-');
                     if (!treeNodes.ContainsKey(segmentName))
                     {
                         var newSegmentNode = new TreeViewNode() { Content = segmentName };

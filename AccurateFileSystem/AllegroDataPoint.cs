@@ -70,7 +70,7 @@ namespace AccurateFileSystem
         {
             if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
-            string docPattern = @"(?i)DOC:?\s?(\d+)(in)?";
+            string docPattern = @"(?i)DOC:?\s?(\d+)\s?(in)?";
             var doc = Regex.Match(OriginalComment, docPattern);
             if (doc.Success)
             {
@@ -103,8 +103,12 @@ namespace AccurateFileSystem
                     CommentTemplate = CommentTemplate.Replace(tsId, tsString);
                 else
                 {
-                    if (read is ReconnectTestStationRead)
+                    if (read is ReconnectTestStationRead reconnect)
+                    {
                         HasReconnect = true;
+                        On = reconnect.NGOn;
+                        Off = reconnect.NGOff;
+                    }
                     TestStationReads.Add(read);
                     ++count;
                 }

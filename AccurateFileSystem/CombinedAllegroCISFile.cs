@@ -49,7 +49,7 @@ namespace AccurateFileSystem
         {
             var output = new StringBuilder();
             var readFormat = $"F{readDecimals}";
-            var curLine = new string[30];
+            var curLine = new string[31];
             curLine[0] = "Footage";
             curLine[1] = "Compensated On";
             curLine[2] = "Compensated Off";
@@ -80,11 +80,12 @@ namespace AccurateFileSystem
             curLine[27] = "Foreign Off";
             curLine[28] = "ACV";
             curLine[29] = "Full Comment";
+            curLine[30] = "DoC";
             output.AppendLine(string.Join("\t", curLine));
 
             foreach (var (footage, isReverse, point, useMir, file) in Points)
             {
-                curLine = new string[30];
+                curLine = new string[31];
                 curLine[0] = footage.ToString("F0");
                 curLine[1] = point.MirOn.ToString(readFormat);
                 curLine[2] = point.MirOff.ToString(readFormat);
@@ -190,7 +191,7 @@ namespace AccurateFileSystem
                             curLine[i] = "N/A";
                     }
                 }
-
+                curLine[30] = point.Depth?.ToString("F0") ?? "";
                 output.AppendLine(string.Join("\t", curLine));
             }
 
@@ -291,11 +292,33 @@ namespace AccurateFileSystem
                 {
                     var curPoint = file.Points[i];
                     var footage = Math.Abs(curPoint.Footage - fileOffset) + offset;
+                    if (curPoint.MirOff < curPoint.MirOn)
+                    {
+                        // 191-1
+                        //curPoint.Off = list.Last().Point.Off;
+                    }
+                    if (footage == 1400)
+                    {
+                        // 3008-01
+                        //curPoint.On = list.Last().Point.On;
+                    }
+                    if (curPoint.On > -1.3 && footage > 63200 && footage < 63300)
+                    {
+                        // 191-1
+                        curPoint.Off = list.Last().Point.Off;
+                    }
+                    if (footage == 58500)
+                    {
+                        curPoint.On = list.Last().Point.On;
+                    }
                     list.Add((footage, isReverse, curPoint, true, file));
+
                 }
                 offset += info.TotalFootage;
                 tempFileInfoNode = tempFileInfoNode.Next;
             }
+            // 3008-01
+            //list.Last().Point.Off = -list.Last().Point.Off;
             Points = list;
         }
 
@@ -416,8 +439,8 @@ namespace AccurateFileSystem
             var startTS = allSolution.First.Info.File.Points.First().Value;
             var endTS = allSolution.Last.Info.File.Points.Last().Value;
 
-            var startTSMatch = Regex.Match(startTS.OriginalComment, @"(?i)mp ?([^\s]+)");
-            var endTSMatch = Regex.Match(endTS.OriginalComment, @"(?i)mp ?([^\s]+)");
+            var startTSMatch = Regex.Match(startTS.OriginalComment, @"(?i)mp ?(\d+)");
+            var endTSMatch = Regex.Match(endTS.OriginalComment, @"(?i)mp ?(\d+)");
 
             if (startTSMatch.Success && endTSMatch.Success)
             {
@@ -645,6 +668,7 @@ namespace AccurateFileSystem
                     tasks.Add(task);
                 }
                 Task.WaitAll(tasks.ToArray());
+
             }
 
             public void Solve(string currentActive = null, List<(int Index, int Start, int End)> values = null, (int Index, int Start, int End)? newValue = null, double curOffset = 0, double footCovered = 0, double roundTo = 10, int? required = null)
