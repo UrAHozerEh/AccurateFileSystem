@@ -305,11 +305,17 @@ namespace AccurateFileSystem
                     if (curPoint.On > -1.3 && footage > 63200 && footage < 63300)
                     {
                         // 191-1
-                        curPoint.Off = list.Last().Point.Off;
+                        //curPoint.Off = list.Last().Point.Off;
                     }
                     if (footage == 58500)
                     {
-                        curPoint.On = list.Last().Point.On;
+                        // 191-1
+                        //curPoint.On = list.Last().Point.On;
+                    }
+                    if (curPoint.On > -1.15)
+                    {
+                        // 191B
+                        //curPoint.On = list.Last().Point.On;
                     }
                     list.Add((footage, isReverse, curPoint, true, file));
 
@@ -436,8 +442,8 @@ namespace AccurateFileSystem
             calc.AsyncSolve();
             //TODO: Maybe look at TS MP to determine if we should reverse the new file.
             var allSolution = calc.GetAllUsedSolution();
-            var startTS = allSolution.First.Info.File.Points.First().Value;
-            var endTS = allSolution.Last.Info.File.Points.Last().Value;
+            var startTS = allSolution.First.Info.File.Points[allSolution.First.Info.Start];
+            var endTS = allSolution.Last.Info.File.Points[allSolution.Last.Info.End];
 
             var startTSMatch = Regex.Match(startTS.OriginalComment, @"(?i)mp ?(\d+)");
             var endTSMatch = Regex.Match(endTS.OriginalComment, @"(?i)mp ?(\d+)");
@@ -447,6 +453,11 @@ namespace AccurateFileSystem
                 var startMp = double.Parse(startTSMatch.Groups[1].Value);
                 var endMp = double.Parse(endTSMatch.Groups[1].Value);
                 if (endMp < startMp)
+                    allSolution = allSolution.Reverse();
+            }
+            else if (endTSMatch.Success)
+            {
+                if (double.Parse(endTSMatch.Groups[1].Value) == 0)
                     allSolution = allSolution.Reverse();
             }
 
@@ -612,46 +623,33 @@ namespace AccurateFileSystem
                     for (int i = 1; i < file.Points.Count - 1; ++i)
                     {
                         var curPoint = file.Points[i];
+                        AllegroDataPoint nextPoint = file.Points[i + 1];
                         if (curPoint.TestStationReads.Count != 0 && !file.Name.ToLower().Contains("redo"))
                         {
                             if (i == 1 && curPoint.Footage - lastFoot <= 10)
                                 continue;
-                            if (i < file.Points.Count)
+
+                            if (nextPoint.TestStationReads.Count != 0)
                             {
-                                var nextPoint = file.Points[i + 1];
-                                if (nextPoint.TestStationReads.Count != 0)
-                                {
-                                    if (nextPoint.Footage - curPoint.Footage <= 10)
-                                        continue;
-                                }
+                                if (nextPoint.Footage - curPoint.Footage <= 10)
+                                    continue;
                             }
                             testStations.Add(i);
                         }
-                        if (curPoint.Footage - lastFoot > (5 * 10) && !testStations.Contains(i - 1))
+                        else if (nextPoint.Footage - curPoint.Footage > (5 * 10))
                         {
-                            testStations.Add(i - 1);
+                            testStations.Add(i);
                         }
                         lastFoot = curPoint.Footage;
                     }
                     var lastIndex = file.Points.Count - 1;
+                    //191B
+                    //if (file.Points[lastIndex].Footage - lastFoot <= 10)
                     testStations.Add(lastIndex);
                     numTestStations += (ulong)testStations.Count;
                     Files.Add((file, testStations));
                 }
                 NumberOFTestStations = numTestStations;
-                while (numTestStations > 1)
-                {
-                    try
-                    {
-                        MaxChecks *= numTestStations;
-                        --numTestStations;
-                    }
-                    catch
-                    {
-                        MaxChecks = ulong.MaxValue;
-                        break;
-                    }
-                }
                 BaseUsings = "".PadLeft(files.Count, '0');
                 AllUsed = "".PadLeft(files.Count, '1');
                 MinimumValues.Add(AllUsed, double.MaxValue);
@@ -668,7 +666,6 @@ namespace AccurateFileSystem
                     tasks.Add(task);
                 }
                 Task.WaitAll(tasks.ToArray());
-
             }
 
             public void Solve(string currentActive = null, List<(int Index, int Start, int End)> values = null, (int Index, int Start, int End)? newValue = null, double curOffset = 0, double footCovered = 0, double roundTo = 10, int? required = null)
