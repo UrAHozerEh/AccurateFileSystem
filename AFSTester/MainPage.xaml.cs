@@ -192,7 +192,14 @@ namespace AFSTester
                 //Title = "PG&E LS 3008-01 MP 6.58 to MP 8.01"
                 //Title = "PG&E LS 191-1 MP 16.79 to MP 30.1000"
                 //Title = "PG&E LS 191A MP 0 to MP 4.83"
-                Title = "PG&E LS 191B MP 0 to MP 1.65"
+                //Title = "PG&E LS 3001-05 MP 3.1300 to MP 4.1671"
+                //Title = "PG&E LS 3017-01 MP 0.4300 to MP 7.5160"
+                //Title = "PG&E LS L131 MP 26.1018 to MP 27.0150"
+                //Title = "PG&E DREG11309 MP 0.0000 to MP 0.0100"
+                //Title = "PG&E DREG21620 MP 0.0000 to MP 0.0310"
+                //Title = "PG&E DREG14570 MP 0.0000 to MP 0.1000"
+                //Title = "PG&E DREG5332 MP 0.0000 to MP 0.0200"
+                Title = "PG&E DREG5397 MP 0.0000 to MP 0.0300"
             };
 
             var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
@@ -249,8 +256,8 @@ namespace AFSTester
             {
                 if (file is AllegroCISFile allegroFile && allegroFile.Header.ContainsKey("segment"))
                 {
-                    
-                    var segmentName = Regex.Replace(Regex.Replace(allegroFile.Header["segment"], "\\s+", ""), "(?i)ls", "").Replace('.','-');
+
+                    var segmentName = Regex.Replace(Regex.Replace(allegroFile.Header["segment"], "\\s+", ""), "(?i)ls", "").Replace('.', '-');
                     if (!treeNodes.ContainsKey(segmentName))
                     {
                         var newSegmentNode = new TreeViewNode() { Content = segmentName };
@@ -495,6 +502,21 @@ namespace AFSTester
                 {
                     files.Add(file);
                     fileNames.Add(file.Name);
+                }
+                else
+                {
+                    if (file.Extension == ".csv")
+                    {
+                        for (int i = 0; i < files.Count; ++i)
+                        {
+                            if (files[i].Name == file.Name)
+                            {
+                                files.RemoveAt(i);
+                                files.Add(file);
+                                break;
+                            }
+                        }
+                    }
                 }
             }
 

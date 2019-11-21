@@ -70,7 +70,7 @@ namespace AccurateReportSystem
                 var middleX = transform.ToDrawArea(middleFoot);
                 if (!FancySingleMiddle)
                     middleX = drawArea.GetMiddlePoint().X;
-                if (!foundOther)
+                if (!foundOther && firstVal.HasValue)
                     ArrowInfo.DrawOnTopOf(session, middleX, y, firstVal.Value ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right);
             }
         }

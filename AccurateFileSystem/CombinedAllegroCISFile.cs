@@ -317,6 +317,12 @@ namespace AccurateFileSystem
                         // 191B
                         //curPoint.On = list.Last().Point.On;
                     }
+                    if(curPoint.Off < -0.85)
+                    {
+                        // 3001-05
+                        //curPoint.On = list.Last().Point.On;
+                        //curPoint.Off = list.Last().Point.Off;
+                    }
                     list.Add((footage, isReverse, curPoint, true, file));
 
                 }
@@ -460,6 +466,8 @@ namespace AccurateFileSystem
                 if (double.Parse(endTSMatch.Groups[1].Value) == 0)
                     allSolution = allSolution.Reverse();
             }
+            else if(files.Count == 1 && first.Name.ToLower().Contains("rev"))
+                allSolution = allSolution.Reverse();
 
             allSolution.CalculateOffset(10);
             var solString = allSolution.ToString();
@@ -658,6 +666,12 @@ namespace AccurateFileSystem
 
             public void AsyncSolve()
             {
+                if(BaseUsings.Length == 1)
+                {
+                    var end = Files.First().File.Points.Count - 1;
+                    Solutions.Add(AllUsed, new List<(int Index, int Start, int End)>() { (0, 0, end)});
+                    return;
+                }
                 var tasks = new List<Task>();
                 for (int i = 0; i < BaseUsings.Length; ++i)
                 {
@@ -847,7 +861,8 @@ namespace AccurateFileSystem
                 else
                     firstInfo = new FileInfo(firstFile, firstIndicies[firstIndicies.Count - 1], End);
                 FileInfoLinkedList output = new FileInfoLinkedList(firstInfo);
-
+                if (list.Count == 1)
+                    return output;
                 for (int i = 1; i < list.Count - 1; ++i)
                 {
                     var cur = list[i];

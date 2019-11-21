@@ -59,6 +59,12 @@ namespace AccurateFileSystem
             int startIndex = 0;
             double? prevOn = null;
             double? prevOff = null;
+            if(Points[0].HasReconnect)
+            {
+                var recon = Points[0].GetReconnect();
+                recon.StartPoint = Points[0];
+                recon.EndPoint = Points[0];
+            }
             for (int i = 1; i < Points.Count; ++i)
             {
                 var cur = Points[i];
@@ -110,7 +116,6 @@ namespace AccurateFileSystem
 
                 var mirOnPerFoot = reconnect.MirOn / footDist;
                 var mirOffPerFoot = reconnect.MirOff / footDist;
-
                 for (int i = start; i < end; ++i)
                 {
                     var curPoint = Points[i];
