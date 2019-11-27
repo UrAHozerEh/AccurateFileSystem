@@ -201,6 +201,32 @@ namespace AccurateFileSystem
             return list;
         }
 
+        public (double Distance, AllegroDataPoint Point) GetClosestPoint(BasicGeoposition pos, BasicGeoposition pos2)
+        {
+            var distance = double.MaxValue;
+            AllegroDataPoint point = null;
+            foreach(var cur in Points.Values)
+            {
+                if (cur.HasGPS)
+                {
+                    var curDist = cur.GPS.Distance(pos);
+                    if(distance > curDist)
+                    {
+                        point = cur;
+                        distance = curDist;
+                    }
+                    curDist = cur.GPS.Distance(pos2);
+                    if (distance > curDist)
+                    {
+                        point = cur;
+                        distance = curDist;
+                    }
+                }
+            }
+
+            return (distance, point);
+        }
+
         public List<(double footage, double value)> GetDoubleData(string fieldName)
         {
             switch (fieldName)

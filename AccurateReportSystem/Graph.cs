@@ -34,7 +34,7 @@ namespace AccurateReportSystem
         public Graph(GraphicalReport report)
         {
             XAxisInfo = new XAxisInfo(report.XAxisInfo);
-            YAxesInfo = new YAxesInfo(report.YAxesInfo, "Potential (Volts)", "Depth (inches)");
+            YAxesInfo = new YAxesInfo(report.YAxesInfo, "Potential (Volts)", "Depth (Inches)");
             LegendInfo = new LegendInfo(report.LegendInfo, "CIS Data");
         }
 

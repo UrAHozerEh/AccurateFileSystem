@@ -8,7 +8,9 @@ using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Data.Pdf;
+using Windows.Data.Xml.Dom;
 using Windows.Devices.Geolocation;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
@@ -42,11 +44,85 @@ namespace AFSTester
         Dictionary<AllegroCISFile, MapLayer> Layers = new Dictionary<AllegroCISFile, MapLayer>();
         private Random Random = new Random();
         TreeViewNode HiddenNode = new TreeViewNode() { Content = "Hidden Files" };
+        List<(string Name, string Route, double Length, BasicGeoposition Start, BasicGeoposition End)> ShortList;
 
         public MainPage()
         {
             this.InitializeComponent();
             FileTreeView.RootNodes.Add(HiddenNode);
+            var xml = new XmlDocument();
+            var xmlStringTask = Clipboard.GetContent().GetTextAsync().AsTask();
+            xmlStringTask.Wait();
+            var xmlString = xmlStringTask.Result;
+            ShortList = null;
+            try { xml.LoadXml(xmlString); } catch { return; }
+            
+            var curNode = xml.ChildNodes.First(n => n.NodeName == "kml");
+            curNode = curNode.ChildNodes.First(n => n.NodeName == "Document");
+            curNode = curNode.ChildNodes.First(n => n.NodeName == "Folder");
+            var lateralList = new List<(string Name, string Route, double Length, BasicGeoposition Start, BasicGeoposition End)>();
+            foreach (var node in curNode.ChildNodes)
+            {
+                if (node.NodeName == "Placemark")
+                {
+                    var name = node.ChildNodes.First(n => n.NodeName == "name").InnerText;
+                    var description = node.ChildNodes.First(n => n.NodeName == "description").InnerText.Split('\n');
+                    var length = double.NaN;
+                    var isLat = false;
+                    string route = null;
+                    for (int i = 0; i < description.Length; ++i)
+                    {
+                        if (description[i] == "<td>Shape_Leng</td>")
+                        {
+                            var lenString = description[i + 2];
+                            lenString = lenString.Substring(4, lenString.Length - 9);
+                            length = double.Parse(lenString);
+                        }
+                        else if (description[i] == "<td>Main_Later</td>")
+                        {
+                            if (description[i + 2] == "<td>Lateral</td>")
+                                isLat = true;
+                            else if(description[i + 2] != "<td>Main</td>")
+                                route = description[i + 2].Substring(4, description[i + 2].Length - 9);
+                        }
+                        else if (description[i] == "<td>SourceRout</td>")
+                        {
+                            if (description[i + 2] == "<td>Lateral</td>")
+                                isLat = true;
+                            else if (description[i + 2] != "<td>Main</td>")
+                                route = description[i + 2].Substring(4, description[i + 2].Length - 9);
+                        }
+                    }
+                    var miltiGeo = node.ChildNodes.First(n => n.NodeName == "MultiGeometry");
+                    var lineString = miltiGeo.ChildNodes.First(n => n.NodeName == "LineString");
+                    var coordsNode = lineString.ChildNodes.First(n => n.NodeName == "coordinates");
+                    var coords = coordsNode.InnerText.Trim().Split(' ');
+                    var start = GetGeoposition(coords[0].Split(','));
+                    var end = GetGeoposition(coords[coords.Length - 1].Split(','));
+                    if (isLat)
+                    {
+                        lateralList.Add((name, route, length, start, end));
+                    }
+                }
+            }
+
+            ShortList = lateralList.Where(info => info.Length < 100).ToList();
+            var shortListStrings = ShortList.Select(info => $"{info.Name}\t{info.Route}\t{info.Length}\t{info.Start.Latitude}\t{info.Start.Longitude}\t{info.End.Latitude}\t{info.End.Longitude}");
+            var shortString = string.Join('\n', shortListStrings);
+            var longList = lateralList.Where(info => info.Length >= 100).ToList();
+            var longListStrings = longList.Select(info => $"{info.Name}\t{info.Route}\t{info.Length}\t{info.Start.Latitude}\t{info.Start.Longitude}\t{info.End.Latitude}\t{info.End.Longitude}");
+            var longString = string.Join('\n', longListStrings);
+        }
+
+        private BasicGeoposition GetGeoposition(string[] list)
+        {
+            var lon = double.Parse(list[0]);
+            var lat = double.Parse(list[1]);
+            return new BasicGeoposition()
+            {
+                Latitude = lat,
+                Longitude = lon
+            };
         }
 
         private async void Button_Click(object sender, RoutedEventArgs e)
@@ -83,6 +159,8 @@ namespace AFSTester
                     }
                 }
             }
+            if (ShortList != null)
+                DoStuff();
             /*
             var picker = new FileOpenPicker();
             picker.FileTypeFilter.Add(".svy");
@@ -91,6 +169,43 @@ namespace AFSTester
             var newFile = await factory.GetFile();
             */
             FillTreeView();
+        }
+
+        private void DoStuff()
+        {
+            var shortListDistance = new List<(double Dist, AllegroDataPoint Point)>();
+            for (int i = 0; i < NewFiles.Count; ++i)
+            {
+                var file = NewFiles[i];
+                if (file is AllegroCISFile allegroFile)
+                {
+                    for (int j = 0; j < ShortList.Count; ++j)
+                    {
+                        var (_, _, _, start, end) = ShortList[j];
+                        var (newShort, newPoint) = allegroFile.GetClosestPoint(start, end);
+                        if (shortListDistance.Count == j)
+                        {
+                            shortListDistance.Add((newShort, newPoint));
+                            continue;
+                        }
+                        var (curShort, _) = shortListDistance[j];
+                        if (newShort < curShort)
+                            shortListDistance[j] = (newShort, newPoint);
+                    }
+                }
+            }
+            var shortCloseStringList = shortListDistance.Select(info => $"{info.Dist}\t{RoundDist(info.Dist)}\t{info.Point.On}\t{info.Point.Off}\t{info.Point.GPS.Latitude}\t{info.Point.GPS.Longitude}\t{info.Point.OriginalComment}");
+            var shortCloseString = string.Join('\n', shortCloseStringList);
+        }
+
+        private double RoundDist(double dist)
+        {
+            int times = (int)(dist / 10);
+            var floor = times * 10;
+            var ceil = (times + 1) * 10;
+            var floorDiff = dist - floor;
+            var ceilDiff = ceil - dist;
+            return floorDiff < ceilDiff ? floor : ceil;
         }
 
         private async void MakeGraphs(CombinedAllegroCISFile allegroFile)
@@ -110,15 +225,15 @@ namespace AFSTester
             };
             var onMir = new GraphSeries("On MIR Compensated", allegroFile.GetDoubleData("On Compensated"))
             {
-                LineColor = Colors.Maroon
+                LineColor = Colors.Purple
             };
             var offMir = new GraphSeries("Off MIR Compensated", allegroFile.GetDoubleData("Off Compensated"))
             {
-                LineColor = Colors.Navy
+                LineColor = Color.FromArgb(255, 57, 255, 20)
             };
             var depth = new GraphSeries("Depth", allegroFile.GetDoubleData("Depth"))
             {
-                LineColor = Colors.Orange,
+                LineColor = Colors.Black,
                 PointColor = Colors.Orange,
                 IsY1Axis = false,
                 PointShape = GraphSeries.Shape.Circle,
@@ -192,14 +307,14 @@ namespace AFSTester
                 //Title = "PG&E LS 3008-01 MP 6.58 to MP 8.01"
                 //Title = "PG&E LS 191-1 MP 16.79 to MP 30.1000"
                 //Title = "PG&E LS 191A MP 0 to MP 4.83"
-                //Title = "PG&E LS 3001-05 MP 3.1300 to MP 4.1671"
+                Title = "PG&E LS 3001-01 MP 3.1300 to MP 4.1671"
                 //Title = "PG&E LS 3017-01 MP 0.4300 to MP 7.5160"
                 //Title = "PG&E LS L131 MP 26.1018 to MP 27.0150"
                 //Title = "PG&E DREG11309 MP 0.0000 to MP 0.0100"
                 //Title = "PG&E DREG21620 MP 0.0000 to MP 0.0310"
                 //Title = "PG&E DREG14570 MP 0.0000 to MP 0.1000"
                 //Title = "PG&E DREG5332 MP 0.0000 to MP 0.0200"
-                Title = "PG&E DREG5397 MP 0.0000 to MP 0.0300"
+                //Title = "PG&E DREG5397 MP 0.0000 to MP 0.0300"
             };
 
             var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);

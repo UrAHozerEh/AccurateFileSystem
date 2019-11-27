@@ -320,8 +320,8 @@ namespace AccurateFileSystem
                     if(curPoint.Off < -0.85)
                     {
                         // 3001-05
-                        //curPoint.On = list.Last().Point.On;
-                        //curPoint.Off = list.Last().Point.Off;
+                        curPoint.On = list.Last().Point.On;
+                        curPoint.Off = list.Last().Point.Off;
                     }
                     list.Add((footage, isReverse, curPoint, true, file));
 
