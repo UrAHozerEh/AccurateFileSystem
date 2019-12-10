@@ -52,6 +52,8 @@ namespace AccurateReportSystem
                         firstVal = isReverseRun;
                     if (isReverseRun == firstVal)
                         continue;
+                    if (!foundOther && footage == page.EndFootage)
+                        break;
                     foundOther = true;
                     var x = transform.ToDrawArea(footage);
                     if (firstVal.Value)

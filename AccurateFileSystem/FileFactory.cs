@@ -31,7 +31,7 @@ namespace AccurateFileSystem
             {
                 case ".svy":
                 case ".aci":
-                case ".dcv":
+                case ".dvg":
                 case ".csv":
                 case ".bak":
                     if (await IsAllegroFile())
@@ -43,6 +43,7 @@ namespace AccurateFileSystem
                 case ".xlsx":
                 case ".xls":
                 case ".zip":
+                case ".pdf":
                     return null;
                 default:
                     throw new Exception();
@@ -135,7 +136,7 @@ namespace AccurateFileSystem
             {
                 case ".svy":
                 case ".aci":
-                case ".dcv":
+                case ".dvg":
                 case ".bak":
                     headerDelimiter = "=";
                     break;
@@ -194,10 +195,22 @@ namespace AccurateFileSystem
                 }
             }
             FileType type = FileType.Unknown;
-            if (header.ContainsKey("onoff"))
+            if (header.ContainsKey("survey_type"))
             {
-                if (header["onoff"] == "T")
-                    type = FileType.OnOff;
+                if (header["survey_type"] == "DC Survey")
+                {
+                    if (header.ContainsKey("onoff"))
+                    {
+                        if (header["onoff"] == "T")
+                            type = FileType.OnOff;
+                        else
+                            type = FileType.Native;
+                    }
+                }
+                else if (header["survey_type"] == "DCVG Survey")
+                {
+                    type = FileType.DCVG;
+                }
             }
             var output = new AllegroCISFile(FileName, extension, header, points, type);
             return output;

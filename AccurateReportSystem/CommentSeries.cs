@@ -25,10 +25,16 @@ namespace AccurateReportSystem
         public BorderType BorderType { get; set; } = BorderType.Full;
         public float PercentOfGraph { get; set; } = 0.5f;
         public bool IsFlippedVertical { get; set; } = false;
+        public float BackdropOpacity { get; set; } = 0.5f;
+        public Color BackdropColor { get; set; } = Colors.White;
+        public StationStyle StationStyle { get; set; } = StationStyle.PlusFoot;
+        public string StationSuffix { get; set; } = "] ";
+        public string StationPrefix { get; set; } = "[";
 
-        public (GeometryInfo, GeometryInfo) GetGeometry(PageInformation page, Rect drawArea, CanvasDrawingSession session)
+        public (GeometryInfo, GeometryInfo, CanvasGeometry) GetGeometry(PageInformation page, Rect drawArea, CanvasDrawingSession session)
         {
             CanvasGeometry commentOutputGeo = null;// = CanvasGeometry.CreateRectangle(device, 0, 0, (float)drawArea.Height, (float)drawArea.Width);
+            CanvasGeometry backdropOutputGeo = null;
             CanvasGeometry lineOutputGeo = null;
             Matrix3x2 translation;
             CommentBoundsInfo first = null, last = null;
@@ -50,7 +56,22 @@ namespace AccurateReportSystem
                         break;
                     if (string.IsNullOrWhiteSpace(comment))
                         continue;
-                    var layout = new CanvasTextLayout(session, comment, format, (float)(drawArea.Height * PercentOfGraph) - TopEdgePadding - LineBuffer, 0);
+                    string prefix;
+                    var footString = footage.ToString("F0");
+                    switch (StationStyle)
+                    {
+                        case StationStyle.PlusFoot:
+                            footString = footString.PadLeft(3, '0');
+                            prefix = $"{StationPrefix}{footString.Insert(footString.Length - 2, "+")}{StationSuffix}";
+                            break;
+                        case StationStyle.Footage:
+                            prefix = $"{StationPrefix}{footString}{StationSuffix}";
+                            break;
+                        default:
+                            prefix = "";
+                            break;
+                    }
+                    var layout = new CanvasTextLayout(session, prefix + comment, format, (float)(drawArea.Height * PercentOfGraph) - TopEdgePadding - LineBuffer, 0);
                     Rect textBounds = layout.DrawBounds;
                     var height = textBounds.Height;
                     var width = layout.LayoutBounds.Width;
@@ -81,7 +102,7 @@ namespace AccurateReportSystem
                 }
             }
             if (first == null)
-                return (null, null);
+                return (null, null, null);
             first.CheckBounds(drawArea, false, CommentBuffer, EdgeBuffer);
             last.CheckBounds(drawArea, true, CommentBuffer, EdgeBuffer);
 
@@ -98,9 +119,9 @@ namespace AccurateReportSystem
                 else
                 {
 
-                    using (var geometry = CanvasGeometry.CreateText(first.Layout))
+                    using (var geometry = CanvasGeometry.CreateText(first.Layout).Transform(translation))
                     {
-                        commentOutputGeo = commentOutputGeo.CombineWith(geometry, translation, CanvasGeometryCombine.Union);
+                        commentOutputGeo = commentOutputGeo.CombineWith(geometry, Matrix3x2.Identity, CanvasGeometryCombine.Union);
                     }
                 }
 
@@ -148,17 +169,19 @@ namespace AccurateReportSystem
                         default:
                             break;
                     }
+                    var backdropRect = new Rect(lineTopEdgePadding, first.CommentMiddle - lineLengthFromMiddle, newBounds.Width + (LineBuffer * 2), lineLengthFromMiddle * 2);
 
                     if (lineOutputGeo == null)
                     {
                         lineOutputGeo = CanvasGeometry.CreatePath(path);
+                        backdropOutputGeo = CanvasGeometry.CreateRectangle(session, backdropRect);
                     }
                     else
                     {
                         using (var pathGeo = CanvasGeometry.CreatePath(path))
-                        {
                             lineOutputGeo = lineOutputGeo.CombineWith(pathGeo, Matrix3x2.Identity, CanvasGeometryCombine.Union);
-                        }
+                        using (var backdrop = CanvasGeometry.CreateRectangle(session, backdropRect))
+                            backdropOutputGeo = backdropOutputGeo.CombineWith(backdrop, Matrix3x2.Identity, CanvasGeometryCombine.Union);
                     }
                 }
 
@@ -171,6 +194,7 @@ namespace AccurateReportSystem
             var rotation = Matrix3x2.CreateRotation((float)(90 * Math.PI / 180), rotationPoint);
             translation = Matrix3x2.CreateTranslation(0, 0 - (float)drawArea.Width);
             commentOutputGeo = commentOutputGeo.Transform(rotation).Transform(translation);
+            backdropOutputGeo = backdropOutputGeo.Transform(rotation).Transform(translation);
             lineOutputGeo = lineOutputGeo.Transform(rotation).Transform(translation);
             var commentOutput = new GeometryInfo
             {
@@ -183,7 +207,7 @@ namespace AccurateReportSystem
                 Color = LineColor,
                 Geometry = lineOutputGeo
             };
-            return (commentOutput, lineOutput);
+            return (commentOutput, lineOutput, backdropOutputGeo);
         }
 
         private class CommentBoundsInfo : IDisposable
@@ -288,6 +312,11 @@ namespace AccurateReportSystem
     public enum BorderType
     {
         Line, Pegs, Full
+    }
+
+    public enum StationStyle
+    {
+        PlusFoot, None, Footage
     }
     /*
     private void temp()

@@ -32,7 +32,7 @@ namespace AccurateReportSystem
         {
             var graphArea = new Rect(page.StartFootage, 0, page.Width, 0);
 
-            var leftSpace = Report.LegendInfo.WidthDIP + Report.YAxesInfo.Y1TotalHeight;
+            var leftSpace = Report.LegendInfo.Width + Report.YAxesInfo.Y1TotalHeight;
             var rightSpace = Report.YAxesInfo.Y2TotalHeight;
             var width = drawArea.Width - leftSpace - rightSpace;
             var realDrawArea = new Rect(drawArea.Left + leftSpace, drawArea.Top, width, drawArea.Height);

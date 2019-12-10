@@ -42,7 +42,7 @@ namespace AFSTester
     {
         List<File> NewFiles;
         Dictionary<AllegroCISFile, MapLayer> Layers = new Dictionary<AllegroCISFile, MapLayer>();
-        private Random Random = new Random();
+        private Random Random = new Random(1984);
         TreeViewNode HiddenNode = new TreeViewNode() { Content = "Hidden Files" };
         List<(string Name, string Route, double Length, BasicGeoposition Start, BasicGeoposition End)> ShortList;
 
@@ -56,7 +56,7 @@ namespace AFSTester
             var xmlString = xmlStringTask.Result;
             ShortList = null;
             try { xml.LoadXml(xmlString); } catch { return; }
-            
+
             var curNode = xml.ChildNodes.First(n => n.NodeName == "kml");
             curNode = curNode.ChildNodes.First(n => n.NodeName == "Document");
             curNode = curNode.ChildNodes.First(n => n.NodeName == "Folder");
@@ -82,7 +82,7 @@ namespace AFSTester
                         {
                             if (description[i + 2] == "<td>Lateral</td>")
                                 isLat = true;
-                            else if(description[i + 2] != "<td>Main</td>")
+                            else if (description[i + 2] != "<td>Main</td>")
                                 route = description[i + 2].Substring(4, description[i + 2].Length - 9);
                         }
                         else if (description[i] == "<td>SourceRout</td>")
@@ -279,7 +279,7 @@ namespace AFSTester
             graph1.Series.Add(offMir);
             graph1.Series.Add(redLine);
             //graph1.XAxisInfo.IsEnabled = false;
-            graph1.DrawBottomBorder = true;
+            graph1.DrawTopBorder = false;
 
 
             graph2.Series.Add(depth);
@@ -326,7 +326,7 @@ namespace AFSTester
             var chart1 = new Chart(report, "Survey Direction");
             var chart2 = new Chart(report, "850 Data");
             var mirSeries = new MirDirection(allegroFile.GetReconnects());
-            var exceptions = new ExceptionsChartSeries(allegroFile.GetCombinedMirData(), chart2.LegendInfo, chart2.YAxesInfo);
+            var exceptions = new OnOff850ExceptionChartSeties(allegroFile.GetCombinedMirData(), chart2.LegendInfo, chart2.YAxesInfo);
             chart2.Series.Add(exceptions);
             //chart1.LegendInfo.NameFontSize = 18f;
 
@@ -351,6 +351,216 @@ namespace AFSTester
             report.Container = splitContainer;
             var pages = report.PageSetup.GetAllPages(0, allegroFile.Points.Last().Footage);
             var tabular = allegroFile.GetTabularData();
+            for (int i = 0; i < pages.Count; ++i)
+            {
+                var page = pages[i];
+                var pageString = $"{i + 1}".PadLeft(3, '0');
+                var image = report.GetImage(page, 300);
+                var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {pageString}" + ".png", CreationCollisionOption.ReplaceExisting);
+                using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
+                {
+                    await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
+                }
+            }
+        }
+
+        private double RandomShift(double curValue, double shift, double min, double max)
+        {
+            var change = Random.NextDouble() * shift - (shift / 2);
+            if (curValue + change > max || curValue + change < min)
+                return curValue - change;
+            return curValue + change;
+        }
+
+        private async void MakeIITGraphs(AllegroCISFile file)
+        {
+
+            var curDepth = 50.0;
+            var curOff = -1.0;
+            var curOn = -1.1;
+            var depthData = new List<(double, double)>();
+            var onData = new List<(double, double)>();
+            var offData = new List<(double, double)>();
+            var dcvgData = new List<(double, double)>();
+            var commentData = new List<(double, string)>();
+            var directionData = new List<(double, bool)>();
+            if (file != null)
+            {
+                depthData = file.GetDoubleData("Depth");
+                offData = file.GetDoubleData("Off");
+                onData = file.GetDoubleData("On");
+                commentData = file.GetStringData("Comment");
+                directionData = file.GetDirectionData();
+            }
+            else
+            {
+                for (double footage = 0; footage <= 4000; footage += 10)
+                {
+                    var direction = false;
+                    if (footage >= 1300)
+                        direction = true;
+                    if (footage >= 1800)
+                        direction = false;
+                    directionData.Add((footage, false));
+                    curDepth = RandomShift(curDepth, 5, 10, 100);
+                    if (footage % 50 == 0)
+                        depthData.Add((footage, curDepth));
+
+                    if (footage == 1000)
+                        curOff = -0.8;
+                    if (footage == 2000)
+                        curOff = -0.6;
+                    if (footage == 3000)
+                        curOff = -0.4;
+
+                    if (footage < 1000)
+                        curOff = RandomShift(curOff, 0.05, -1.1, -0.851);
+                    else if (footage < 2000)
+                        curOff = RandomShift(curOff, 0.05, -0.849, -0.701);
+                    else if (footage < 3000)
+                        curOff = RandomShift(curOff, 0.05, -0.699, -0.501);
+                    else if (footage < 4000)
+                        curOff = RandomShift(curOff, 0.05, -0.499, -0.301);
+                    curOn = curOff - 0.1;
+
+
+                    onData.Add((footage, curOn));
+                    offData.Add((footage, curOff));
+
+                    if (footage % 1000 == 200)
+                    {
+                        dcvgData.Add((footage, 12.0));
+                        commentData.Add((footage, "NRI DCVG"));
+                    }
+                    else if (footage % 1000 == 400)
+                    {
+                        dcvgData.Add((footage, 20.0));
+                        commentData.Add((footage, "Minor DCVG"));
+                    }
+                    else if (footage % 1000 == 600)
+                    {
+                        dcvgData.Add((footage, 50.0));
+                        commentData.Add((footage, "Moderate DCVG"));
+                    }
+                    else if (footage % 1000 == 800)
+                    {
+                        dcvgData.Add((footage, 75.0));
+                        commentData.Add((footage, "Severe DCVG"));
+                    }
+                }
+                commentData.Add((0, "Start NRI CIS Area"));
+                commentData.Add((1000, "Start Minor CIS Area"));
+                commentData.Add((2000, "Start Moderate CIS Area"));
+                commentData.Add((3000, "Start Severe CIS Area"));
+
+                commentData.Sort((c1, c2) => c1.Item1.CompareTo(c2.Item1));
+            }
+            var report = new GraphicalReport();
+            report.LegendInfo.NameFontSize = 16f;
+            if (file != null && file.Points.Last().Value.Footage < 100)
+            {
+                report.PageSetup = new PageSetup(100, 0);
+                report.XAxisInfo.MajorGridline.Offset = 10;
+            }
+            var onOffGraph = new Graph(report);
+            var on = new GraphSeries("On", onData)
+            {
+                LineColor = Colors.Blue,
+                PointShape = GraphSeries.Shape.Circle,
+                PointColor = Colors.Blue,
+                ShapeRadius = 2
+            };
+            var off = new GraphSeries("Off", offData)
+            {
+                LineColor = Colors.Green,
+                PointShape = GraphSeries.Shape.Circle,
+                PointColor = Colors.Green,
+                ShapeRadius = 2
+            };
+            var depth = new GraphSeries("Depth", depthData)
+            {
+                LineColor = Colors.Black,
+                PointColor = Colors.Orange,
+                IsY1Axis = false,
+                PointShape = GraphSeries.Shape.Circle,
+                GraphType = GraphSeries.Type.Point
+            };
+            var redLine = new SingleValueGraphSeries("850 Line", -0.85)
+            {
+                IsDrawnInLegend = false,
+                Opcaity = 0.75f
+            };
+            var commentSeries = new CommentSeries { Values = commentData, PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs, BackdropOpacity = 0.75f };
+
+
+            onOffGraph.Series.Add(depth);
+            onOffGraph.YAxesInfo.Y2IsDrawn = true;
+            onOffGraph.CommentSeries = commentSeries;
+            onOffGraph.Series.Add(on);
+            onOffGraph.Series.Add(off);
+            onOffGraph.Series.Add(redLine);
+            onOffGraph.DrawTopBorder = false;
+
+            var dcvgLabels = dcvgData.Select((value) => (value.Item1, value.Item2.ToString("F1") + "%")).ToList();
+            var dcvgIndication = new PointWithLabelGraphSeries("DCVG Indication", -0.2, dcvgLabels)
+            {
+                ShapeRadius = 3,
+                PointColor = Colors.Red,
+                BackdropOpacity = 1f
+            };
+
+            onOffGraph.Series.Add(dcvgIndication);
+
+            report.XAxisInfo.IsEnabled = false;
+            report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
+            report.LegendInfo.SeriesNameFontSize = report.YAxesInfo.Y1LabelFontSize;
+
+            var bottomGlobalXAxis = new GlobalXAxis(report)
+            {
+                DrawPageInfo = true
+            };
+
+            var topGlobalXAxis = new GlobalXAxis(report, true)
+            {
+                Title = "EXAMPLE DATA"
+                //Title = "PG&E X11134 HCA 1830 11-13-19"
+            };
+
+            var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
+
+            //var graph1Measurement = new SplitContainerMeasurement(graph1)
+            //{
+            //    RequestedPercent = 0.5
+            //};
+            var surveyDirectionChart = new Chart(report, "Survey Direction");
+            var cisClass = new Chart(report, "CIS Severity");
+            var cisIndication = new PGECISIndicationChartSeries(onData, offData, cisClass);
+            cisClass.Series.Add(cisIndication);
+
+            var dcvgClass = new Chart(report, "DCVG Severity");
+            var dcvgIndicationSeries = new PgeDcvgIndicationChartSeries(dcvgData, dcvgClass);
+            dcvgClass.Series.Add(dcvgIndicationSeries);
+
+            var ecdaClassChart = new Chart(report, "ECDA Clas.");
+            var ecdaClassSeries = new PGEDirectExaminationPriorityChartSeries(ecdaClassChart, cisIndication, dcvgIndicationSeries);
+            ecdaClassChart.Series.Add(ecdaClassSeries);
+
+            var surveyDirectionSeries = new SurveyDirectionSeries(directionData);
+            surveyDirectionChart.Series.Add(surveyDirectionSeries);
+
+            splitContainer.AddSelfSizedContainer(topGlobalXAxis);
+            splitContainer.AddContainer(onOffGraph);
+            //splitContainer.AddSelfSizedContainer(cis850DataChart);
+            //splitContainer.AddSelfSizedContainer(cisClass);
+            //splitContainer.AddSelfSizedContainer(dcvgClass);
+            splitContainer.AddSelfSizedContainer(ecdaClassChart);
+            splitContainer.AddSelfSizedContainer(surveyDirectionChart);
+            //splitContainer.AddContainer(graph2);
+            //splitContainer.AddContainer(graph3);
+            splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
+            report.Container = splitContainer;
+            var pages = report.PageSetup.GetAllPages(0, onData.Last().Item1);
+            //var tabular = allegroFile.GetTabularData();
             for (int i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
@@ -650,6 +860,22 @@ namespace AFSTester
                 HideFileOnMap(file.Content as AllegroCISFile);
             }
             FileTreeView.SelectedNodes.Clear();
+        }
+
+        private void IITClick(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var fileNode = FileTreeView.SelectedNodes.First(node => node.Content is AllegroCISFile);
+                var file = fileNode.Content as AllegroCISFile;
+                MakeIITGraphs(file);
+            }
+            catch
+            {
+                MakeIITGraphs(null);
+                return;
+            }
+
         }
     }
 }

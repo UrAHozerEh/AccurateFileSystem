@@ -122,22 +122,25 @@ namespace AccurateReportSystem
             }
         }
         private CanvasHorizontalAlignment? horizontalAlignment = null;
-        public double Width
+        /// <summary>
+        /// Width of the Legend in inches. Default value: 1
+        /// </summary>
+        public double WidthInches
         {
             get
             {
-                return width ?? Master.Width;
+                return widthInches ?? Master.WidthInches;
             }
             set
             {
                 if (double.IsNaN(value))
-                    width = null;
+                    widthInches = null;
                 else
-                    width = value;
+                    widthInches = value;
             }
         }
-        private double? width = null;
-        public double WidthDIP => Math.Round(Width * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
+        private double? widthInches = null;
+        public double Width => Math.Round(WidthInches * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
         public string Name { get; set; }
 
         public LegendInfo()
@@ -150,7 +153,7 @@ namespace AccurateReportSystem
             VerticalAlignment = CanvasVerticalAlignment.Center;
             HorizontalAlignment = CanvasHorizontalAlignment.Center;
             SeriesNameUsesSeriesColor = true;
-            Width = 1.5;
+            WidthInches = 1;
             Name = "Master";
         }
 

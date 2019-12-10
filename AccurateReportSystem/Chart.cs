@@ -36,7 +36,7 @@ namespace AccurateReportSystem
         }
         public override void Draw(PageInformation page, CanvasDrawingSession session, Rect drawArea)
         {
-            var leftSpace = LegendInfo.WidthDIP + YAxesInfo.Y1TotalHeight;
+            var leftSpace = LegendInfo.Width + YAxesInfo.Y1TotalHeight;
             var rightSpace = YAxesInfo.Y2TotalHeight;
             var remainingWidth = drawArea.Width - leftSpace - rightSpace;
 
@@ -70,7 +70,7 @@ namespace AccurateReportSystem
                 session.DrawLine((float)drawArea.Left, (float)drawArea.Bottom, (float)drawArea.Right, (float)drawArea.Bottom, Colors.Black, 1);
             DrawOverlapShadow(page, session, transform, gridlineDrawArea);
 
-            var legendWidth = LegendInfo.WidthDIP + (YAxesInfo.Y1IsDrawn ? 0 : YAxesInfo.Y1TotalHeight);
+            var legendWidth = LegendInfo.Width + (YAxesInfo.Y1IsDrawn ? 0 : YAxesInfo.Y1TotalHeight);
             var legendDrawArea = new Rect(drawArea.X, drawArea.Y, legendWidth, drawArea.Height);
             LegendInfo.Draw(session, Series, legendDrawArea);
         }

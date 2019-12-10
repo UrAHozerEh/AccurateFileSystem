@@ -23,6 +23,7 @@ namespace AccurateReportSystem
 
         public override void Draw(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
         {
+            using (var _ = session.CreateLayer(Opcaity))
             using (var strokeStyle = new CanvasStrokeStyle())
             {
                 strokeStyle.DashStyle = IsDashed ? CanvasDashStyle.Dash : CanvasDashStyle.Solid;
