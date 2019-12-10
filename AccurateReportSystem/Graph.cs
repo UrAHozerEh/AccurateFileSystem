@@ -25,7 +25,7 @@ namespace AccurateReportSystem
         public XAxisInfo XAxisInfo { get; set; }
         public LegendInfo LegendInfo { get; set; }
         public YAxesInfo YAxesInfo { get; set; }
-        private double TotalXValueShift => LegendInfo.WidthDIP + YAxesInfo.Y1TotalHeight;
+        private double TotalXValueShift => LegendInfo.Width + YAxesInfo.Y1TotalHeight;
         private double TotalWidthShift => TotalXValueShift + YAxesInfo.Y2TotalHeight;
         private double TotalYValueShift => XAxisInfo.IsFlippedVertical ? XAxisInfo.TotalHeight : 0;
         public bool DrawTopBorder { get; set; } = true;
@@ -105,19 +105,29 @@ namespace AccurateReportSystem
                     var curTransform = series.IsY1Axis ? y1Transform : y2Transform;
                     series.Draw(session, page, curTransform);
                 }
+                
+                //TODO: Comment should draw itself. Should have a way to order drawing of everything (gridlines, series, shadow, comments, comment backdrop, etc.)
                 if (CommentSeries != null)
                 {
-                    var (commentGeoInfo, lineGeoInfo) = CommentSeries.GetGeometry(page, graphBodyDrawArea, session);
+                    var (commentGeoInfo, lineGeoInfo, backdropGeo) = CommentSeries.GetGeometry(page, graphBodyDrawArea, session);
                     var style = new CanvasStrokeStyle
                     {
                         
                     };
+                    if (backdropGeo != null)
+                    {
+                        using (var _ = session.CreateLayer(CommentSeries.BackdropOpacity))
+                            session.FillGeometry(backdropGeo, CommentSeries.BackdropColor);
+                    }
                     if (lineGeoInfo != null)
                         session.DrawGeometry(lineGeoInfo.Geometry, lineGeoInfo.Color, 1, style);
                     if (commentGeoInfo != null)
                         session.FillGeometry(commentGeoInfo.Geometry, commentGeoInfo.Color);
+                    
                     //TODO: Canvas Stroke Style should be in Geo Info. Also should have different styles for text and the indicators.
                 }
+
+                DrawOverlapShadow(page, session, graphBodyDrawArea);
             }
             var xAxisY = XAxisInfo.IsFlippedVertical ? (graphBodyDrawArea.Top - XAxisInfo.TotalHeight) : graphBodyDrawArea.Bottom;
             var xAxisDrawArea = new Rect(graphBodyDrawArea.Left, xAxisY, graphBodyDrawArea.Width, XAxisInfo.TotalHeight);
@@ -127,8 +137,8 @@ namespace AccurateReportSystem
 
             //DrawAxisLabels(page, session, graphBodyDrawArea);
             //DrawAxisTitles(session, graphBodyDrawArea);
-            DrawOverlapShadow(page, session, graphBodyDrawArea);
-            var legendWidth = LegendInfo.WidthDIP + (YAxesInfo.Y1IsDrawn ? 0 : YAxesInfo.Y1TotalHeight);
+            
+            var legendWidth = LegendInfo.Width + (YAxesInfo.Y1IsDrawn ? 0 : YAxesInfo.Y1TotalHeight);
             var legendDrawArea = new Rect(DrawArea.X, DrawArea.Y, legendWidth, graphBodyDrawArea.Height);
             LegendInfo.Draw(session, Series, legendDrawArea);
 

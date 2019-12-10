@@ -23,6 +23,7 @@
                 <RowDefinition Height="1*"/>
                 <RowDefinition Height="1*"/>
                 <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
             </Grid.RowDefinitions>
             <Button Content="Import" Click="Button_Click" Grid.Row="0" HorizontalAlignment="Center"/>
             <Button Content="Do Map" Click="Button_Click_1" Grid.Row="1" HorizontalAlignment="Center"/>
@@ -30,6 +31,7 @@
             <Button Content="Zoom Map" Click="Button_Click_3" Grid.Row="3" HorizontalAlignment="Center"/>
             <Button Content="Combine" Click="CombineButtonClick" Grid.Row="4" HorizontalAlignment="Center"/>
             <Button Content="Hide" Click="HideButtonClick" Grid.Row="5" HorizontalAlignment="Center"/>
+            <Button Content="IIT" Click="IITClick"  Grid.Row="6" HorizontalAlignment="Center"/>
         </Grid>
 
         <Maps:MapControl x:Name="MapControl" Grid.Column="0"/>

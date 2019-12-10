@@ -26,6 +26,7 @@ namespace AccurateReportSystem
         public double MaxDrawDistance { get; set; } = 10;
         public bool IsY1Axis { get; set; } = true;
         public override bool IsDrawnInLegend { get; set; } = true;
+        public float ShapeRadius { get; set; } = 3f;
         public override Color LegendNameColor
         {
             get
@@ -50,6 +51,7 @@ namespace AccurateReportSystem
             }
         }
         private Color? legendNameColor = null;
+        public float Opcaity { get; set; } = 1f;
 
         public GraphSeries(string name, List<(double footage, double value)> values)
         {
@@ -62,14 +64,16 @@ namespace AccurateReportSystem
         {
             if (Values == null || Values.Count == 0)
                 return;
-
-            if (GraphType == Type.Line)
-                DrawLineGeometry(session, page, transform);
-            if (PointShape != Shape.None)
-                DrawPoints(session, page, transform);
+            using (var _ = session.CreateLayer(Opcaity))
+            {
+                if (GraphType == Type.Line)
+                    DrawLineGeometry(session, page, transform);
+                if (PointShape != Shape.None)
+                    DrawPoints(session, page, transform);
+            }
         }
 
-        private void DrawLineGeometry(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
+        protected void DrawLineGeometry(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
         {
             if (Values == null || Values.Count == 0)
                 return;
@@ -162,7 +166,7 @@ namespace AccurateReportSystem
                     last = (footage, value);
                 }
                 pathBuilder.EndFigure(CanvasFigureLoop.Open);
-                using(var geometry = CanvasGeometry.CreatePath(pathBuilder))
+                using (var geometry = CanvasGeometry.CreatePath(pathBuilder))
                 {
                     var style = new CanvasStrokeStyle
                     {
@@ -173,7 +177,7 @@ namespace AccurateReportSystem
             }
         }
 
-        private void DrawPoints(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
+        protected void DrawPoints(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
         {
             if (Values == null || Values.Count == 0 || PointShape == Shape.None)
                 return;
@@ -185,47 +189,44 @@ namespace AccurateReportSystem
                 if (footage > page.EndFootage)
                     break;
                 var (x, y) = transform.ToDrawArea(footage, value);
-                session.FillCircle(x, y, 3, PointColor);
-                session.DrawCircle(x, y, 3, Colors.Black);
+                switch (PointShape)
+                {
+                    case Shape.Square:
+                        break;
+                    case Shape.Circle:
+                        session.FillCircle(x, y, ShapeRadius, PointColor);
+                        session.DrawCircle(x, y, ShapeRadius, Colors.Black);
+                        break;
+                    case Shape.Triangle:
+                        var geo = GetTriangleGeometry(session);
+                        session.FillGeometry(geo, x, y, PointColor);
+                        session.DrawGeometry(geo, x, y, Colors.Black);
+                        break;
+                    case Shape.InvertedTriangle:
+                        break;
+                    case Shape.Rectangle:
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 
-        private Path GetLinePath()
+        public CanvasGeometry GetTriangleGeometry(CanvasDrawingSession session)
         {
-            if (Values == null || Values.Count == 0)
-                return null;
-            var path = new Path();
-            path.StrokeThickness = LineThickness;
-            path.Stroke = new SolidColorBrush(LineColor);
-            var geomitry = new PathGeometry();
-            var figure = new PathFigure();
-            figure.IsClosed = false;
-            figure.StartPoint = GetPoint(Values[0]);
-            var pathSegments = new PathSegmentCollection();
-            var curSegment = new PolyLineSegment();
-            for (int i = 1; i < Values.Count; ++i)
+            return GetTriangleGeometry(session, ShapeRadius);
+        }
+
+        public CanvasGeometry GetTriangleGeometry(CanvasDrawingSession session, float radius)
+        {
+            using (var pathBuilder = new CanvasPathBuilder(session))
             {
-                curSegment.Points.Add(GetPoint(Values[i]));
+                pathBuilder.BeginFigure(0, -radius);
+                pathBuilder.AddLine(radius, radius);
+                pathBuilder.AddLine(-radius, radius);
+                pathBuilder.EndFigure(CanvasFigureLoop.Closed);
+                return CanvasGeometry.CreatePath(pathBuilder);
             }
-            pathSegments.Add(curSegment);
-            figure.Segments = pathSegments;
-            return path;
-        }
-
-        private Path GetPointPath()
-        {
-            if (PointShape == Shape.None || Values == null || Values.Count == 0)
-                return null;
-            var path = new Path();
-
-
-
-            return path;
-        }
-
-        private Point GetPoint((double footage, double value) read)
-        {
-            return new Point(read.footage, read.value);
         }
 
         public enum Type

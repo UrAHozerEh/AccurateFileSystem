@@ -33,7 +33,40 @@ namespace AccurateFileSystem
 
         public override string ToString()
         {
-            return $"'{Name}' cis with {Points.Count} points";
+            var typeString = "";
+            switch (Type)
+            {
+                case FileType.OnOff:
+                    typeString = "On Off";
+                    break;
+                case FileType.CISWaveform:
+                    typeString = "Waveform";
+                    break;
+                case FileType.RISWaveform:
+                    typeString = "RIS";
+                    break;
+                case FileType.DCVG:
+                    typeString = "DCVG";
+                    break;
+                case FileType.ACVG:
+                    typeString = "ACVG";
+                    break;
+                case FileType.PCM:
+                    typeString = "PCM";
+                    break;
+                case FileType.SoilRes:
+                    typeString = "Soil";
+                    break;
+                case FileType.Native:
+                    typeString = "Native";
+                    break;
+                case FileType.Unknown:
+                    typeString = "UNKNOWN";
+                    break;
+                default:
+                    break;
+            }
+            return $"'{Name}' {typeString} with {Points.Count} points";
         }
 
         public List<(double Footage, bool IsReverseRun)> GetDirectionData()
@@ -196,6 +229,7 @@ namespace AccurateFileSystem
             list.Add(("Off", typeof(double)));
             list.Add(("On Compensated", typeof(double)));
             list.Add(("Off Compensated", typeof(double)));
+            list.Add(("DCVG", typeof(double)));
             list.Add(("Depth", typeof(double)));
             list.Add(("Comment", typeof(string)));
             return list;
@@ -227,6 +261,38 @@ namespace AccurateFileSystem
             return (distance, point);
         }
 
+        public List<(double Footage, double Value1, double Value2)> GetCombinedDoubleData(string name1, string name2)
+        {
+            var val1Data = GetDoubleData(name1);
+            var val2Data = GetDoubleData(name2);
+            var index1 = 0;
+            var index2 = 0;
+            var output = new List<(double, double, double)>();
+            while(index1 < val1Data.Count && index2 < val2Data.Count)
+            {
+
+                var (foot1, value1) = index1 == val1Data.Count ? (double.NaN, double.NaN) : val1Data[index1];
+                var (foot2, value2) = index2 == val2Data.Count ? (double.NaN, double.NaN) : val2Data[index2];
+                if(foot1 == foot2)
+                {
+                    output.Add((foot1, value1, value2));
+                    ++index1;
+                    ++index2;
+                }
+                else if(foot1 < foot2)
+                {
+                    output.Add((foot1, value1, double.NaN));
+                    ++index1;
+                }
+                else
+                {
+                    output.Add((foot1, double.NaN, value2));
+                    ++index2;
+                }
+            }
+            return output;
+        }
+
         public List<(double footage, double value)> GetDoubleData(string fieldName)
         {
             switch (fieldName)
@@ -237,6 +303,8 @@ namespace AccurateFileSystem
                     return GetOffData();
                 case "Depth":
                     return GetDepthData();
+                case "DCVG":
+                    return GetOnData();
                 default:
                     return null;
             }
