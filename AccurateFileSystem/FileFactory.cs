@@ -32,12 +32,16 @@ namespace AccurateFileSystem
                 case ".svy":
                 case ".aci":
                 case ".dvg":
-                case ".csv":
                 case ".bak":
                     if (await IsAllegroFile())
                         return await GetAllegroFile();
                     else
-                        throw new Exception();
+                        throw new Exception("File is corrupted Allegro File.");
+                case ".csv":
+                    if (await IsAllegroFile())
+                        return await GetAllegroFile();
+                    else
+                        return null;
                 case ".txt":
                     return await GetAllegroWaveform();
                 case ".xlsx":
@@ -46,7 +50,7 @@ namespace AccurateFileSystem
                 case ".pdf":
                     return null;
                 default:
-                    throw new Exception();
+                    throw new Exception($"File is an unknown file format '{extension}'");
             }
         }
 
@@ -73,7 +77,7 @@ namespace AccurateFileSystem
                 while (!string.IsNullOrEmpty(line))
                 {
                     if (!line.Contains(':'))
-                        throw new Exception();
+                        throw new Exception($"Expected header labels in waveform file. Got '{line}' instead. Filename: '{FileName}'");
                     string label = line.Substring(0, line.IndexOf(':')).Trim();
                     string value = line.Substring(line.IndexOf(':') + 1).Trim();
 
@@ -92,7 +96,7 @@ namespace AccurateFileSystem
                             sampleRate = int.Parse(value);
                             break;
                         default:
-                            throw new Exception();
+                            throw new Exception($"Unexpected label in Waveform header. Filename: '{FileName}' Label: '{label}'");
                     }
 
                     line = reader.ReadLine().Trim();
