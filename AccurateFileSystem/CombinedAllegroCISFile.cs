@@ -317,7 +317,7 @@ namespace AccurateFileSystem
                         // 191B
                         //curPoint.On = list.Last().Point.On;
                     }
-                    if(curPoint.Off < -0.85)
+                    if (curPoint.Off < -0.85)
                     {
                         // 3001-05
                         //curPoint.On = list.Last().Point.On;
@@ -466,7 +466,7 @@ namespace AccurateFileSystem
                 if (double.Parse(endTSMatch.Groups[1].Value) == 0)
                     allSolution = allSolution.Reverse();
             }
-            else if(files.Count == 1 && first.Name.ToLower().Contains("rev"))
+            else if (files.Count == 1 && first.Name.ToLower().Contains("rev"))
                 allSolution = allSolution.Reverse();
 
             allSolution.CalculateOffset(10);
@@ -511,6 +511,8 @@ namespace AccurateFileSystem
                 var isReversed = Start > End;
                 var numFoot = Math.Abs(File.Points[Start].Footage - File.Points[End].Footage);
                 var output = $"'{File.Name}'{(isReversed ? " Rev Run" : "")} offset {Offset} feet {numPoints} reads of {File.Points.Count} from {Start}|{File.Points[Start].Footage} to {End}|{File.Points[End].Footage} over {numFoot} feet.";
+                if(numPoints == File.Points.Count)
+                    output = $"'{File.Name}'{(isReversed ? " Rev Run" : "")} offset {Offset} feet ALL {File.Points.Count} reads over {numFoot} feet.";
                 return output;
             }
         }
@@ -616,6 +618,7 @@ namespace AccurateFileSystem
             Dictionary<string, List<(int Index, int Start, int End)>> Solutions = new Dictionary<string, List<(int Index, int Start, int End)>>();
             string BaseUsings;
             string AllUsed;
+            public double MaxGap { get; set; } = 1500;
             ulong NumberOfChecks = 0;
             ulong NumberOFTestStations;
             public OrderCalculator(List<AllegroCISFile> files)
@@ -664,13 +667,14 @@ namespace AccurateFileSystem
 
             public void AsyncSolve()
             {
-                if(BaseUsings.Length == 1)
+                if (BaseUsings.Length == 1)
                 {
                     var end = Files.First().File.Points.Count - 1;
-                    Solutions.Add(AllUsed, new List<(int Index, int Start, int End)>() { (0, 0, end)});
+                    Solutions.Add(AllUsed, new List<(int Index, int Start, int End)>() { (0, 0, end) });
                     return;
                 }
                 var tasks = new List<Task>();
+                var startTime = DateTime.Now;
                 for (int i = 0; i < BaseUsings.Length; ++i)
                 {
                     var curRequired = i;
@@ -678,6 +682,8 @@ namespace AccurateFileSystem
                     tasks.Add(task);
                 }
                 Task.WaitAll(tasks.ToArray());
+                var endTime = DateTime.Now;
+                var duration = endTime - startTime;
             }
 
             public void Solve(string currentActive = null, List<(int Index, int Start, int End)> values = null, (int Index, int Start, int End)? newValue = null, double curOffset = 0, double footCovered = 0, double roundTo = 10, int? required = null)
@@ -743,6 +749,8 @@ namespace AccurateFileSystem
                                 continue;
                             var newFootage = Math.Abs(file.File.Points[start].Footage - file.File.Points[end].Footage);
                             var newOffset = lastFile?.OffsetDistance(End, file.File, start, roundTo) ?? 0;
+                            if (newOffset > MaxGap)
+                                continue;
                             if (newOffset > (2 * 10))
                             {
                                 if (start != file.Indicies[0] && start != file.Indicies[file.Indicies.Count - 1])
@@ -771,6 +779,8 @@ namespace AccurateFileSystem
                     foreach (var (start, end) in availablePairs)
                     {
                         var newOffset = lastFile?.OffsetDistance(End, file.File, start, roundTo) ?? 0;
+                        if (newOffset > MaxGap)
+                            continue;
                         if (newOffset > (2 * 10))
                         {
                             if (start != file.Indicies[0] && start != file.Indicies[file.Indicies.Count - 1])
@@ -848,7 +858,27 @@ namespace AccurateFileSystem
             {
                 if (Solutions.Count == 0)
                     return null;
-                var list = Solutions[AllUsed];
+                var bestSolutions = Enumerable.Repeat(("", double.MaxValue), AllUsed.Length + 1).ToList();
+                foreach (var (key, value) in Solutions)
+                {
+                    var usedCount = key.Count(c => c == '1');
+                    var curMin = MinimumValues[key];
+                    var (minKey, minValue) = bestSolutions[usedCount];
+                    if (string.IsNullOrWhiteSpace(minKey) || curMin < minValue)
+                    {
+                        bestSolutions[usedCount] = (key, curMin);
+                    }
+                }
+                string chosenSolution = null;
+                for (int i = AllUsed.Length; i >= 0; --i)
+                {
+                    var (key, _) = bestSolutions[i];
+                    if (string.IsNullOrWhiteSpace(key))
+                        continue;
+                    chosenSolution = key;
+                    break;
+                }
+                var list = Solutions[chosenSolution];
 
                 var (Index, Start, End) = list[0];
                 var firstFile = Files[Index].File;
