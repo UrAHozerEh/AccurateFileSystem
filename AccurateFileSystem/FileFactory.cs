@@ -77,7 +77,8 @@ namespace AccurateFileSystem
                 while (!string.IsNullOrEmpty(line))
                 {
                     if (!line.Contains(':'))
-                        throw new Exception($"Expected header labels in waveform file. Got '{line}' instead. Filename: '{FileName}'");
+                        return null; //TODO: Handle this exception. There was a bad file in 4914
+                    //throw new Exception($"Expected header labels in waveform file. Got '{line}' instead. Filename: '{FileName}'");
                     string label = line.Substring(0, line.IndexOf(':')).Trim();
                     string value = line.Substring(line.IndexOf(':') + 1).Trim();
 
@@ -96,7 +97,8 @@ namespace AccurateFileSystem
                             sampleRate = int.Parse(value);
                             break;
                         default:
-                            throw new Exception($"Unexpected label in Waveform header. Filename: '{FileName}' Label: '{label}'");
+                            return null; 
+                            //throw new Exception($"Unexpected label in Waveform header. Filename: '{FileName}' Label: '{label}'");
                     }
 
                     line = reader.ReadLine().Trim();
