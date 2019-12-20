@@ -55,7 +55,7 @@ namespace AccurateReportSystem
                 if (foot > page.EndFootage)
                     break;
                 var (x, y) = transform.ToDrawArea(foot, value);
-                y -= FontSize + 2f + ShapeRadius;
+                
                 var drawArea = transform.DrawArea;
                 using (var format = new CanvasTextFormat())
                 {
@@ -80,6 +80,7 @@ namespace AccurateReportSystem
                             endLocation = (float)drawArea.Right - halfLayoutWidth;
                             finalLocation = (float)Math.Round(drawArea.Right - (2 * halfLayoutWidth), GraphicalReport.DIGITS_TO_ROUND);
                         }
+                        y -= ((float)layout.LayoutBounds.Height) + 2f + ShapeRadius;
                         var translate = Matrix3x2.CreateTranslation(finalLocation, y);
 
                         using (var geo = CanvasGeometry.CreateText(layout))

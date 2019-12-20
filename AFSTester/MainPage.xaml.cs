@@ -849,6 +849,306 @@ namespace AFSTester
             MakeGraphs(test);
         }
 
+        private async void MakeNustarGraphs()
+        {
+            var mainOnOffData = new List<(double, double)>
+            {
+                (0,0.9),
+(10,-0.7),
+(20,-1.7),
+(30,-0.7),
+(40,5.7),
+(50,381.3),
+(60,11),
+(70,-7.7),
+(82,-0.9),
+(92,-2.3),
+(102,0.2),
+(112,3),
+(122,3.7),
+(132,3.7),
+(142,-2.3),
+(152,-0.7),
+(162,2.1),
+(172,-0.4),
+(182,-0.9),
+(192,10.6),
+(202,0),
+(212,-7.8),
+(222,-3.7),
+(232,0.7),
+(242,-2.3),
+(252,1.9),
+(262,-2.8),
+(272,-1.6),
+(282,0.7),
+(292,-0.2),
+(302,0),
+(312,0.9),
+(322,-0.2),
+(332,-1.6),
+(342,-0.7),
+(352,-0.4),
+(362,-1.9),
+(372,-0.7),
+(382,0.2),
+(392,0),
+(402,0.9),
+(412,-1.7),
+(422,3.7),
+(432,-0.4),
+(442,0),
+(452,0.2),
+(462,0.9),
+(472,0.7),
+(482,3.7),
+(492,0.9),
+(502,3.7),
+(512,-49.4),
+(522,1.6),
+(532,6.8),
+(542,-0.7),
+(552,-4),
+(562,0),
+(572,3),
+(582,17.7),
+(592,0.9),
+(602,0.9),
+(612,-2.1),
+(622,5.2),
+(632,6.1),
+(642,0.4),
+(652,3.8),
+(662,0.9),
+(672,1.6),
+(682,4.9),
+(692,5.9),
+(702,0),
+(712,5.9),
+(722,-9.7),
+(732,2.6),
+(742,0),
+(752,-42.6),
+(762,-2.3),
+(772,3.5),
+(782,-5.9),
+(792,8.7),
+(802,0.7),
+(812,3.1),
+(822,6.8),
+(832,0.2),
+(842,1),
+(852,3.1),
+(862,0),
+(872,23.3),
+(882,0),
+(892,-12.2),
+(902,14.3),
+(912,-2.8),
+(922,-0.4),
+(932,-4.9),
+(942,0.4),
+(952,1.9),
+(962,3),
+(972,0.7),
+(982,30.6),
+(992,-85.6),
+(1002,7),
+(1012,0),
+(1022,-2.1),
+(1032,41.9),
+(1042,3.1),
+(1052,-1.9),
+(1062,5),
+(1072,-0.4),
+(1082,7.8),
+(1092,-1.6),
+(1112,3.5),
+(1122,3.7),
+(1132,12.5),
+(1142,32.5),
+(1152,-29.6),
+(1162,-12.7),
+(1172,-1.7),
+(1182,0.4),
+(1192,67),
+(1202,-2.3),
+(1212,-0.4),
+(1222,-13.2),
+(1232,-13.2),
+(1242,-1.6),
+(1252,-6.4),
+(1262,-6.1),
+(1272,4.5),
+(1282,0),
+(1292,-5),
+(1302,0.4),
+(1312,11),
+(1322,10.3),
+(1332,-1.2),
+            };
+            var mainComments = new List<(double, string)>
+            {
+                (10,"Left: -2.6mV, Right: -5.6mV"),
+(70,"Power line crossing, Asphalt Road"),
+(142,"Left: 0.7mV, Right: -3.7mV"),
+(202,"Side Drain Reading , Culvert drainage"),
+(212,"Left: -579mV, Right: -5.9mV"),
+(242,"Left: 0.7mV, Right: 4.5mV"),
+(332,"Left: -0.4mV, Right: -0.4mV"),
+(412,"Left: 0.4mV, Right: 1.6mV"),
+(512,"Left: 1.7mV, Right: 6.1mV"),
+(552,"Left: 9.1mV, Right: -0.4mV"),
+(572,"Left: 6.6mV, Right: 5mV"),
+(612,"Left: 1.9mV, Right: 0.7mV"),
+(732,"Left: 3.5mV, Right: -0.4mV"),
+(762,"Left: 24.4mV, Right: 30.1mV"),
+(782,"Left: 10.6mV, Right: -2.8mV"),
+(822,"Fence"),
+(892,"Left: 5.7mV, Right: 1mV"),
+(902,"Dirt Road, Dyke tank rd"),
+(912,"Left: 8.7mV, Right: 4.9mV"),
+(982,"Side Drain Reading , Emergency valve"),
+(992,"Side Drain Reading , Tank farm Left: -94.6mV, Right: -22.4mV"),
+(1022,"Left: -0.4mV, Right: -6.1mV"),
+(1052,"Left: 1mV, Right: -4mV"),
+(1152,"Left: 7.7mV, Right: -10.6mV"),
+(1202,"Left: -0.4mV, Right: -17.7mV"),
+(1232,"Left: -12.9mV, Right: -7.5mV"),
+(1292,"Left: -2.3mV, Right: -1.9mV"),
+(1332,"Cultivated Field, End of main line Left: 5.7mV, Right: -6.4mV"),
+            };
+            var mainHotAnoms = new List<(double,double, string)>
+            {
+                (10,-0.7,""),
+(142,-2.3,""),
+(212,-7.8,""),
+(242,-2.3,""),
+(332,-1.6,""),
+(412,-1.7,""),
+(512,-49.4,""),
+(552,-4,""),
+(572,3,""),
+(612,-2.1,""),
+(732,2.6,""),
+(762,-2.3,""),
+(782,-5.9,""),
+(892,-12.2,""),
+(912,-2.8,""),
+(992,-85.6,""),
+(1022,-2.1,""),
+(1052,-1.9,""),
+(1152,-29.6,""),
+(1202,-2.3,""),
+(1232,-13.2,""),
+(1292,-5,""),
+(1332,-1.2,""),
+            };
+            var mainACVG = new List<(double, double, string)>
+            {
+                (220,28,"28"),
+(317,5,"5"),
+(347,9,"9"),
+(367,17,"17"),
+(427,18,"18"),
+(510,20,"20"),
+(552,18,"18"),
+(592,16,"16"),
+(631,20,"20"),
+(672,17,"17"),
+(711,22,"22"),
+(782,15,"15"),
+(830,20,"20"),
+(872,18,"18"),
+(1022,24,"24"),
+
+            };
+            await CreateNustarGraph("Main Line", "Main Line", mainOnOffData, mainComments, mainHotAnoms, mainACVG);
+
+        }
+
+        private async Task CreateNustarGraph(string fileName, string title, List<(double, double)> onData, List<(double, string)> comments, List<(double, double, string)> hotspotAnoms, List<(double, double, string)> acvgAnoms)
+        {
+            var report = new GraphicalReport();
+            report.LegendInfo.NameFontSize = 16f;
+            var onOffGraph = new Graph(report);
+            onOffGraph.YAxesInfo.Y2Title = "ACVG Value (dbµV)";
+            onOffGraph.YAxesInfo.Y1Title = "Potential (Millivolts)";
+            onOffGraph.LegendInfo.Name = "Survey Data";
+            onOffGraph.YAxesInfo.Y1LabelFormat = "F0";
+            var on = new GraphSeries("Hotspot Values", onData)
+            {
+                LineColor = Colors.Green,
+                PointShape = GraphSeries.Shape.None,
+            };
+            var acvgIndication = new PointWithLabelGraphSeries("ACVG Anomaly", acvgAnoms)
+            {
+                ShapeRadius = 4,
+                PointColor = Colors.Maroon,
+                BackdropOpacity = 1f,
+                IsY1Axis = false
+            };
+            var hotspotIndication = new PointWithLabelGraphSeries("Hotspot Anomaly", hotspotAnoms)
+            {
+                ShapeRadius = 3,
+                PointShape = GraphSeries.Shape.Circle,
+                PointColor = Colors.Goldenrod,
+                BackdropOpacity = 1f
+            };
+            var commentSeries = new CommentSeries { Values = comments, PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs, BackdropOpacity = 0.75f };
+
+            var yAxesInfo = report.YAxesInfo;
+            yAxesInfo.Y2IsDrawn = true;
+            yAxesInfo.Y2IsInverted = false;
+            yAxesInfo.Y2MaximumValue = 40;
+            yAxesInfo.MajorGridlines.Offset = 100;
+            yAxesInfo.MinorGridlines.Offset = 50;
+
+            yAxesInfo.Y1MinimumValue = -500;
+            yAxesInfo.Y1MaximumValue = 500;
+            yAxesInfo.Y1IsInverted = false;
+
+            onOffGraph.CommentSeries = commentSeries;
+            onOffGraph.Series.Add(on);
+            onOffGraph.DrawTopBorder = true;
+            onOffGraph.DrawBottomBorder = true;
+            onOffGraph.Series.Add(hotspotIndication);
+            onOffGraph.Series.Add(acvgIndication);
+
+            report.XAxisInfo.IsEnabled = false;
+            report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
+            report.LegendInfo.SeriesNameFontSize = report.YAxesInfo.Y1LabelFontSize;
+
+            var bottomGlobalXAxis = new GlobalXAxis(report)
+            {
+                DrawPageInfo = true
+            };
+
+            var topGlobalXAxis = new GlobalXAxis(report, true)
+            {
+                Title = $"NuStar 4'' {title} - Rosario, New Mexico"
+            };
+
+            var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
+            splitContainer.AddSelfSizedContainer(topGlobalXAxis);
+            splitContainer.AddContainer(onOffGraph);
+            splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
+            report.Container = splitContainer;
+            var pages = report.PageSetup.GetAllPages(on.Values.First().Item1, on.Values.Last().Item1);
+
+            for (int i = 0; i < pages.Count; ++i)
+            {
+                var page = pages[i];
+                var pageString = $"{i + 1}".PadLeft(3, '0');
+                var image = report.GetImage(page, 300);
+                var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{fileName} Page {pageString}" + ".png", CreationCollisionOption.ReplaceExisting);
+                using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
+                {
+                    await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
+                }
+            }
+        }
+
         private void HideButtonClick(object sender, RoutedEventArgs e)
         {
             var fileNodes = FileTreeView.SelectedNodes.Where(node => node.Content is AllegroCISFile).ToList();
@@ -872,7 +1172,8 @@ namespace AFSTester
             }
             catch
             {
-                MakeIITGraphs(null);
+                //MakeIITGraphs(null);
+                MakeNustarGraphs();
                 return;
             }
 
