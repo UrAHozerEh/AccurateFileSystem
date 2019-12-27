@@ -244,6 +244,14 @@ namespace AccurateFileSystem
 
         private AllegroDataPoint ParseAllegroLineFromCSV(int id, string line)
         {
+            var indicationMatch = Regex.Match(line, ",\"[^\"]*\",\"UN\",0,(\\d+\\.?\\d*),0");
+            double indicationValue = double.NaN;
+            if (indicationMatch.Success)
+            {
+                var commentIndicationMatch = Regex.Match(line, "\\(Indication [^;]*; [^\\)]+\\)");
+                line = line.Replace(indicationMatch.Value, "").Replace(commentIndicationMatch.Value, "");
+                indicationValue = double.Parse(indicationMatch.Groups[1].Value);
+            }
             var split = line.Split(',');
             if (split.Length < 16)
                 return null;
@@ -282,7 +290,7 @@ namespace AccurateFileSystem
                 };
             }
 
-            var output = new AllegroDataPoint(id, footage, on, off, gps, times, comment.Trim());
+            var output = new AllegroDataPoint(id, footage, on, off, gps, times, indicationValue, comment.Trim());
             return output;
         }
 
@@ -309,6 +317,14 @@ namespace AccurateFileSystem
             string firstPattern = @"^([^\s]+) M?\s+([^\s]+)\s+([^\s]+)";
             string gpsPattern = @"\{GD?E? ([^\}]+)\}";
             string timePattern = @"\{T ([^g\}]+)g?\}";
+            var indicationMatch = Regex.Match(line, "\\{Indication [^,]*, UN, 0, (\\d+\\.?\\d*), 0\\}");
+            double indicationValue = double.NaN;
+            if (indicationMatch.Success)
+            {
+                var commentIndicationMatch = Regex.Match(line, "\\(Indication [^;]*; [^\\)]+\\)");
+                line = line.Replace(indicationMatch.Value, "").Replace(commentIndicationMatch.Value, "");
+                indicationValue = double.Parse(indicationMatch.Groups[1].Value);
+            }
             var match = Regex.Match(line, firstPattern);
             if (!match.Success)
                 throw new Exception();
@@ -343,7 +359,7 @@ namespace AccurateFileSystem
                 times.Add(time);
                 line = line = Regex.Replace(line, timeMatch.Value, "").Trim();
             }
-            var output = new AllegroDataPoint(id, footage, on, off, gps, times, line);
+            var output = new AllegroDataPoint(id, footage, on, off, gps, times, indicationValue, line);
             return output;
         }
 

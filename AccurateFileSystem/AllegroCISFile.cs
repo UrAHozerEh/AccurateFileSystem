@@ -15,6 +15,7 @@ namespace AccurateFileSystem
         public string Extension { get; }
         public double StartFootage { get; private set; }
         public double EndFootage { get; private set; }
+        public double TotalFootage => EndFootage - StartFootage;
         public List<(int start, int end)> Reconnects { get; private set; }
         public bool IsReverseRun { get; set; }
 
@@ -89,10 +90,23 @@ namespace AccurateFileSystem
             if (Points == null || Points.Count == 0)
                 return;
             int incVal = int.Parse(Header["autoincval"]);
+            double startIrDrop = 0;
+            double irDropFactor = 0;
+            if (Type == FileType.DCVG)
+            {
+                var startOn = double.Parse(Header["DCVG_Begin_PS_ON"]);
+                var startOff = double.Parse(Header["DCVG_Begin_PS_OFF"]);
+                var endOn = double.Parse(Header["DCVG_End_PS_ON"]);
+                var endOff = double.Parse(Header["DCVG_End_PS_OFF"]);
+
+                startIrDrop = startOff - startOn;
+                var endIrDrop = endOff - endOn;
+                irDropFactor = (endIrDrop - startIrDrop) / TotalFootage;
+            }
             int startIndex = 0;
             double? prevOn = null;
             double? prevOff = null;
-            if(Points[0].HasReconnect)
+            if (Points[0].HasReconnect)
             {
                 var recon = Points[0].GetReconnect();
                 recon.StartPoint = Points[0];
@@ -101,11 +115,11 @@ namespace AccurateFileSystem
             for (int i = 1; i < Points.Count; ++i)
             {
                 var cur = Points[i];
-                if(cur.On == 0 || cur.Off == 0)
+                if (cur.On == 0 || cur.Off == 0)
                 {
-                    if(string.IsNullOrWhiteSpace(cur.OriginalComment))
+                    if (string.IsNullOrWhiteSpace(cur.OriginalComment))
                     {
-                        if(i == Points.Count -1)
+                        if (i == Points.Count - 1)
                         {
                             Points.Remove(i);
                             EndFootage = Points[Points.Count - 1].Footage;
@@ -117,16 +131,21 @@ namespace AccurateFileSystem
                         cur.On = recon.NGOn;
                         cur.Off = recon.NGOff;
                     }
-                    else if(prevOn.HasValue)
+                    else if (prevOn.HasValue)
                     {
                         cur.On = prevOn.Value;
                         cur.Off = prevOff.Value;
                     }
-                    else if(i + 1 < Points.Count)
+                    else if (i + 1 < Points.Count)
                     {
                         cur.On = Points[i + 1].On;
                         cur.Off = Points[i + 1].Off;
                     }
+                }
+                if (cur.HasIndication)
+                {
+                    var curIrDrop = startIrDrop + irDropFactor * cur.Footage;
+                    cur.IndicationPercent = (cur.IndicationValue / curIrDrop) * 100;
                 }
                 prevOn = cur.On;
                 prevOff = cur.Off;
@@ -239,12 +258,12 @@ namespace AccurateFileSystem
         {
             var distance = double.MaxValue;
             AllegroDataPoint point = null;
-            foreach(var cur in Points.Values)
+            foreach (var cur in Points.Values)
             {
                 if (cur.HasGPS)
                 {
                     var curDist = cur.GPS.Distance(pos);
-                    if(distance > curDist)
+                    if (distance > curDist)
                     {
                         point = cur;
                         distance = curDist;
@@ -268,18 +287,18 @@ namespace AccurateFileSystem
             var index1 = 0;
             var index2 = 0;
             var output = new List<(double, double, double)>();
-            while(index1 < val1Data.Count && index2 < val2Data.Count)
+            while (index1 < val1Data.Count && index2 < val2Data.Count)
             {
 
                 var (foot1, value1) = index1 == val1Data.Count ? (double.NaN, double.NaN) : val1Data[index1];
                 var (foot2, value2) = index2 == val2Data.Count ? (double.NaN, double.NaN) : val2Data[index2];
-                if(foot1 == foot2)
+                if (foot1 == foot2)
                 {
                     output.Add((foot1, value1, value2));
                     ++index1;
                     ++index2;
                 }
-                else if(foot1 < foot2)
+                else if (foot1 < foot2)
                 {
                     output.Add((foot1, value1, double.NaN));
                     ++index1;
@@ -377,9 +396,9 @@ namespace AccurateFileSystem
             double maxLat = double.MinValue;
             double maxLong = double.MinValue;
 
-            foreach(var point in Points.Values)
+            foreach (var point in Points.Values)
             {
-                if(point.HasGPS)
+                if (point.HasGPS)
                 {
                     var gps = point.GPS;
                     if (gps.Latitude < minLat)
