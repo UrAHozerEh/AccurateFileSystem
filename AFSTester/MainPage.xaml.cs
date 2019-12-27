@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
@@ -376,16 +377,14 @@ namespace AFSTester
             return curValue + change;
         }
 
-        private async void MakeIITGraphs(AllegroCISFile file)
+        private async void MakeIITGraphs(CombinedAllegroCISFile file, List<(double, double)> dcvgData)
         {
-
             var curDepth = 50.0;
             var curOff = -1.0;
             var curOn = -1.1;
             var depthData = new List<(double, double)>();
             var onData = new List<(double, double)>();
             var offData = new List<(double, double)>();
-            var dcvgData = new List<(double, double)>();
             var commentData = new List<(double, string)>();
             var directionData = new List<(double, bool)>();
             if (file != null)
@@ -393,11 +392,12 @@ namespace AFSTester
                 depthData = file.GetDoubleData("Depth");
                 offData = file.GetDoubleData("Off");
                 onData = file.GetDoubleData("On");
-                commentData = file.GetStringData("Comment");
+                commentData = file.GetCommentData("Comment");
                 directionData = file.GetDirectionData();
             }
             else
             {
+                dcvgData = new List<(double, double)>();
                 for (double footage = 0; footage <= 4000; footage += 10)
                 {
                     var direction = false;
@@ -461,7 +461,7 @@ namespace AFSTester
             }
             var report = new GraphicalReport();
             report.LegendInfo.NameFontSize = 16f;
-            if (file != null && file.Points.Last().Value.Footage < 100)
+            if (file != null && file.Points.Last().Footage < 100)
             {
                 report.PageSetup = new PageSetup(100, 0);
                 report.XAxisInfo.MajorGridline.Offset = 10;
@@ -576,6 +576,35 @@ namespace AFSTester
                     await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
                 }
             }
+
+            var areas = ecdaClassSeries.GetReportQ();
+            var output = new StringBuilder();
+            foreach(var (startFoot, endFoot, cisSeverity, dcvgSeverity, priority, reason) in areas)
+            {
+                output.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1).ToString("F0")}\t");
+                var startGps = file.GetClosesetGps(startFoot);
+                output.Append($"{startGps.Latitude.ToString("F5")}\t{startGps.Longitude.ToString("F5")}\t");
+                var endGps = file.GetClosesetGps(endFoot);
+                output.Append($"{endGps.Latitude.ToString("F5")}\t{endGps.Longitude.ToString("F5")}\t");
+                output.AppendLine($"{(int)cisSeverity}\t{(int)dcvgSeverity}\t{priority}\t{reason}");
+                //TODO: Depth and proper severity and priority labeling.
+            }
+            var reportQ = output.ToString();
+        }
+
+        private string ToStationing(double footage)
+        {
+            int hundred = (int)footage / 100;
+            int tens = (int)footage % 100;
+            return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
+        }
+
+        private string GenerateReportQ(CombinedAllegroCISFile onOffFile, List<(double, double)> dcvgIndications)
+        {
+            for(int i = 0; i < onOffFile.Points.Count; ++i)
+            {
+            }
+            return "";
         }
 
         private void FillTreeView()
@@ -1181,24 +1210,29 @@ namespace AFSTester
                     else
                         onOffFiles.Add(file);
                 }
-                var combined = CombinedAllegroCISFile.CombineFiles("Combined", onOffFiles);
+                var combinedFile = CombinedAllegroCISFile.CombineFiles("Combined", onOffFiles);
                 var combinedFootages = new List<(double, BasicGeoposition)>();
-                foreach(var (foot, _, point, _, _) in combined.Points)
+                foreach (var (foot, _, point, _, _) in combinedFile.Points)
                 {
-                    combinedFootages.Add((foot, point.GPS));
+                    if (point.HasGPS)
+                        combinedFootages.Add((foot, point.GPS));
                 }
-                var dcvgData = new List<(double, double)>()
+                var dcvgData = new List<(double, double)>();
                 foreach (var file in dcvgFiles)
                 {
                     foreach (var (_, point) in file.Points)
                     {
                         if (point.HasIndication)
                         {
-                            var footage = combinedFootages.AlignPoint(point.GPS, false);
+                            if (!point.HasGPS)
+                                throw new ArgumentException();
+                            var (footage, _) = combinedFootages.AlignPoint(point.GPS, false);
+                            dcvgData.Add((footage, point.IndicationPercent));
                         }
                     }
                 }
-                //MakeIITGraphs(file);
+                dcvgData.Sort((first, second) => first.Item1.CompareTo(second.Item1));
+                MakeIITGraphs(combinedFile, dcvgData);
             }
             catch
             {

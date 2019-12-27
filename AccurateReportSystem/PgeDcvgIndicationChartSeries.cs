@@ -9,7 +9,7 @@ namespace AccurateReportSystem
 {
     public class PgeDcvgIndicationChartSeries : ExceptionsChartSeries
     {
-        public List<(double Footage, double Percent, PGESeverity Severity)> Data { get; set; }
+        public List<(double Footage, double ActualFoot, double Percent, PGESeverity Severity, string Reason)> Data { get; set; }
         public Color MinorColor { get; set; } = Colors.Blue;
         public Color ModerateColor { get; set; } = Colors.Green;
         public Color SevereColor { get; set; } = Colors.Red;
@@ -22,19 +22,29 @@ namespace AccurateReportSystem
 
         public PgeDcvgIndicationChartSeries(List<(double, double)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo) : base(masterLegendInfo, masterYAxesInfo)
         {
-            Data = new List<(double Footage, double Percent, PGESeverity Severity)>();
+            Data = new List<(double Footage, double ActualFoot, double Percent, PGESeverity Severity, string)>();
             foreach (var (foot, percent) in data)
             {
                 var severity = PGESeverity.NRI;
-                if (percent >= 61)
+                var reason = "DCVG % IR is greater than 0 and less than or equal to 15";
+                if (percent > 60)
+                {
                     severity = PGESeverity.Severe;
-                else if (percent >= 36)
+                    reason = "DCVG % IR is greater than 60";
+                }
+                else if (percent > 35)
+                {
                     severity = PGESeverity.Moderate;
-                else if (percent >= 16)
+                    reason = "DCVG % IR is greater than 35 and less than or equal to 60";
+                }
+                else if (percent > 15)
+                {
                     severity = PGESeverity.Minor;
+                    reason = "DCVG % IR is greater than 15 and less than or equal to 35";
+                }
                 for(double curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
                 {
-                    Data.Add((curFoot, percent, severity));
+                    Data.Add((curFoot, foot, percent, severity, reason));
                 }
             }
         }
@@ -47,7 +57,7 @@ namespace AccurateReportSystem
             (double Start, double end, PGESeverity Severity)? prevData = null;
             for (int i = 0; i < Data.Count; ++i)
             {
-                var (curFoot, _, severity) = Data[i];
+                var (curFoot, _, _, severity, _) = Data[i];
                 if (curFoot < page.StartFootage)
                 {
                     continue;

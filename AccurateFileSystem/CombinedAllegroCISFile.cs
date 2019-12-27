@@ -468,12 +468,30 @@ namespace AccurateFileSystem
             }
             else if (files.Count == 1 && first.Name.ToLower().Contains("rev"))
                 allSolution = allSolution.Reverse();
+            if(allSolution.Last.Info.File.Points[allSolution.Last.Info.End].OriginalComment.ToLower().Contains("start"))
+                allSolution = allSolution.Reverse();
 
             allSolution.CalculateOffset(10);
             var solString = allSolution.ToString();
             var combined = new CombinedAllegroCISFile(name, type, allSolution);
             calc.Dispose();
             return combined;
+        }
+
+        public BasicGeoposition GetClosesetGps(double footage)
+        {
+            var distance = double.MaxValue;
+            AllegroDataPoint closePoint = null;
+            foreach(var (curfootage, _, point, _, _) in Points)
+            {
+                var curDist = Math.Abs(curfootage - footage);
+                if(curDist < distance && point.HasGPS)
+                {
+                    distance = curDist;
+                    closePoint = point;
+                }
+            }
+            return closePoint.GPS;
         }
 
 
