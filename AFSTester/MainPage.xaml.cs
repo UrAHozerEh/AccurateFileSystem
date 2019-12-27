@@ -51,67 +51,71 @@ namespace AFSTester
             this.InitializeComponent();
             FileTreeView.RootNodes.Add(HiddenNode);
             var xml = new XmlDocument();
-            var xmlStringTask = Clipboard.GetContent().GetTextAsync().AsTask();
-            xmlStringTask.Wait();
-            var xmlString = xmlStringTask.Result;
-            ShortList = null;
-            try { xml.LoadXml(xmlString); } catch { return; }
-
-            var curNode = xml.ChildNodes.First(n => n.NodeName == "kml");
-            curNode = curNode.ChildNodes.First(n => n.NodeName == "Document");
-            curNode = curNode.ChildNodes.First(n => n.NodeName == "Folder");
-            var lateralList = new List<(string Name, string Route, double Length, BasicGeoposition Start, BasicGeoposition End)>();
-            foreach (var node in curNode.ChildNodes)
+            try
             {
-                if (node.NodeName == "Placemark")
+                var xmlStringTask = Clipboard.GetContent().GetTextAsync().AsTask();
+                xmlStringTask.Wait();
+                var xmlString = xmlStringTask.Result;
+                ShortList = null;
+                try { xml.LoadXml(xmlString); } catch { return; }
+
+                var curNode = xml.ChildNodes.First(n => n.NodeName == "kml");
+                curNode = curNode.ChildNodes.First(n => n.NodeName == "Document");
+                curNode = curNode.ChildNodes.First(n => n.NodeName == "Folder");
+                var lateralList = new List<(string Name, string Route, double Length, BasicGeoposition Start, BasicGeoposition End)>();
+                foreach (var node in curNode.ChildNodes)
                 {
-                    var name = node.ChildNodes.First(n => n.NodeName == "name").InnerText;
-                    var description = node.ChildNodes.First(n => n.NodeName == "description").InnerText.Split('\n');
-                    var length = double.NaN;
-                    var isLat = false;
-                    string route = null;
-                    for (int i = 0; i < description.Length; ++i)
+                    if (node.NodeName == "Placemark")
                     {
-                        if (description[i] == "<td>Shape_Leng</td>")
+                        var name = node.ChildNodes.First(n => n.NodeName == "name").InnerText;
+                        var description = node.ChildNodes.First(n => n.NodeName == "description").InnerText.Split('\n');
+                        var length = double.NaN;
+                        var isLat = false;
+                        string route = null;
+                        for (int i = 0; i < description.Length; ++i)
                         {
-                            var lenString = description[i + 2];
-                            lenString = lenString.Substring(4, lenString.Length - 9);
-                            length = double.Parse(lenString);
+                            if (description[i] == "<td>Shape_Leng</td>")
+                            {
+                                var lenString = description[i + 2];
+                                lenString = lenString.Substring(4, lenString.Length - 9);
+                                length = double.Parse(lenString);
+                            }
+                            else if (description[i] == "<td>Main_Later</td>")
+                            {
+                                if (description[i + 2] == "<td>Lateral</td>")
+                                    isLat = true;
+                                else if (description[i + 2] != "<td>Main</td>")
+                                    route = description[i + 2].Substring(4, description[i + 2].Length - 9);
+                            }
+                            else if (description[i] == "<td>SourceRout</td>")
+                            {
+                                if (description[i + 2] == "<td>Lateral</td>")
+                                    isLat = true;
+                                else if (description[i + 2] != "<td>Main</td>")
+                                    route = description[i + 2].Substring(4, description[i + 2].Length - 9);
+                            }
                         }
-                        else if (description[i] == "<td>Main_Later</td>")
+                        var miltiGeo = node.ChildNodes.First(n => n.NodeName == "MultiGeometry");
+                        var lineString = miltiGeo.ChildNodes.First(n => n.NodeName == "LineString");
+                        var coordsNode = lineString.ChildNodes.First(n => n.NodeName == "coordinates");
+                        var coords = coordsNode.InnerText.Trim().Split(' ');
+                        var start = GetGeoposition(coords[0].Split(','));
+                        var end = GetGeoposition(coords[coords.Length - 1].Split(','));
+                        if (isLat)
                         {
-                            if (description[i + 2] == "<td>Lateral</td>")
-                                isLat = true;
-                            else if (description[i + 2] != "<td>Main</td>")
-                                route = description[i + 2].Substring(4, description[i + 2].Length - 9);
+                            lateralList.Add((name, route, length, start, end));
                         }
-                        else if (description[i] == "<td>SourceRout</td>")
-                        {
-                            if (description[i + 2] == "<td>Lateral</td>")
-                                isLat = true;
-                            else if (description[i + 2] != "<td>Main</td>")
-                                route = description[i + 2].Substring(4, description[i + 2].Length - 9);
-                        }
-                    }
-                    var miltiGeo = node.ChildNodes.First(n => n.NodeName == "MultiGeometry");
-                    var lineString = miltiGeo.ChildNodes.First(n => n.NodeName == "LineString");
-                    var coordsNode = lineString.ChildNodes.First(n => n.NodeName == "coordinates");
-                    var coords = coordsNode.InnerText.Trim().Split(' ');
-                    var start = GetGeoposition(coords[0].Split(','));
-                    var end = GetGeoposition(coords[coords.Length - 1].Split(','));
-                    if (isLat)
-                    {
-                        lateralList.Add((name, route, length, start, end));
                     }
                 }
-            }
 
-            ShortList = lateralList.Where(info => info.Length < 100).ToList();
-            var shortListStrings = ShortList.Select(info => $"{info.Name}\t{info.Route}\t{info.Length}\t{info.Start.Latitude}\t{info.Start.Longitude}\t{info.End.Latitude}\t{info.End.Longitude}");
-            var shortString = string.Join('\n', shortListStrings);
-            var longList = lateralList.Where(info => info.Length >= 100).ToList();
-            var longListStrings = longList.Select(info => $"{info.Name}\t{info.Route}\t{info.Length}\t{info.Start.Latitude}\t{info.Start.Longitude}\t{info.End.Latitude}\t{info.End.Longitude}");
-            var longString = string.Join('\n', longListStrings);
+                ShortList = lateralList.Where(info => info.Length < 100).ToList();
+                var shortListStrings = ShortList.Select(info => $"{info.Name}\t{info.Route}\t{info.Length}\t{info.Start.Latitude}\t{info.Start.Longitude}\t{info.End.Latitude}\t{info.End.Longitude}");
+                var shortString = string.Join('\n', shortListStrings);
+                var longList = lateralList.Where(info => info.Length >= 100).ToList();
+                var longListStrings = longList.Select(info => $"{info.Name}\t{info.Route}\t{info.Length}\t{info.Start.Latitude}\t{info.Start.Longitude}\t{info.End.Latitude}\t{info.End.Longitude}");
+                var longString = string.Join('\n', longListStrings);
+            }
+            catch { return; }
         }
 
         private BasicGeoposition GetGeoposition(string[] list)
@@ -1018,7 +1022,7 @@ namespace AFSTester
 (1292,"Left: -2.3mV, Right: -1.9mV"),
 (1332,"Cultivated Field, End of main line Left: 5.7mV, Right: -6.4mV"),
             };
-            var mainHotAnoms = new List<(double,double, string)>
+            var mainHotAnoms = new List<(double, double, string)>
             {
                 (10,-0.7,""),
 (142,-2.3,""),
@@ -1166,9 +1170,35 @@ namespace AFSTester
         {
             try
             {
-                var fileNode = FileTreeView.SelectedNodes.First(node => node.Content is AllegroCISFile);
-                var file = fileNode.Content as AllegroCISFile;
-                MakeIITGraphs(file);
+                var fileNodesList = FileTreeView.SelectedNodes.Where(node => node.Content is AllegroCISFile);
+                var onOffFiles = new List<AllegroCISFile>();
+                var dcvgFiles = new List<AllegroCISFile>();
+                foreach (var node in fileNodesList)
+                {
+                    var file = node.Content as AllegroCISFile;
+                    if (file.Type == FileType.DCVG)
+                        dcvgFiles.Add(file);
+                    else
+                        onOffFiles.Add(file);
+                }
+                var combined = CombinedAllegroCISFile.CombineFiles("Combined", onOffFiles);
+                var combinedFootages = new List<(double, BasicGeoposition)>();
+                foreach(var (foot, _, point, _, _) in combined.Points)
+                {
+                    combinedFootages.Add((foot, point.GPS));
+                }
+                var dcvgData = new List<(double, double)>()
+                foreach (var file in dcvgFiles)
+                {
+                    foreach (var (_, point) in file.Points)
+                    {
+                        if (point.HasIndication)
+                        {
+                            var footage = combinedFootages.AlignPoint(point.GPS, false);
+                        }
+                    }
+                }
+                //MakeIITGraphs(file);
             }
             catch
             {

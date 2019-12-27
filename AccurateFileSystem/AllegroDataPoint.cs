@@ -48,11 +48,14 @@ namespace AccurateFileSystem
                 return Times[Times.Count - 1];
             }
         }
+        public double IndicationValue { get; set; } = double.NaN;
+        public bool HasIndication => !double.IsNaN(IndicationValue);
+        public double IndicationPercent { get; set; } = double.NaN;
         public bool IsHiLo { get; private set; } = false;
         public List<TestStationRead> TestStationReads = new List<TestStationRead>();
         public bool HasReconnect { get; private set; } = false;
 
-        public AllegroDataPoint(int id, double footage, double on, double off, BasicGeoposition gps, List<DateTime> times, string comment)
+        public AllegroDataPoint(int id, double footage, double on, double off, BasicGeoposition gps, List<DateTime> times, double indicationValue, string comment)
         {
             Id = id;
             Footage = footage;
@@ -63,6 +66,7 @@ namespace AccurateFileSystem
             OriginalComment = comment;
             GPS = gps;
             Times = times;
+            IndicationValue = indicationValue;
             ParseComment();
         }
 
@@ -130,6 +134,9 @@ namespace AccurateFileSystem
                 return false;
             if (!GPS.Equals(other.GPS) && !CloseEnough(GPS, other.GPS))
                 return false;
+            if (!double.IsNaN(IndicationPercent) || !double.IsNaN(other.IndicationPercent))
+                if (IndicationPercent != other.IndicationPercent)
+                    return false;
             if (Times.Count != other.Times.Count)
                 return false;
             for (int i = 0; i < Times.Count; ++i)

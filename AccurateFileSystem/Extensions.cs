@@ -28,6 +28,39 @@ namespace AccurateFileSystem
             return Math.PI * value / 180.0; ;
         }
 
+        private static (double Footage, double Distance) AlignPoint(this List<(double, BasicGeoposition)> points, BasicGeoposition otherGps, bool extrapolated)
+        {
+            int closestIndex = 0;
+            double closestDistance = double.MaxValue;
+            double footage = 0;
+            for(int i = 0; i < points.Count; ++i)
+            {
+                var (foot, gps) = points[i];
+                var curDistance = gps.Distance(otherGps);
+                if(curDistance < closestDistance)
+                {
+                    closestDistance = curDistance;
+                    closestIndex = i;
+                    footage = foot;
+                }
+            }
+            if (extrapolated)
+            {
+                var startIndex = Math.Max(0, closestIndex - 1);
+                var endIndex = Math.Min(points.Count - 1, closestIndex + 1);
+                var extrapolatedPoints = new List<(double, BasicGeoposition)>();
+                for(int i = startIndex; i < endIndex; ++i)
+                {
+                    var (startFoot, startGps) = points[i];
+                    var (endFoot, endGps) = points[i + 1];
+
+                    //TODO: Finish this.
+                    throw new NotImplementedException();
+                }
+            }
+            return (footage, closestDistance);
+        }
+
         public static GeoboundingBox CombineAreas (this GeoboundingBox rect1, GeoboundingBox rect2)
         {
             var minLong = Math.Min(rect1.NorthwestCorner.Longitude, rect2.NorthwestCorner.Longitude);
