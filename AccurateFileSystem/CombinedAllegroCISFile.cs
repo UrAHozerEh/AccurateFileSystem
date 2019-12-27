@@ -21,7 +21,7 @@ namespace AccurateFileSystem
             Name = name;
             FileInfos = fileInfos;
             UpdatePoints();
-            var output = FilterMir(new List<string>() { "anode", "rectifier" });
+            //var output = FilterMir(new List<string>() { "anode", "rectifier" });
         }
 
         public List<(string fieldName, Type fieldType)> GetFields()
@@ -193,6 +193,148 @@ namespace AccurateFileSystem
                 }
                 curLine[30] = point.Depth?.ToString("F0") ?? "";
                 output.AppendLine(string.Join("\t", curLine));
+            }
+
+            return output.ToString();
+        }
+
+        public string GetTestStationData(int readDecimals = 4)
+        {
+            var output = new StringBuilder();
+            var readFormat = $"F{readDecimals}";
+            var curLine = new string[25];
+            curLine[0] = "Footage";
+            curLine[1] = "Date";
+            curLine[2] = "Latitude";
+            curLine[3] = "Longitude";
+            curLine[4] = "Remarks";
+            curLine[5] = "Near Ground On";
+            curLine[6] = "Near Ground Off";
+            curLine[7] = "Left On";
+            curLine[8] = "Left Off";
+            curLine[9] = "Right On";
+            curLine[10] = "Right Off";
+            curLine[11] = "Far Ground On";
+            curLine[12] = "Far Ground Off";
+            curLine[13] = "MIR On";
+            curLine[14] = "MIR Off";
+            curLine[15] = "Reconnect Distance";
+            curLine[16] = "Reconnect Direction";
+            curLine[17] = "Coupon On";
+            curLine[18] = "Coupon Off";
+            curLine[19] = "Coupon Native";
+            curLine[20] = "Casing On";
+            curLine[21] = "Casing Off";
+            curLine[22] = "Foreign On";
+            curLine[23] = "Foreign Off";
+            curLine[24] = "ACV";
+            output.AppendLine(string.Join("\t", curLine));
+
+            foreach (var (footage, isReverse, point, useMir, file) in Points)
+            {
+                if (point.TestStationReads.Count > 0)
+                {
+                    curLine = new string[25];
+                    curLine[0] = footage.ToString("F0");
+                    if (point.HasTime)
+                        curLine[1] = point.Times[0].ToString("MM/dd/yyyy");
+                    else
+                        curLine[1] = "N/A";
+                    if (point.HasGPS)
+                    {
+                        curLine[2] = point.GPS.Latitude.ToString("F8");
+                        curLine[3] = point.GPS.Longitude.ToString("F8");
+                    }
+                    else
+                    {
+                        curLine[2] = "N/A";
+                        curLine[3] = "N/A";
+                    }
+                    curLine[4] = point.StrippedComment ?? "";
+                    foreach (TestStationRead read in point.TestStationReads)
+                    {
+                        if (read is ReconnectTestStationRead reconnect)
+                        {
+                            curLine[5] = reconnect.NGOn.ToString(readFormat);
+                            curLine[6] = reconnect.NGOff.ToString(readFormat);
+
+                            curLine[11] = reconnect.FGOn.ToString(readFormat);
+                            curLine[12] = reconnect.FGOff.ToString(readFormat);
+
+                            curLine[13] = reconnect.MirOn.ToString(readFormat);
+                            curLine[14] = reconnect.MirOff.ToString(readFormat);
+
+                            curLine[15] = reconnect.ReconnectDistance.ToString("F0");
+                            curLine[16] = isReverse ? "Downstream" : "Upstream";
+                        }
+                        else if (read is SingleTestStationRead single)
+                        {
+                            var lowerTag = single.Tag?.ToLower() ?? "";
+                            if (lowerTag.Contains("coup"))
+                            {
+                                if (lowerTag.Contains("off"))
+                                {
+                                    curLine[18] = single.Off.ToString(readFormat);
+                                }
+                                else
+                                {
+                                    curLine[17] = single.On.ToString(readFormat);
+                                }
+                            }
+                            else if (lowerTag.Contains("nat"))
+                            {
+                                curLine[19] = single.Off.ToString(readFormat);
+                            }
+                            else
+                            {
+                                if (string.IsNullOrEmpty(curLine[5]))
+                                {
+                                    curLine[5] = single.On.ToString(readFormat);
+                                    curLine[6] = single.Off.ToString(readFormat);
+                                }
+                            }
+                        }
+                        else if (read is SideDrainTestStationRead sideDrain)
+                        {
+                            curLine[7] = sideDrain.LeftOn.ToString(readFormat);
+                            curLine[8] = sideDrain.LeftOff.ToString(readFormat);
+
+                            curLine[9] = sideDrain.RightOn.ToString(readFormat);
+                            curLine[10] = sideDrain.RightOff.ToString(readFormat);
+                        }
+                        else if (read is CasingTestStationRead casing)
+                        {
+                            if (string.IsNullOrEmpty(curLine[5]))
+                            {
+                                curLine[5] = casing.StructOn.ToString(readFormat);
+                                curLine[6] = casing.StructOff.ToString(readFormat);
+                            }
+                            curLine[20] = casing.CasingOn.ToString(readFormat);
+                            curLine[21] = casing.CasingOff.ToString(readFormat);
+                        }
+                        else if (read is CrossingTestStationRead crossing)
+                        {
+                            if (string.IsNullOrEmpty(curLine[5]))
+                            {
+                                curLine[5] = crossing.StructOn.ToString(readFormat);
+                                curLine[6] = crossing.StructOff.ToString(readFormat);
+                            }
+                            curLine[22] = crossing.ForeignOn.ToString(readFormat);
+                            curLine[23] = crossing.ForeignOff.ToString(readFormat);
+                        }
+                        else if (read is ACTestStationRead ac)
+                        {
+                            curLine[24] = ac.Value.ToString(readFormat);
+                        }
+                    }
+                    for (int i = 5; i <= 24; ++i)
+                    {
+                        if (string.IsNullOrEmpty(curLine[i]))
+                            curLine[i] = "N/A";
+                    }
+                    output.AppendLine(string.Join("\t", curLine));
+                }
+
             }
 
             return output.ToString();
@@ -468,7 +610,7 @@ namespace AccurateFileSystem
             }
             else if (files.Count == 1 && first.Name.ToLower().Contains("rev"))
                 allSolution = allSolution.Reverse();
-            if(allSolution.Last.Info.File.Points[allSolution.Last.Info.End].OriginalComment.ToLower().Contains("start"))
+            if (allSolution.Last.Info.File.Points[allSolution.Last.Info.End].OriginalComment.ToLower().Contains("start"))
                 allSolution = allSolution.Reverse();
 
             allSolution.CalculateOffset(10);
@@ -482,10 +624,10 @@ namespace AccurateFileSystem
         {
             var distance = double.MaxValue;
             AllegroDataPoint closePoint = null;
-            foreach(var (curfootage, _, point, _, _) in Points)
+            foreach (var (curfootage, _, point, _, _) in Points)
             {
                 var curDist = Math.Abs(curfootage - footage);
-                if(curDist < distance && point.HasGPS)
+                if (curDist < distance && point.HasGPS)
                 {
                     distance = curDist;
                     closePoint = point;
@@ -529,7 +671,7 @@ namespace AccurateFileSystem
                 var isReversed = Start > End;
                 var numFoot = Math.Abs(File.Points[Start].Footage - File.Points[End].Footage);
                 var output = $"'{File.Name}'{(isReversed ? " Rev Run" : "")} offset {Offset} feet {numPoints} reads of {File.Points.Count} from {Start}|{File.Points[Start].Footage} to {End}|{File.Points[End].Footage} over {numFoot} feet.";
-                if(numPoints == File.Points.Count)
+                if (numPoints == File.Points.Count)
                     output = $"'{File.Name}'{(isReversed ? " Rev Run" : "")} offset {Offset} feet ALL {File.Points.Count} reads over {numFoot} feet.";
                 return output;
             }

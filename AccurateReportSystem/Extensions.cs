@@ -79,5 +79,22 @@ namespace AccurateReportSystem
                 return (recon1.EndPoint.Footage, recon2.StartPoint.Footage);
             return (recon1.EndPoint.Footage, recon2.EndPoint.Footage);
         }
+
+        public static string GetDisplayName(this PGESeverity severity)
+        {
+            switch (severity)
+            {
+                case PGESeverity.NRI:
+                    return "NRI";
+                case PGESeverity.Minor:
+                    return "Minor";
+                case PGESeverity.Moderate:
+                    return "Moderate";
+                case PGESeverity.Severe:
+                    return "Severe";
+                default:
+                    throw new ArgumentException();
+            }
+        }
     }
 }

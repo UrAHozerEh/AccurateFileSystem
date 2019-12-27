@@ -46,6 +46,7 @@ namespace AFSTester
         private Random Random = new Random(1984);
         TreeViewNode HiddenNode = new TreeViewNode() { Content = "Hidden Files" };
         List<(string Name, string Route, double Length, BasicGeoposition Start, BasicGeoposition End)> ShortList;
+        string FolderName;
 
         public MainPage()
         {
@@ -137,6 +138,7 @@ namespace AFSTester
             var folder = await folderPicker.PickSingleFolderAsync();
             if (folder == null)
                 return;
+            FolderName = folder.DisplayName;
             var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
             var makeGraphs = false;
             NewFiles = new List<File>();
@@ -157,7 +159,7 @@ namespace AFSTester
                     var nextFile = NewFiles[j];
                     if (curFile.Name != nextFile.Name)
                         break;
-                    if (curFile.IsEquivalent(nextFile))
+                    if (true)//curFile.IsEquivalent(nextFile))
                     {
                         NewFiles.RemoveAt(j);
                         --j;
@@ -526,7 +528,7 @@ namespace AFSTester
 
             var topGlobalXAxis = new GlobalXAxis(report, true)
             {
-                Title = "EXAMPLE DATA"
+                Title = $"PGE IIT Survey {FolderName}"
                 //Title = "PG&E X11134 HCA 1830 11-13-19"
             };
 
@@ -563,14 +565,15 @@ namespace AFSTester
             //splitContainer.AddContainer(graph3);
             splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
             report.Container = splitContainer;
-            var pages = report.PageSetup.GetAllPages(0, onData.Last().Item1);
-            //var tabular = allegroFile.GetTabularData();
+            var surveyLength = onData.Last().Item1;
+            var pages = report.PageSetup.GetAllPages(0, surveyLength);
+            //
             for (int i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
                 var image = report.GetImage(page, 300);
-                var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {pageString}" + ".png", CreationCollisionOption.ReplaceExisting);
+                var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{FolderName} Page {pageString}" + ".png", CreationCollisionOption.ReplaceExisting);
                 using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
                 {
                     await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
@@ -579,17 +582,107 @@ namespace AFSTester
 
             var areas = ecdaClassSeries.GetReportQ();
             var output = new StringBuilder();
-            foreach(var (startFoot, endFoot, cisSeverity, dcvgSeverity, priority, reason) in areas)
+            var extrapolatedDepth = new List<(double, double)>();
+            double curFoot;
+            double curExtrapolatedFoot = 0;
+            for (int i = 0; i < depthData.Count; ++i)
             {
-                output.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1).ToString("F0")}\t");
+                (curFoot, curDepth) = depthData[i];
+                while (curExtrapolatedFoot <= curFoot)
+                {
+                    extrapolatedDepth.Add((curExtrapolatedFoot, curDepth));
+                    ++curExtrapolatedFoot;
+                }
+                if (i == depthData.Count - 1)
+                {
+                    while (curExtrapolatedFoot <= surveyLength)
+                    {
+                        extrapolatedDepth.Add((curExtrapolatedFoot, curDepth));
+                        ++curExtrapolatedFoot;
+                    }
+                }
+                else
+                {
+                    var (nextFoot, nextDepth) = depthData[i + 1];
+                    var factor = (nextDepth - curDepth) / (nextFoot - curFoot);
+                    while (curExtrapolatedFoot < nextFoot)
+                    {
+                        var curExtrapolatedDepth = factor * (curExtrapolatedFoot - curFoot) + curDepth;
+                        extrapolatedDepth.Add((curExtrapolatedFoot, curExtrapolatedDepth));
+                        ++curExtrapolatedFoot;
+                    }
+                }
+            }
+            var skipReport = new StringBuilder();
+            foreach (var (startFoot, endFoot, cisSeverity, dcvgSeverity, priority, reason) in areas)
+            {
+                var depthInArea = extrapolatedDepth.Where(value => value.Item1 >= startFoot && value.Item1 <= endFoot);
+                var minDepth = depthInArea.Count() != 0 ? depthInArea.Min(value => value.Item2) : -1;
+                output.Append("\t\t\t\t");
+                output.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t\t{Math.Max(endFoot - startFoot, 1).ToString("F0")}\t{minDepth.ToString("F0")}\t");
                 var startGps = file.GetClosesetGps(startFoot);
                 output.Append($"{startGps.Latitude.ToString("F5")}\t{startGps.Longitude.ToString("F5")}\t");
                 var endGps = file.GetClosesetGps(endFoot);
                 output.Append($"{endGps.Latitude.ToString("F5")}\t{endGps.Longitude.ToString("F5")}\t");
-                output.AppendLine($"{(int)cisSeverity}\t{(int)dcvgSeverity}\t{priority}\t{reason}");
-                //TODO: Depth and proper severity and priority labeling.
+                if (reason == "SKIP.")
+                {
+                    output.AppendLine($"NT\tNT\tNT\tSkipped");
+                    skipReport.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1).ToString("F0")}\t");
+                    skipReport.Append($"{startGps.Latitude.ToString("F5")}\t{startGps.Longitude.ToString("F5")}\t");
+                    skipReport.AppendLine($"{endGps.Latitude.ToString("F5")}\t{endGps.Longitude.ToString("F5")}");
+                }
+                else
+                    output.AppendLine($"{cisSeverity.GetDisplayName()}\t{dcvgSeverity.GetDisplayName()}\t{PriorityDisplayName(priority)}\t{reason}");
             }
             var reportQ = output.ToString();
+            var skipReportString = skipReport.ToString();
+            var testStation = file.GetTestStationData();
+            var depthException = new StringBuilder();
+            for(int i = 0; i < extrapolatedDepth.Count; ++i)
+            {
+                (curFoot, curDepth) = extrapolatedDepth[i];
+                if (curDepth < 36)
+                {
+                    var start = i;
+                    var curIndex = i;
+                    var minDepth = curDepth;
+                    while(curDepth < 36 && curIndex != extrapolatedDepth.Count)
+                    {
+                        (curFoot, curDepth) = extrapolatedDepth[curIndex];
+                        if (curDepth < minDepth)
+                            minDepth = curDepth;
+                        ++curIndex;
+                    }
+                    --curIndex;
+                    var (startFoot, _) = extrapolatedDepth[start];
+                    var (endFoot, _) = extrapolatedDepth[curIndex];
+                    depthException.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1).ToString("F0")}\t{minDepth.ToString("F0")}\t");
+                    var startGps = file.GetClosesetGps(startFoot);
+                    depthException.Append($"{startGps.Latitude.ToString("F5")}\t{startGps.Longitude.ToString("F5")}\t");
+                    var endGps = file.GetClosesetGps(endFoot);
+                    depthException.AppendLine($"{endGps.Latitude.ToString("F5")}\t{endGps.Longitude.ToString("F5")}");
+
+                    i = curIndex + 1;
+                }
+            }
+            var depthString = depthException.ToString();
+        }
+
+        private string PriorityDisplayName(int priority)
+        {
+            switch (priority)
+            {
+                case 1:
+                    return "Priority I";
+                case 2:
+                    return "Priority II";
+                case 3:
+                    return "Priority III";
+                case 4:
+                    return "Priority IV";
+                default:
+                    throw new ArgumentException();
+            }
         }
 
         private string ToStationing(double footage)
@@ -597,14 +690,6 @@ namespace AFSTester
             int hundred = (int)footage / 100;
             int tens = (int)footage % 100;
             return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
-        }
-
-        private string GenerateReportQ(CombinedAllegroCISFile onOffFile, List<(double, double)> dcvgIndications)
-        {
-            for(int i = 0; i < onOffFile.Points.Count; ++i)
-            {
-            }
-            return "";
         }
 
         private void FillTreeView()
@@ -1218,16 +1303,33 @@ namespace AFSTester
                         combinedFootages.Add((foot, point.GPS));
                 }
                 var dcvgData = new List<(double, double)>();
+                double lastFoot = double.MaxValue - 10;
+                BasicGeoposition lastGps = new BasicGeoposition();
+                double footage;
                 foreach (var file in dcvgFiles)
                 {
-                    foreach (var (_, point) in file.Points)
+                    foreach (var (foot, point) in file.Points)
                     {
                         if (point.HasIndication)
                         {
                             if (!point.HasGPS)
-                                throw new ArgumentException();
-                            var (footage, _) = combinedFootages.AlignPoint(point.GPS, false);
+                            {
+                                var dist = foot - lastFoot;
+                                if (dist <= 10)
+                                {
+                                    (footage, _) = combinedFootages.AlignPoint(lastGps, false);
+                                    dcvgData.Add((footage, point.IndicationPercent));
+                                }
+                                else
+                                    throw new ArgumentException();
+                            }
+                            (footage, _) = combinedFootages.AlignPoint(point.GPS, false);
                             dcvgData.Add((footage, point.IndicationPercent));
+                        }
+                        if (point.HasGPS)
+                        {
+                            lastFoot = foot;
+                            lastGps = point.GPS;
                         }
                     }
                 }
