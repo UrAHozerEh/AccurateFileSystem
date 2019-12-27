@@ -14,7 +14,7 @@ namespace AccurateReportSystem
         public Color ModerateColor { get; set; } = Colors.Green;
         public Color SevereColor { get; set; } = Colors.Red;
         public List<(double Footage, double On, double Off, bool IsExtrapolated, double Baseline, PGESeverity Severity, string Reason)> Data { get; set; }
-        public double MinimumFeet { get; set; } = 5;
+        public double SkipDistance { get; set; } = 10;
 
         public PGECISIndicationChartSeries(List<(double, double)> onData, List<(double, double)> offData, Chart chart) : base(chart.LegendInfo, chart.YAxesInfo)
         {
@@ -40,13 +40,13 @@ namespace AccurateReportSystem
         private List<(double Footage, double On, double Off, bool IsExtrapolated, double Baseline, PGESeverity Severity, string Reason)> ExtrapolateData(List<(double Footage, double On, double Off)> data)
         {
 
-            var extrapolatedData = new List<(double Footage, double On, double Off, bool IsExtrapolated)>();
+            var extrapolatedData = new List<(double Footage, double On, double Off, bool IsExtrapolated, bool isSkipped)>();
 
             for (int i = 0; i < data.Count - 1; ++i)
             {
                 var (startFoot, startOn, startOff) = data[i];
                 var (endFoot, endOn, endOff) = data[i + 1];
-                extrapolatedData.Add((startFoot, startOn, startOff, false));
+                extrapolatedData.Add((startFoot, startOn, startOff, false, false));
                 var dist = endFoot - startFoot;
                 var onDiff = endOn - startOn;
                 var offDiff = endOff - startOff;
@@ -57,21 +57,27 @@ namespace AccurateReportSystem
                     var newOn = onPerFoot * offset + startOn;
                     var newOff = offPerFoot * offset + startOff;
                     var newFoot = startFoot + offset;
-                    extrapolatedData.Add((newFoot, newOn, newOff, true));
+
+                    extrapolatedData.Add((newFoot, newOn, newOff, true, dist > SkipDistance));
                 }
             }
             var (foot, on, off) = data.Last();
-            extrapolatedData.Add((foot, on, off, false));
-            bool extrapolated;
+            extrapolatedData.Add((foot, on, off, false, false));
+            bool extrapolated, skipped;
             var output = new List<(double, double, double, bool, double, PGESeverity, string)>(extrapolatedData.Count);
             if (foot <= 200)
             {
                 var average = extrapolatedData.Average(value => value.Off);
                 for (int i = 0; i < extrapolatedData.Count; ++i)
                 {
-                    (foot, on, off, extrapolated) = extrapolatedData[i];
+                    (foot, on, off, extrapolated, skipped) = extrapolatedData[i];
                     var changeInBaseline = Math.Abs(off - average);
                     var (severity, reason) = GetSeverity(off, average);
+                    if (skipped)
+                    {
+                        severity = PGESeverity.NRI;
+                        reason = "SKIP";
+                    }
                     output.Add((foot, on, off, extrapolated, average, severity, reason));
                 }
                 return output;
@@ -79,9 +85,9 @@ namespace AccurateReportSystem
             var curAverages = new List<double>(extrapolatedData.Count);
             for (int i = 0; i < extrapolatedData.Count; ++i)
             {
-                (foot, on, off, extrapolated) = extrapolatedData[i];
-                var within100 = extrapolatedData.Where(value => Within100(foot, value.Footage));
-                var average = within100.Average(value => value.Off);
+                (foot, on, off, extrapolated, skipped) = extrapolatedData[i];
+                var within100 = extrapolatedData.Where(value => Within100(foot, value.Footage) && !value.isSkipped);
+                var average = (within100.Count() != 0 ? within100.Average(value => value.Off) : off);
                 curAverages.Add(average);
             }
             var curBaselines = Enumerable.Repeat(double.NaN, extrapolatedData.Count).ToList();
@@ -89,11 +95,11 @@ namespace AccurateReportSystem
             {
                 var start = Math.Max(center - 105, 0);
                 var end = Math.Min(center + 105, extrapolatedData.Count - 1);
-                var (centerFoot, centerOn, centerOff, centerExtrapolated) = extrapolatedData[center];
+                var (centerFoot, centerOn, centerOff, centerExtrapolated, centerSkipped) = extrapolatedData[center];
                 var centerAverage = curAverages[center];
                 for (int i = start; i <= end; ++i)
                 {
-                    var (curFoot, _, _, _) = extrapolatedData[i];
+                    var (curFoot, _, _, _, _) = extrapolatedData[i];
                     var curAverage = curAverages[i];
                     if (Within100(centerFoot, curFoot))
                     {
@@ -113,6 +119,11 @@ namespace AccurateReportSystem
                 }
                 var baseline = curBaselines[center];
                 var (severity, reason) = GetSeverity(centerOff, baseline);
+                if (centerSkipped)
+                {
+                    severity = PGESeverity.NRI;
+                    reason = "SKIP";
+                }
                 output.Add((centerFoot, centerOn, centerOff, centerExtrapolated, baseline, severity, reason));
             }
             return output;
@@ -181,7 +192,8 @@ namespace AccurateReportSystem
                 }
 
                 var (prevStart, prevEnd, prevSeverity) = prevData.Value;
-                if (severity == prevSeverity)
+                var withinSkipDist = curFoot - prevEnd <= SkipDistance;
+                if (severity == prevSeverity && withinSkipDist)
                 {
                     prevData = (prevStart, curFoot, prevSeverity);
                 }
@@ -190,8 +202,16 @@ namespace AccurateReportSystem
                     var middleFoot = (prevEnd + curFoot) / 2;
                     var prevColor = GetColor(prevSeverity);
                     if (prevColor.HasValue)
-                        colors.Add((prevStart, middleFoot, prevColor.Value));
-                    prevData = (middleFoot, curFoot, severity);
+                    {
+                        if (withinSkipDist)
+                            colors.Add((prevStart, middleFoot, prevColor.Value));
+                        else
+                            colors.Add((prevStart, prevEnd, prevColor.Value));
+                    }
+                    if (withinSkipDist)
+                        prevData = (middleFoot, curFoot, severity);
+                    else
+                        prevData = (curFoot, curFoot, severity);
                 }
             }
             if (prevData.HasValue)
