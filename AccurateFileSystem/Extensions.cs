@@ -28,7 +28,7 @@ namespace AccurateFileSystem
             return Math.PI * value / 180.0; ;
         }
 
-        private static (double Footage, double Distance) AlignPoint(this List<(double, BasicGeoposition)> points, BasicGeoposition otherGps, bool extrapolated)
+        public static (double Footage, double Distance) AlignPoint(this List<(double, BasicGeoposition)> points, BasicGeoposition otherGps, bool extrapolated)
         {
             int closestIndex = 0;
             double closestDistance = double.MaxValue;

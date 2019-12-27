@@ -13,7 +13,7 @@ namespace AccurateReportSystem
         public Color MinorColor { get; set; } = Colors.Blue;
         public Color ModerateColor { get; set; } = Colors.Green;
         public Color SevereColor { get; set; } = Colors.Red;
-        public List<(double Footage, double On, double Off, bool IsExtrapolated, double Baseline, PGESeverity Severity)> Data { get; set; }
+        public List<(double Footage, double On, double Off, bool IsExtrapolated, double Baseline, PGESeverity Severity, string Reason)> Data { get; set; }
         public double MinimumFeet { get; set; } = 5;
 
         public PGECISIndicationChartSeries(List<(double, double)> onData, List<(double, double)> offData, Chart chart) : base(chart.LegendInfo, chart.YAxesInfo)
@@ -37,7 +37,7 @@ namespace AccurateReportSystem
             Data = ExtrapolateData(data);
         }
 
-        private List<(double Footage, double On, double Off, bool IsExtrapolated, double Baseline, PGESeverity Severity)> ExtrapolateData(List<(double Footage, double On, double Off)> data)
+        private List<(double Footage, double On, double Off, bool IsExtrapolated, double Baseline, PGESeverity Severity, string Reason)> ExtrapolateData(List<(double Footage, double On, double Off)> data)
         {
 
             var extrapolatedData = new List<(double Footage, double On, double Off, bool IsExtrapolated)>();
@@ -63,7 +63,7 @@ namespace AccurateReportSystem
             var (foot, on, off) = data.Last();
             extrapolatedData.Add((foot, on, off, false));
             bool extrapolated;
-            var output = new List<(double, double, double, bool, double, PGESeverity)>(extrapolatedData.Count);
+            var output = new List<(double, double, double, bool, double, PGESeverity, string)>(extrapolatedData.Count);
             if (foot <= 200)
             {
                 var average = extrapolatedData.Average(value => value.Off);
@@ -71,8 +71,8 @@ namespace AccurateReportSystem
                 {
                     (foot, on, off, extrapolated) = extrapolatedData[i];
                     var changeInBaseline = Math.Abs(off - average);
-                    PGESeverity severity = GetSeverity(off, average);
-                    output.Add((foot, on, off, extrapolated, average, severity));
+                    var (severity, reason) = GetSeverity(off, average);
+                    output.Add((foot, on, off, extrapolated, average, severity, reason));
                 }
                 return output;
             }
@@ -112,22 +112,28 @@ namespace AccurateReportSystem
                     }
                 }
                 var baseline = curBaselines[center];
-                PGESeverity severity = GetSeverity(centerOff, baseline);
-                output.Add((centerFoot, centerOn, centerOff, centerExtrapolated, baseline, severity));
+                var (severity, reason) = GetSeverity(centerOff, baseline);
+                output.Add((centerFoot, centerOn, centerOff, centerExtrapolated, baseline, severity, reason));
             }
             return output;
         }
 
-        private PGESeverity GetSeverity(double off, double baseline)
+        private (PGESeverity, string) GetSeverity(double off, double baseline)
         {
             var changeInBaseline = Math.Abs(off - baseline);
-            if (off > -0.5 || (off > -0.7 && changeInBaseline >= 0.2))
-                return PGESeverity.Severe;
-            if (off > -0.7 || (off > -0.85 && changeInBaseline >= 0.2))
-                return PGESeverity.Moderate;
-            if (off > -0.85 || changeInBaseline >= 0.2)
-                return PGESeverity.Minor;
-            return PGESeverity.NRI;
+            if (off > -0.5)
+                return (PGESeverity.Severe, "Off is less than -0.500");
+            if (off > -0.7 && changeInBaseline >= 0.2)
+                return (PGESeverity.Severe, "Off is between -0.700 and -0.501 and difference in baseline is greater than 0.200");
+            if (off > -0.7)
+                return (PGESeverity.Moderate, "Off is between -0.700 and -0.501");
+            if (off > -0.85 && changeInBaseline >= 0.2)
+                return (PGESeverity.Moderate, "Off is between -0.850 and -0.701 and difference in baseline is greater than 0.200");
+            if (off > -0.85)
+                return (PGESeverity.Minor, "Off is between -0.850 and -0.701");
+            if (changeInBaseline >= 0.2)
+                return (PGESeverity.Minor, "difference in baseline is greater than 0.200");
+            return (PGESeverity.NRI, "");
         }
 
         private bool Within100(double footage, double checkFootage)
@@ -143,7 +149,7 @@ namespace AccurateReportSystem
             (double Footage, PGESeverity Severity)? lastData = null;
             for (int i = 0; i < Data.Count; ++i)
             {
-                var (curFoot, _, _, _, _, severity) = Data[i];
+                var (curFoot, _, _, _, _, severity, _) = Data[i];
                 if (curFoot < page.StartFootage)
                 {
                     firstData = (curFoot, severity);

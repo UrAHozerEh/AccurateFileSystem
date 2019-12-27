@@ -24,38 +24,81 @@ namespace AccurateReportSystem
             DcvgSeries = dcvgSeries;
         }
 
-        public string GetAllData()
+        public List<(double Start, double End, PGESeverity CisSeverity, PGESeverity DcvgSeverity, int Overall, string Comments)> GetReportQ()
         {
-            var output = new StringBuilder();
+            var output = new List<(double, double, PGESeverity, PGESeverity, int, string)>();
             var lastFoot = 0.0;
 
-            var cisSeverities = new Dictionary<int, PGESeverity>();
+            var cisSeverities = new Dictionary<int, (PGESeverity, string)>();
             if (CisSeries != null)
             {
-                foreach (var (foot, _, _, _, _, severity) in CisSeries.Data)
+                foreach (var (foot, _, _, _, _, severity, reason) in CisSeries.Data)
                 {
                     if (foot > lastFoot)
                         lastFoot = foot;
-                    cisSeverities.Add((int)foot, severity);
+                    cisSeverities.Add((int)foot, (severity, reason));
                 }
             }
-            var dcvgSeverities = new Dictionary<int, PGESeverity>();
+            var dcvgSeverities = new Dictionary<int, (PGESeverity, string)>();
             if (DcvgSeries != null)
             {
-                foreach (var (foot, _, severity) in DcvgSeries.Data)
+                foreach (var (_, foot, _, severity, reason) in DcvgSeries.Data)
                 {
                     if (foot > lastFoot)
                         lastFoot = foot;
-                    dcvgSeverities.Add((int)foot, severity);
+                    if (!dcvgSeverities.ContainsKey((int)foot))
+                        dcvgSeverities.Add((int)foot, (severity, reason));
                 }
             }
+            var lastStartFoot = 0;
+            var lastEndFoot = 0;
+            var lastDcvgSeverity = PGESeverity.NRI;
+            var lastDcvgReason = "";
+            if (dcvgSeverities.ContainsKey(0))
+                (lastDcvgSeverity, lastDcvgReason) = dcvgSeverities[0];
 
-            for (var curFoot = 0; curFoot <= lastFoot; ++curFoot)
+            var lastCisSeverity = PGESeverity.NRI;
+            var lastCisReason = "";
+            if (cisSeverities.ContainsKey(0))
+                (lastCisSeverity, lastCisReason) = cisSeverities[0];
+
+            for (var curFoot = 1; curFoot <= lastFoot; ++curFoot)
             {
+                var (curDcvgSeverity, curDcvgReason) = (PGESeverity.NRI, "");
+                if (dcvgSeverities.ContainsKey(curFoot))
+                    (curDcvgSeverity, curDcvgReason) = dcvgSeverities[curFoot];
 
+                var (curCisSeverity, curCisReason) = (PGESeverity.NRI, "");
+                if (cisSeverities.ContainsKey(curFoot))
+                    (curCisSeverity, curCisReason) = cisSeverities[curFoot];
+
+                if (curCisSeverity != lastCisSeverity || curCisReason != lastCisReason || curDcvgSeverity != lastDcvgSeverity || curDcvgReason != lastDcvgReason)
+                {
+                    var lastPrio = GetPriority(lastCisSeverity, lastDcvgSeverity, PGESeverity.NRI);
+                    var fullReason = lastCisReason;
+                    if (string.IsNullOrWhiteSpace(fullReason))
+                        fullReason = lastDcvgReason;
+                    else
+                        fullReason += ". " + lastDcvgReason;
+                    output.Add((lastStartFoot, lastEndFoot, lastCisSeverity, lastDcvgSeverity, lastPrio, fullReason.Trim()));
+                    lastStartFoot = curFoot;
+                    lastCisReason = curCisReason;
+                    lastCisSeverity = curCisSeverity;
+                    lastDcvgReason = curDcvgReason;
+                    lastDcvgSeverity = curDcvgSeverity;
+                }
+                lastEndFoot = curFoot;
             }
 
-            return output.ToString();
+            var finalPrio = GetPriority(lastCisSeverity, lastDcvgSeverity, PGESeverity.NRI);
+            var finalReason = lastCisReason;
+            if (string.IsNullOrWhiteSpace(finalReason))
+                finalReason = lastDcvgReason;
+            else
+                finalReason += ". " + lastDcvgReason;
+            output.Add((lastStartFoot, lastEndFoot, lastCisSeverity, lastDcvgSeverity, finalPrio, finalReason));
+
+            return output;
         }
 
         public override List<(double Start, double End, Color Color)> GetColorBounds(PageInformation page)
@@ -63,7 +106,7 @@ namespace AccurateReportSystem
             var cisSeverities = new Dictionary<int, PGESeverity>();
             if (CisSeries != null)
             {
-                foreach (var (foot, _, _, _, _, severity) in CisSeries.Data)
+                foreach (var (foot, _, _, _, _, severity, _) in CisSeries.Data)
                 {
                     if (foot < page.StartFootage)
                         continue;
@@ -75,13 +118,14 @@ namespace AccurateReportSystem
             var dcvgSeverities = new Dictionary<int, PGESeverity>();
             if (DcvgSeries != null)
             {
-                foreach (var (foot, _, severity) in DcvgSeries.Data)
+                foreach (var (foot, _, _, severity, _) in DcvgSeries.Data)
                 {
                     if (foot < page.StartFootage)
                         continue;
                     if (foot > page.EndFootage)
                         break;
-                    dcvgSeverities.Add((int)foot, severity);
+                    if (!dcvgSeverities.ContainsKey((int)foot))
+                        dcvgSeverities.Add((int)foot, severity);
                 }
             }
 
