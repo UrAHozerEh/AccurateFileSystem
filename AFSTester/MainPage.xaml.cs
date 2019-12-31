@@ -51,6 +51,7 @@ namespace AFSTester
         public MainPage()
         {
             this.InitializeComponent();
+            MapControl.StyleSheet = MapStyleSheet.Aerial();
             FileTreeView.RootNodes.Add(HiddenNode);
             var xml = new XmlDocument();
             try
