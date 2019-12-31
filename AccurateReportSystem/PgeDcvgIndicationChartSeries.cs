@@ -25,6 +25,29 @@ namespace AccurateReportSystem
             Data = new List<(double Footage, double ActualFoot, double Percent, PGESeverity Severity, string)>();
             foreach (var (foot, percent) in data)
             {
+                // ACVG
+                var severity = PGESeverity.NRI;
+                var reason = "Individual normalized ACVG indications are less than 25";
+                if (percent >= 75)
+                {
+                    severity = PGESeverity.Severe;
+                    reason = "Individual normalized ACVG indications are greater than or equal to 75";
+                }
+                else if (percent >= 50)
+                {
+                    severity = PGESeverity.Moderate;
+                    reason = "Individual normalized ACVG indications are greater than or equal to 50 and less than 75";
+                }
+                else if (percent >= 25)
+                {
+                    severity = PGESeverity.Minor;
+                    reason = "Individual normalized ACVG indications are greater than or equal to 25 and less than 50";
+                }
+                for (double curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
+                {
+                    Data.Add((curFoot, foot, percent, severity, reason));
+                }
+                /*
                 var severity = PGESeverity.NRI;
                 var reason = "DCVG % IR is greater than 0 and less than or equal to 15";
                 if (percent > 60)
@@ -46,6 +69,7 @@ namespace AccurateReportSystem
                 {
                     Data.Add((curFoot, foot, percent, severity, reason));
                 }
+                */
             }
         }
 
