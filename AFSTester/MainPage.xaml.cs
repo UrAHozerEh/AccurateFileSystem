@@ -507,8 +507,11 @@ namespace AFSTester
             onOffGraph.Series.Add(redLine);
             onOffGraph.DrawTopBorder = false;
 
-            var dcvgLabels = dcvgData.Select((value) => (value.Item1, value.Item2.ToString("F1") + "%")).ToList();
-            var dcvgIndication = new PointWithLabelGraphSeries("DCVG Indication", -0.2, dcvgLabels)
+            // ACVG
+            var dcvgLabels = dcvgData.Select((value) => (value.Item1, value.Item2.ToString("F1") /*+ "%"*/)).ToList();
+
+            // ACVG
+            var dcvgIndication = new PointWithLabelGraphSeries("ACVG Indication", -0.2, dcvgLabels)
             {
                 ShapeRadius = 3,
                 PointColor = Colors.Red,
@@ -1333,6 +1336,25 @@ namespace AFSTester
                         }
                     }
                 }
+                var correction = 15.563025007672872650175335959592166719366374913056088;
+
+                var curHardGps = new BasicGeoposition()
+                {
+                    Latitude = 38.468252981,
+                    Longitude = -122.745688108
+                };
+                var curHardFoot = combinedFootages.AlignPoint(curHardGps, false);
+                dcvgData.Add((curHardFoot.Footage, 29 - correction));
+
+                curHardGps = new BasicGeoposition()
+                {
+                    Latitude = 38.328751459,
+                    Longitude = -122.737339361
+                };
+                curHardFoot = combinedFootages.AlignPoint(curHardGps, false);
+                //dcvgData.Add((curHardFoot.Footage, 67 - correction));
+
+
                 dcvgData.Sort((first, second) => first.Item1.CompareTo(second.Item1));
                 MakeIITGraphs(combinedFile, dcvgData);
             }
