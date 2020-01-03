@@ -48,6 +48,7 @@ namespace AccurateFileSystem
                 case ".xls":
                 case ".zip":
                 case ".pdf":
+                case ".acvg":
                     return null;
                 default:
                     throw new Exception($"File is an unknown file format '{extension}'");
@@ -97,7 +98,7 @@ namespace AccurateFileSystem
                             sampleRate = int.Parse(value);
                             break;
                         default:
-                            return null; 
+                            return null;
                             //throw new Exception($"Unexpected label in Waveform header. Filename: '{FileName}' Label: '{label}'");
                     }
 
@@ -162,6 +163,7 @@ namespace AccurateFileSystem
                 if (!line.Contains("Start survey:")) throw new Exception();
                 Match extraCommasMatch = Regex.Match(line, ",+");
                 string extraCommasShort = extraCommasMatch.Success ? extraCommasMatch.Value.Substring(1) : "";
+                double? startFoot = null;
                 while (!reader.EndOfStream)
                 {
                     line = reader.ReadLine().Trim();
@@ -194,7 +196,10 @@ namespace AccurateFileSystem
                             point = ParseAllegroLineFromACI(pointId, line);
                         else
                             point = ParseAllegroLineFromCSV(pointId, line);
-
+                        if (startFoot == null)
+                            startFoot = point.Footage;
+                        if (extension != ".dvg")
+                            point.Footage -= startFoot ?? 0;
                         points.Add(pointId, point);
                         ++pointId;
                     }

@@ -11,7 +11,7 @@ namespace AccurateFileSystem
     public class AllegroDataPoint
     {
         public int Id { get; }
-        public double Footage { get; private set; }
+        public double Footage { get; set; }
         public double On { get; set; }
         public double MirOnOffset { get; set; }
         public double MirOn => On - MirOnOffset;
@@ -80,9 +80,13 @@ namespace AccurateFileSystem
             {
                 Depth = double.Parse(doc.Groups[1].Value);
                 OriginalComment = OriginalComment.Replace(doc.Value, "");
+                
                 OriginalComment = Regex.Replace(OriginalComment, "^\\s*,\\s*", "");
                 OriginalComment = Regex.Replace(OriginalComment, "\\s*,\\s*$", "");
             }
+            var vaultMatch = Regex.Match(OriginalComment, "(?i)valt");
+            if(vaultMatch.Success)
+                OriginalComment = Regex.Replace(OriginalComment, vaultMatch.Value, "Vault");
 
             if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
