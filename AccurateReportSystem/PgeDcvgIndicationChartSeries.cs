@@ -15,61 +15,66 @@ namespace AccurateReportSystem
         public Color SevereColor { get; set; } = Colors.Red;
         public double MinimumFeet { get; set; } = 3;
 
-        public PgeDcvgIndicationChartSeries(List<(double, double)> data, Chart chart) : this(data, chart.LegendInfo, chart.YAxesInfo)
+        public PgeDcvgIndicationChartSeries(List<(double, double)> data, Chart chart, bool isDcvg) : this(data, chart.LegendInfo, chart.YAxesInfo, isDcvg)
         {
 
         }
 
-        public PgeDcvgIndicationChartSeries(List<(double, double)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo) : base(masterLegendInfo, masterYAxesInfo)
+        public PgeDcvgIndicationChartSeries(List<(double, double)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo, bool isDcvg) : base(masterLegendInfo, masterYAxesInfo)
         {
             Data = new List<(double Footage, double ActualFoot, double Percent, PGESeverity Severity, string)>();
             foreach (var (foot, percent) in data)
             {
-                // ACVG
-                var severity = PGESeverity.NRI;
-                var reason = "Individual normalized ACVG indications are less than 25";
-                if (percent >= 75)
+                if (!isDcvg)
                 {
-                    severity = PGESeverity.Severe;
-                    reason = "Individual normalized ACVG indications are greater than or equal to 75";
+                    //ACVG
+                    var severity = PGESeverity.NRI;
+                    var reason = "Individual normalized ACVG indications are less than 25";
+                    if (percent >= 75)
+                    {
+                        severity = PGESeverity.Severe;
+                        reason = "Individual normalized ACVG indications are greater than or equal to 75";
+                    }
+                    else if (percent >= 50)
+                    {
+                        severity = PGESeverity.Moderate;
+                        reason = "Individual normalized ACVG indications are greater than or equal to 50 and less than 75";
+                    }
+                    else if (percent >= 25)
+                    {
+                        severity = PGESeverity.Minor;
+                        reason = "Individual normalized ACVG indications are greater than or equal to 25 and less than 50";
+                    }
+                    for (double curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
+                    {
+                        Data.Add((curFoot, foot, percent, severity, reason));
+                    }
                 }
-                else if (percent >= 50)
+                else
                 {
-                    severity = PGESeverity.Moderate;
-                    reason = "Individual normalized ACVG indications are greater than or equal to 50 and less than 75";
+                    //DCVG
+                    var severity = PGESeverity.NRI;
+                    var reason = "DCVG % IR is greater than 0 and less than or equal to 15";
+                    if (percent > 60)
+                    {
+                        severity = PGESeverity.Severe;
+                        reason = "DCVG % IR is greater than 60";
+                    }
+                    else if (percent > 35)
+                    {
+                        severity = PGESeverity.Moderate;
+                        reason = "DCVG % IR is greater than 35 and less than or equal to 60";
+                    }
+                    else if (percent > 15)
+                    {
+                        severity = PGESeverity.Minor;
+                        reason = "DCVG % IR is greater than 15 and less than or equal to 35";
+                    }
+                    for (double curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
+                    {
+                        Data.Add((curFoot, foot, percent, severity, reason));
+                    }
                 }
-                else if (percent >= 25)
-                {
-                    severity = PGESeverity.Minor;
-                    reason = "Individual normalized ACVG indications are greater than or equal to 25 and less than 50";
-                }
-                for (double curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
-                {
-                    Data.Add((curFoot, foot, percent, severity, reason));
-                }
-                /*
-                var severity = PGESeverity.NRI;
-                var reason = "DCVG % IR is greater than 0 and less than or equal to 15";
-                if (percent > 60)
-                {
-                    severity = PGESeverity.Severe;
-                    reason = "DCVG % IR is greater than 60";
-                }
-                else if (percent > 35)
-                {
-                    severity = PGESeverity.Moderate;
-                    reason = "DCVG % IR is greater than 35 and less than or equal to 60";
-                }
-                else if (percent > 15)
-                {
-                    severity = PGESeverity.Minor;
-                    reason = "DCVG % IR is greater than 15 and less than or equal to 35";
-                }
-                for(double curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
-                {
-                    Data.Add((curFoot, foot, percent, severity, reason));
-                }
-                */
             }
         }
 
@@ -97,7 +102,7 @@ namespace AccurateReportSystem
                 }
 
                 var (prevStart, prevEnd, prevSeverity) = prevData.Value;
-                if(curFoot - prevEnd > MinimumFeet)
+                if (curFoot - prevEnd > MinimumFeet)
                 {
                     var prevColor = GetColor(prevSeverity);
                     if (prevColor.HasValue)
