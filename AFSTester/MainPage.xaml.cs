@@ -696,7 +696,7 @@ namespace AFSTester
             }
             reportLString += "\n" + reportLNext;
 
-            reportQ = "HCA ID	Route	Milepost		Station		ECDA Region	Length (Feet)	Depth of Cover (Inches)	GPS Coordinates				IIT Severity Classifications			\nStart	End	Start	End				Start Latitude	Start Longitude	End Latitude	End Longitude	CIS 	DCVG	Overall	Comments" + reportQ;
+            reportQ = "\n\n" + reportQ;
             skipReportString = "\n\n" + skipReportString;
             depthString = "\n\n" + depthString;
 
@@ -767,7 +767,7 @@ namespace AFSTester
             workbook.Workbook.Sheets.AppendChild(sheet);
 
             var mergeCells = new MergeCells();
-            sheet.InsertAfterSelf(mergeCells);
+            //sheet.InsertAfterSelf(mergeCells);
             foreach (var mergeCellString in mergeCellStrings)
             {
                 var mergeCell = new MergeCell() { Reference = new DocumentFormat.OpenXml.StringValue(mergeCellString) };
@@ -1074,7 +1074,7 @@ namespace AFSTester
             MakeGraphs(test);
         }
 
-        private async void MakeNustarGraphs()
+        private async void MakeNustarGraphs(object sender, RoutedEventArgs e)
         {
             var mainOnOffData = new List<(double, double)>
             {
@@ -1288,8 +1288,109 @@ namespace AFSTester
 (1022,24,"24"),
 
             };
+
             await CreateNustarGraph("Main Line", "Main Line", mainOnOffData, mainComments, mainHotAnoms, mainACVG);
 
+            var lat2OnOffData = new List<(double, double)>
+            {
+                (1332,-14.8),
+(1342,54.8),
+(1352,-41.4),
+(1362,-23),
+(1372,-27.7),
+(1382,17.6),
+(1392,8.7),
+(1402,12.9),
+(1412,24.5),
+(1422,29.8),
+(1432,-27),
+(1442,-7.7),
+(1452,-7.8),
+(1462,-0.4),
+
+            };
+            var lat2Comments = new List<(double, string)>
+            {
+                (1332,"Left: -0.0028, Right: 0.0016"),
+(1352,"Left: -0.0308, Right: -0.0162"),
+(1412,"Bend in Pipe"),
+(1432,"Left: -0.0148, Right: 0.0047"),
+(1452,"Bend in Pipe"),
+(1462,"Side Drain Reading , End at boiler room riser"),
+            };
+            var lat2HotAnoms = new List<(double, double, string)>
+            {
+                (1332,-14.8,""),
+(1352,-41.4,""),
+(1432,-27,""),
+            };
+            var lat2ACVG = new List<(double, double, string)>
+            {
+            };
+
+            await CreateNustarGraph("Lateral 2", "Lateral 2", lat2OnOffData, lat2Comments, lat2HotAnoms, lat2ACVG);
+
+            var lat1OnOffData = new List<(double, double)>
+            {
+                (1462,-5.2),
+(1472,-4.9),
+(1482,0),
+(1492,-0.9),
+(1502,1.6),
+(1512,-0.7),
+(1522,-6.1),
+            };
+            var lat1Comments = new List<(double, string)>
+            {
+                (1492,"Left: 0.0164, Right: -0.0026"),
+(1522,"Side Drain Reading , End at riser Left: 0.0183, Right: 0.0238"),
+            };
+            var lat1HotAnoms = new List<(double, double, string)>
+            {
+                (1492,-0.9,""),
+(1522,-6.1,""),
+            };
+            var lat1ACVG = new List<(double, double, string)>
+            {
+            };
+
+            await CreateNustarGraph("Lateral 1", "Lateral 1", lat1OnOffData, lat1Comments, lat1HotAnoms, lat1ACVG);
+
+            var toBuildingOnOffData = new List<(double, double)>
+            {
+                (1522,3.7),
+(1532,-1.7),
+(1542,-17.7),
+(1552,-7.8),
+(1562,-7),
+(1572,-7.1),
+(1582,2.3),
+(1592,0.9),
+(1602,-0.7),
+(1612,-4.2),
+(1622,-0.7),
+(1632,5),
+(1642,4.5),
+(1652,-6.6),
+            };
+            var toBuildingComments = new List<(double, string)>
+            {
+                (1542,"Left: -0.0047, Right: -0.0019"),
+(1612,"Left: -0.0038, Right: -0.0012"),
+(1642,"House, pipe runs under building"),
+(1652,"Side Drain Reading , End of Svy at 3/4 riser RO room Left: 0.0007, Right: -0.008"),
+            };
+            var toBuildingHotAnoms = new List<(double, double, string)>
+            {
+                (1542,-17.7,""),
+(1612,-4.2,""),
+(1652,-6.6,""),
+            };
+            var toBuildingACVG = new List<(double, double, string)>
+            {
+            };
+
+            await CreateNustarGraph("To Building", "To Building", toBuildingOnOffData, toBuildingComments, toBuildingHotAnoms, toBuildingACVG);
         }
 
         private async Task CreateNustarGraph(string fileName, string title, List<(double, double)> onData, List<(double, string)> comments, List<(double, double, string)> hotspotAnoms, List<(double, double, string)> acvgAnoms)
@@ -1359,7 +1460,17 @@ namespace AFSTester
             splitContainer.AddContainer(onOffGraph);
             splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
             report.Container = splitContainer;
-            var pages = report.PageSetup.GetAllPages(on.Values.First().Item1, on.Values.Last().Item1);
+
+            var start = on.Values.First().Item1;
+            var end = on.Values.Last().Item1;
+            var distance = end - start;
+            if(distance < 500)
+            {
+                report.PageSetup.Overlap = 10;
+                report.PageSetup.FootagePerPage = 100;
+            }
+
+            var pages = report.PageSetup.GetAllPages(start, distance);
 
             for (int i = 0; i < pages.Count; ++i)
             {
@@ -1465,7 +1576,7 @@ namespace AFSTester
             catch
             {
                 //MakeIITGraphs(null);
-                MakeNustarGraphs();
+                //MakeNustarGraphs();
                 return;
             }
 
@@ -1480,13 +1591,14 @@ namespace AFSTester
             var isDcvg = folder.DisplayName == "DCVG";
             var folders = await folder.GetFoldersAsync();
             var correction = 15.563025007672872650175335959592166719366374913056088;
-            var acvgReads = new List<(BasicGeoposition, double)>();
+            
 
             foreach (var curFolder in folders)
             {
                 var files = await curFolder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
                 var cisFiles = new List<AllegroCISFile>();
                 var dcvgFiles = new List<AllegroCISFile>();
+                var acvgReads = new List<(BasicGeoposition, double)>();
                 foreach (var file in files)
                 {
                     var factory = new FileFactory(file);
@@ -1525,6 +1637,8 @@ namespace AFSTester
                         }
                     }
                 }
+                if (cisFiles.Count == 0)
+                    return;
                 cisFiles.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
                 for (int i = 0; i < cisFiles.Count; ++i)
                 {

@@ -49,6 +49,7 @@ namespace AccurateFileSystem
                 case ".zip":
                 case ".pdf":
                 case ".acvg":
+                case ".png":
                     return null;
                 default:
                     throw new Exception($"File is an unknown file format '{extension}'");
