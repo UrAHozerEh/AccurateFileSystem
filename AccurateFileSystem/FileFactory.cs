@@ -154,6 +154,7 @@ namespace AccurateFileSystem
                 default:
                     throw new Exception();
             }
+            FileType type = FileType.Unknown;
             using (var stream = await File.OpenStreamForReadAsync())
             using (var reader = new StreamReader(stream))
             {
@@ -165,6 +166,8 @@ namespace AccurateFileSystem
                 Match extraCommasMatch = Regex.Match(line, ",+");
                 string extraCommasShort = extraCommasMatch.Success ? extraCommasMatch.Value.Substring(1) : "";
                 double? startFoot = null;
+                AllegroDataPoint lastPoint = null;
+                
                 while (!reader.EndOfStream)
                 {
                     line = reader.ReadLine().Trim();
@@ -182,6 +185,23 @@ namespace AccurateFileSystem
                         {
                             value = value.Replace(":", "");
                             isHeader = false;
+                            if (header.ContainsKey("survey_type"))
+                            {
+                                if (header["survey_type"] == "DC Survey")
+                                {
+                                    if (header.ContainsKey("onoff"))
+                                    {
+                                        if (header["onoff"] == "T")
+                                            type = FileType.OnOff;
+                                        else
+                                            type = FileType.Native;
+                                    }
+                                }
+                                else if (header["survey_type"] == "DCVG Survey")
+                                {
+                                    type = FileType.DCVG;
+                                }
+                            }
                         }
                         (key, value) = FixHeaderKeyValue(key, value);
                         header.Add(key, value);
@@ -201,27 +221,20 @@ namespace AccurateFileSystem
                             startFoot = point.Footage;
                         if (extension != ".dvg")
                             point.Footage -= startFoot ?? 0;
-                        points.Add(pointId, point);
+                        if (lastPoint != null && type == FileType.OnOff && lastPoint.Footage + 20 == point.Footage)
+                        {
+                            var extrapolatedOn = (lastPoint.On + point.On) / 2;
+                            var extrapolatedOff = (lastPoint.Off + point.Off) / 2;
+                            var curGps = point.HasGPS ? point.GPS : lastPoint.GPS;
+                            var extrapolatedPoint = new AllegroDataPoint(point.Id, lastPoint.Footage + 10, extrapolatedOn, extrapolatedOff, curGps, point.Times, point.IndicationValue, "");
+                            point.Id = point.Id + 1;
+                            points.Add(extrapolatedPoint.Id, extrapolatedPoint);
+                            ++pointId;
+                        }
+                        points.Add(point.Id, point);
+                        lastPoint = point;
                         ++pointId;
                     }
-                }
-            }
-            FileType type = FileType.Unknown;
-            if (header.ContainsKey("survey_type"))
-            {
-                if (header["survey_type"] == "DC Survey")
-                {
-                    if (header.ContainsKey("onoff"))
-                    {
-                        if (header["onoff"] == "T")
-                            type = FileType.OnOff;
-                        else
-                            type = FileType.Native;
-                    }
-                }
-                else if (header["survey_type"] == "DCVG Survey")
-                {
-                    type = FileType.DCVG;
                 }
             }
             var output = new AllegroCISFile(FileName, extension, header, points, type);

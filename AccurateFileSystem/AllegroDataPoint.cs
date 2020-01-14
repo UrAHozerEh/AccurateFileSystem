@@ -10,7 +10,7 @@ namespace AccurateFileSystem
 {
     public class AllegroDataPoint
     {
-        public int Id { get; }
+        public int Id { get; set; }
         public double Footage { get; set; }
         public double On { get; set; }
         public double MirOnOffset { get; set; }
@@ -67,25 +67,44 @@ namespace AccurateFileSystem
             GPS = gps;
             Times = times;
             IndicationValue = indicationValue;
-            ParseComment();
+            ParseComment(true);
         }
 
-        private void ParseComment()
+        private void ParseComment(bool removeDoc)
         {
             if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
             string docPattern = @"(?i)DOC:?\s?(\d+)\s?(in)?";
+            string docFootInchPattern = @"(?i)DOC:?\s?(\d+)'(\d*)\s?(in)?";
             var doc = Regex.Match(OriginalComment, docPattern);
-            if (doc.Success)
+            var docFoot = Regex.Match(OriginalComment, docFootInchPattern);
+            if (docFoot.Success)
+            {
+                var feet = double.Parse(docFoot.Groups[1].Value);
+                double inches = 0;
+                double.TryParse(docFoot.Groups[2].Value, out inches);
+                Depth = feet * 12 + inches;
+                if (removeDoc)
+                {
+                    OriginalComment = OriginalComment.Replace(docFoot.Value, "");
+
+                    OriginalComment = Regex.Replace(OriginalComment, "^\\s*,\\s*", "");
+                    OriginalComment = Regex.Replace(OriginalComment, "\\s*,\\s*$", "");
+                }
+            }
+            else if (doc.Success)
             {
                 Depth = double.Parse(doc.Groups[1].Value);
-                OriginalComment = OriginalComment.Replace(doc.Value, "");
-                
-                OriginalComment = Regex.Replace(OriginalComment, "^\\s*,\\s*", "");
-                OriginalComment = Regex.Replace(OriginalComment, "\\s*,\\s*$", "");
+                if (removeDoc)
+                {
+                    OriginalComment = OriginalComment.Replace(doc.Value, "");
+
+                    OriginalComment = Regex.Replace(OriginalComment, "^\\s*,\\s*", "");
+                    OriginalComment = Regex.Replace(OriginalComment, "\\s*,\\s*$", "");
+                }
             }
             var vaultMatch = Regex.Match(OriginalComment, "(?i)valt");
-            if(vaultMatch.Success)
+            if (vaultMatch.Success)
                 OriginalComment = Regex.Replace(OriginalComment, vaultMatch.Value, "Vault");
 
             if (string.IsNullOrWhiteSpace(OriginalComment))

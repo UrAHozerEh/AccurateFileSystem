@@ -322,7 +322,7 @@ namespace AFSTester
                 //Title = "PG&E LS 3008-01 MP 6.58 to MP 8.01"
                 //Title = "PG&E LS 191-1 MP 16.79 to MP 30.1000"
                 //Title = "PG&E LS 191A MP 0 to MP 4.83"
-                Title = "PG&E LS 3001-01 MP 3.1300 to MP 4.1671"
+                Title = "PG&E LS 210B MP 13.03 to MP 25.98"
                 //Title = "PG&E LS 3017-01 MP 0.4300 to MP 7.5160"
                 //Title = "PG&E LS L131 MP 26.1018 to MP 27.0150"
                 //Title = "PG&E DREG11309 MP 0.0000 to MP 0.0100"
@@ -340,8 +340,12 @@ namespace AFSTester
             //};
             var chart1 = new Chart(report, "Survey Direction");
             var chart2 = new Chart(report, "850 Data");
+            chart2.LegendInfo.SeriesNameFontSize = 8f;
+            chart2.LegendInfo.NameFontSize = 16f;
+
             var mirSeries = new MirDirection(allegroFile.GetReconnects());
-            var exceptions = new OnOff850ExceptionChartSeties(allegroFile.GetCombinedMirData(), chart2.LegendInfo, chart2.YAxesInfo);
+            var exceptions = new OnOff850ExceptionChartSeries(allegroFile.GetCombinedMirData(), chart2.LegendInfo, chart2.YAxesInfo);
+            exceptions.LegendLabelSplit = 0.5f;
             chart2.Series.Add(exceptions);
             //chart1.LegendInfo.NameFontSize = 18f;
 
@@ -371,7 +375,7 @@ namespace AFSTester
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
                 var image = report.GetImage(page, 300);
-                var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"Test Page {pageString}" + ".png", CreationCollisionOption.ReplaceExisting);
+                var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{topGlobalXAxis.Title} Page {pageString}" + ".png", CreationCollisionOption.ReplaceExisting);
                 using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
                 {
                     await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
@@ -404,7 +408,7 @@ namespace AFSTester
                 onData = file.GetDoubleData("On");
                 commentData = file.GetCommentData("Comment");
                 directionData = file.GetDirectionData();
-                if(onData.Count == 1)
+                if (onData.Count == 1)
                 {
                     onData.Add((5, onData[0].Item2));
                     offData.Add((5, offData[0].Item2));
@@ -711,16 +715,16 @@ namespace AFSTester
             outputString += depthString;
             outputString += "\nReport L\n";
             outputString += reportLString;
-            await FileIO.WriteTextAsync(outputFile, outputString);
-            var outStream = await outputFile.OpenStreamForWriteAsync();
+            //await FileIO.WriteTextAsync(outputFile, outputString);
+            using (var outStream = await outputFile.OpenStreamForWriteAsync())
             using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
             {
                 var wbPart = spreadDoc.AddWorkbookPart();
                 wbPart.Workbook = new Workbook();
                 wbPart.Workbook.AppendChild(new Sheets());
                 AddData(wbPart, reportLString, 1, "Report L", new List<string>());
-                AddData(wbPart, reportQ, 2, "Report Q",new List<string>() {"A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
-                AddData(wbPart, skipReportString, 3, "CIS Skip Report", new List<string>() { "A1:B1", "C1:C2", "D1:G1"});
+                AddData(wbPart, reportQ, 2, "Report Q", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
+                AddData(wbPart, skipReportString, 3, "CIS Skip Report", new List<string>() { "A1:B1", "C1:C2", "D1:G1" });
                 AddData(wbPart, skipReportString, 4, $"{indicationLabel} Skip Report", new List<string>() { "A1:B1", "C1:C2", "D1:G1" });
                 AddData(wbPart, testStation, 5, "Test Station and Coupon Data", new List<string>());
                 AddData(wbPart, depthString, 6, "Depth Exception", new List<string>() { "A1:B1", "C1:C2", "D1:D2", "E1:H1" });
@@ -742,7 +746,7 @@ namespace AFSTester
                 SheetId = (UInt32)worksheetId,
                 Name = worksheetName
             };
-            
+
             UInt32 rowIndex = 1;
             foreach (var line in lines)
             {
@@ -1070,7 +1074,7 @@ namespace AFSTester
                 }
             }
 
-            var test = CombinedAllegroCISFile.CombineFiles("Testing", files);
+            var test = CombinedAllegroCISFile.CombineFiles(files.First().Header["segment"].Trim(), files);
             MakeGraphs(test);
         }
 
@@ -1464,7 +1468,7 @@ namespace AFSTester
             var start = on.Values.First().Item1;
             var end = on.Values.Last().Item1;
             var distance = end - start;
-            if(distance < 500)
+            if (distance < 500)
             {
                 report.PageSetup.Overlap = 10;
                 report.PageSetup.FootagePerPage = 100;
@@ -1513,7 +1517,7 @@ namespace AFSTester
                     else
                         onOffFiles.Add(file);
                 }
-                var combinedFile = CombinedAllegroCISFile.CombineFiles("Combined", onOffFiles);
+                var combinedFile = CombinedAllegroCISFile.CombineOrderedFiles("Combined", onOffFiles, 10);
                 var combinedFootages = new List<(double, BasicGeoposition)>();
                 foreach (var (foot, _, point, _, _) in combinedFile.Points)
                 {
@@ -1591,7 +1595,7 @@ namespace AFSTester
             var isDcvg = folder.DisplayName == "DCVG";
             var folders = await folder.GetFoldersAsync();
             var correction = 15.563025007672872650175335959592166719366374913056088;
-            
+
 
             foreach (var curFolder in folders)
             {
@@ -1655,6 +1659,7 @@ namespace AFSTester
                         }
                     }
                 }
+                dcvgFiles.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
                 for (int i = 0; i < dcvgFiles.Count; ++i)
                 {
                     var curFile = dcvgFiles[i];
@@ -1670,7 +1675,7 @@ namespace AFSTester
                         }
                     }
                 }
-                var combinedFile = CombinedAllegroCISFile.CombineFiles("Combined", cisFiles);
+                var combinedFile = CombinedAllegroCISFile.CombineOrderedFiles("Combined", cisFiles, 10);
                 var combinedFootages = new List<(double, BasicGeoposition)>();
                 foreach (var (foot, _, point, _, _) in combinedFile.Points)
                 {
@@ -1694,6 +1699,7 @@ namespace AFSTester
                                 {
                                     (footage, _) = combinedFootages.AlignPoint(lastGps, false);
                                     dcvgData.Add((footage, point.IndicationPercent));
+                                    continue;
                                 }
                                 else
                                     throw new ArgumentException();

@@ -21,6 +21,7 @@ namespace AccurateReportSystem
         public float LabelFontSize { get; set; } = 8f;
         public abstract int NumberOfValues { get; }
         public float Opacity { get; set; } = 0.75f;
+        public float LegendLabelSplit { get; set; } = 0.33f;
 
         private readonly LegendInfo MasterLegendInfo;
         private readonly YAxesInfo MasterYAxesInfo;
@@ -53,7 +54,7 @@ namespace AccurateReportSystem
                 }
             }
 
-            var legendWidth = (MasterLegendInfo.Width + MasterYAxesInfo.Y1TotalHeight) / 3;
+            var legendWidth = (MasterLegendInfo.Width + MasterYAxesInfo.Y1TotalHeight) * LegendLabelSplit;
             var legendX = drawArea.Left - legendWidth;
             var legendRect = new Rect(legendX, drawArea.Top, legendWidth, drawArea.Height);
             var longest = DrawNames(session, legendRect);
@@ -87,7 +88,7 @@ namespace AccurateReportSystem
             {
                 format.HorizontalAlignment = CanvasHorizontalAlignment.Left;
                 format.WordWrapping = CanvasWordWrapping.WholeWord;
-                format.FontSize = MasterYAxesInfo.Y1LabelFontSize;
+                format.FontSize = MasterLegendInfo.SeriesNameFontSize;
                 format.FontFamily = "Arial";
                 format.FontWeight = FontWeights.Thin;
                 format.FontStyle = FontStyle.Normal;
@@ -110,7 +111,7 @@ namespace AccurateReportSystem
                         }
                     }
                     layout.Dispose();
-                    yOffset += MasterYAxesInfo.Y1LabelFontSize + 2;
+                    yOffset += MasterLegendInfo.SeriesNameFontSize + 2;
                 }
             }
 
