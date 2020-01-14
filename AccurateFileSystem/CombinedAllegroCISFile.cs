@@ -434,45 +434,12 @@ namespace AccurateFileSystem
                 {
                     var curPoint = file.Points[i];
                     var footage = Math.Abs(curPoint.Footage - fileOffset) + offset;
-                    if (curPoint.MirOff < curPoint.MirOn)
-                    {
-                        // 191-1
-                        //curPoint.Off = list.Last().Point.Off;
-                    }
-                    if (footage == 1400)
-                    {
-                        // 3008-01
-                        //curPoint.On = list.Last().Point.On;
-                    }
-                    if (curPoint.On > -1.3 && footage > 63200 && footage < 63300)
-                    {
-                        // 191-1
-                        //curPoint.Off = list.Last().Point.Off;
-                    }
-                    if (footage == 58500)
-                    {
-                        // 191-1
-                        //curPoint.On = list.Last().Point.On;
-                    }
-                    if (curPoint.On > -1.15)
-                    {
-                        // 191B
-                        //curPoint.On = list.Last().Point.On;
-                    }
-                    if (curPoint.Off < -0.85)
-                    {
-                        // 3001-05
-                        //curPoint.On = list.Last().Point.On;
-                        //curPoint.Off = list.Last().Point.Off;
-                    }
                     list.Add((footage, isReverse, curPoint, true, file));
 
                 }
                 offset += info.TotalFootage;
                 tempFileInfoNode = tempFileInfoNode.Next;
             }
-            // 3008-01
-            //list.Last().Point.Off = -list.Last().Point.Off;
             Points = list;
         }
 
@@ -620,6 +587,40 @@ namespace AccurateFileSystem
             return combined;
         }
 
+        public static CombinedAllegroCISFile CombineOrderedFiles(string name, List<AllegroCISFile> files, double offset)
+        {
+            var first = files.First();
+            var type = first.Type;
+
+            var allSolution = new FileInfoLinkedList(new FileInfo(first));
+            for (int i = 1; i < files.Count; ++i)
+            {
+                var curFile = files[i];
+                var isLastReversed = allSolution.Last.Info.IsReversed;
+                var lastFile = allSolution.Last.Info.File;
+                var lastGps = isLastReversed ? lastFile.GetFirstGps() : lastFile.GetLastGps();
+
+                var startGps = curFile.GetFirstGps();
+                var endGps = curFile.GetLastGps();
+
+                var startDist = lastGps.Distance(startGps);
+                var endDist = lastGps.Distance(endGps);
+
+                if (startDist <= endDist)
+                {
+                    allSolution.AddToEnd(new FileInfo(curFile) { Offset = offset });
+                }
+                else
+                {
+                    allSolution.AddToEnd(new FileInfo(curFile, curFile.Points.Count - 1, 0) { Offset = offset });
+                }
+            }
+            //allSolution.CalculateOffset(offset);
+            var solString = allSolution.ToString();
+            var combined = new CombinedAllegroCISFile(name, type, allSolution);
+            return combined;
+        }
+
         public BasicGeoposition GetClosesetGps(double footage)
         {
             var distance = double.MaxValue;
@@ -646,6 +647,7 @@ namespace AccurateFileSystem
             public double EndFootage => File.Points[End].Footage;
             public double TotalFootage => Math.Abs(StartFootage - EndFootage);
             public int TotalPoints => Math.Abs(Start - End);
+            public bool IsReversed => Start > End;
             public double Offset;
             public AllegroCISFile File;
 
@@ -654,7 +656,7 @@ namespace AccurateFileSystem
                 File = file;
                 Offset = 0;
                 Start = 0;
-                End = file.Points.Count;
+                End = file.Points.Count - 1;
             }
 
             public FileInfo(AllegroCISFile file, int first, int last, double offset = 0)
@@ -668,11 +670,10 @@ namespace AccurateFileSystem
             public override string ToString()
             {
                 var numPoints = Math.Abs(End - Start) + 1;
-                var isReversed = Start > End;
                 var numFoot = Math.Abs(File.Points[Start].Footage - File.Points[End].Footage);
-                var output = $"'{File.Name}'{(isReversed ? " Rev Run" : "")} offset {Offset} feet {numPoints} reads of {File.Points.Count} from {Start}|{File.Points[Start].Footage} to {End}|{File.Points[End].Footage} over {numFoot} feet.";
+                var output = $"'{File.Name}'{(IsReversed ? " Rev Run" : "")} offset {Offset} feet {numPoints} reads of {File.Points.Count} from {Start}|{File.Points[Start].Footage} to {End}|{File.Points[End].Footage} over {numFoot} feet.";
                 if (numPoints == File.Points.Count)
-                    output = $"'{File.Name}'{(isReversed ? " Rev Run" : "")} offset {Offset} feet ALL {File.Points.Count} reads over {numFoot} feet.";
+                    output = $"'{File.Name}'{(IsReversed ? " Rev Run" : "")} offset {Offset} feet ALL {File.Points.Count} reads over {numFoot} feet.";
                 return output;
             }
         }

@@ -80,6 +80,27 @@ namespace AccurateFileSystem
             return output;
         }
 
+        public BasicGeoposition GetLastGps()
+        {
+            var lastGps = new BasicGeoposition();
+            for(int i = 0; i < Points.Count; ++i)
+            {
+                if (Points[i].HasGPS)
+                    lastGps = Points[i].GPS;
+            }
+            return lastGps;
+        }
+
+        public BasicGeoposition GetFirstGps()
+        {
+            for (int i = 0; i < Points.Count; ++i)
+            {
+                if (Points[i].HasGPS)
+                    return Points[i].GPS;
+            }
+            return new BasicGeoposition();
+        }
+
         /// <summary>
         /// Function used to clean up the data points in a file. This will also compute the MIR and related data for each point.
         /// This will also clear any duplicated more than once GPS points. May leave many blank GPS points, so you should do something to correct for those.

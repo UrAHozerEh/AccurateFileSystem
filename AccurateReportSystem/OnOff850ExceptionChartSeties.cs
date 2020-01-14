@@ -7,7 +7,7 @@ using Windows.UI;
 
 namespace AccurateReportSystem
 {
-    public class OnOff850ExceptionChartSeties : ExceptionsChartSeries
+    public class OnOff850ExceptionChartSeries : ExceptionsChartSeries
     {
         public Color OffBelow850Color { get; set; } = Colors.Yellow;
         public Color OnBelow850Color { get; set; } = Colors.Red;
@@ -17,7 +17,7 @@ namespace AccurateReportSystem
         public override int NumberOfValues => 4;
         public List<(double Footage, double On, double Off)> Data { get; set; }
 
-        public OnOff850ExceptionChartSeties(List<(double Footage, double On, double Off)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo) : base(masterLegendInfo, masterYAxesInfo)
+        public OnOff850ExceptionChartSeries(List<(double Footage, double On, double Off)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo) : base(masterLegendInfo, masterYAxesInfo)
         {
             Data = data;
         }
