@@ -1,8 +1,10 @@
-﻿using System;
+﻿using AccurateFileSystem;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Devices.Geolocation;
 using Windows.UI;
 
 namespace AccurateReportSystem
@@ -15,62 +17,67 @@ namespace AccurateReportSystem
         public Color SevereColor { get; set; } = Colors.Red;
         public List<(double Footage, double On, double Off, bool IsExtrapolated, double Baseline, PGESeverity Severity, string Reason)> Data { get; set; }
         public double SkipDistance { get; set; } = 10;
+        public List<(double Footage, AllegroDataPoint Point)> RawData { get; set; }
 
-        public PGECISIndicationChartSeries(List<(double, double)> onData, List<(double, double)> offData, Chart chart) : base(chart.LegendInfo, chart.YAxesInfo)
+        public PGECISIndicationChartSeries(List<(double, AllegroDataPoint)> data, Chart chart) : base(chart.LegendInfo, chart.YAxesInfo)
         {
-            if (onData.Count != offData.Count)
-                throw new ArgumentException();
-            var combinedData = new List<(double Footage, double On, double Off)>();
-            for (int i = 0; i < onData.Count; ++i)
-            {
-                var (footOn, on) = onData[i];
-                var (footOff, off) = offData[i];
-                if (footOn != footOff)
-                    throw new ArgumentException();
-                combinedData.Add((footOn, on, off));
-            }
-            Data = ExtrapolateData(combinedData);
-        }
-
-        public PGECISIndicationChartSeries(List<(double Footage, double On, double Off)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo) : base(masterLegendInfo, masterYAxesInfo)
-        {
+            RawData = data;
             Data = ExtrapolateData(data);
         }
 
-        private List<(double Footage, double On, double Off, bool IsExtrapolated, double Baseline, PGESeverity Severity, string Reason)> ExtrapolateData(List<(double Footage, double On, double Off)> data)
+        public PGECISIndicationChartSeries(List<(double, AllegroDataPoint)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo) : base(masterLegendInfo, masterYAxesInfo)
         {
+            RawData = data;
+            Data = ExtrapolateData(data);
+        }
 
-            var extrapolatedData = new List<(double Footage, double On, double Off, bool IsExtrapolated, bool isSkipped)>();
+        private List<(double Footage, double On, double Off, bool IsExtrapolated, double Baseline, PGESeverity Severity, string Reason)> ExtrapolateData(List<(double Footage, AllegroDataPoint Point)> data)
+        {
+            var extrapolatedData = new List<(double Footage, double On, double Off, BasicGeoposition gpsPoint, bool IsExtrapolated, bool isSkipped)>();
 
             for (int i = 0; i < data.Count - 1; ++i)
             {
-                var (startFoot, startOn, startOff) = data[i];
-                var (endFoot, endOn, endOff) = data[i + 1];
-                extrapolatedData.Add((startFoot, startOn, startOff, false, false));
+                var (startFoot, startPoint) = data[i];
+                var (endFoot, endPoint) = data[i + 1];
+                extrapolatedData.Add((startFoot, startPoint.MirOn, startPoint.MirOff, startPoint.GPS, false, false));
                 var dist = endFoot - startFoot;
-                var onDiff = endOn - startOn;
-                var offDiff = endOff - startOff;
+
+                var onDiff = endPoint.MirOn - startPoint.MirOn;
+                var offDiff = endPoint.MirOff - startPoint.MirOff;
                 var onPerFoot = onDiff / dist;
                 var offPerFoot = offDiff / dist;
+
+                var latDiff = endPoint.GPS.Latitude - startPoint.GPS.Latitude;
+                var latPerFoot = latDiff / dist;
+
+                var longDiff = endPoint.GPS.Longitude - startPoint.GPS.Longitude;
+                var longPerFoot = longDiff / dist;
+
                 for (int offset = 1; offset < dist; ++offset)
                 {
-                    var newOn = onPerFoot * offset + startOn;
-                    var newOff = offPerFoot * offset + startOff;
+                    var newOn = onPerFoot * offset + startPoint.MirOn;
+                    var newOff = offPerFoot * offset + startPoint.MirOn;
                     var newFoot = startFoot + offset;
 
-                    extrapolatedData.Add((newFoot, newOn, newOff, true, dist > SkipDistance));
+                    var newLat = latPerFoot * offset + startPoint.GPS.Latitude;
+                    var newLong = longPerFoot * offset + startPoint.GPS.Longitude;
+                    var newGps = new BasicGeoposition() { Latitude = newLat, Longitude = newLong };
+
+                    extrapolatedData.Add((newFoot, newOn, newOff, newGps, true, dist > SkipDistance));
                 }
             }
-            var (foot, on, off) = data.Last();
-            extrapolatedData.Add((foot, on, off, false, false));
+            var (foot, point) = data.Last();
+            extrapolatedData.Add((foot, point.MirOn, point.MirOff, point.GPS, false, false));
             bool extrapolated, skipped;
+            BasicGeoposition gps;
+            double on, off;
             var output = new List<(double, double, double, bool, double, PGESeverity, string)>(extrapolatedData.Count);
             if (foot <= 200)
             {
                 var average = extrapolatedData.Average(value => value.Off);
                 for (int i = 0; i < extrapolatedData.Count; ++i)
                 {
-                    (foot, on, off, extrapolated, skipped) = extrapolatedData[i];
+                    (foot, on, off, gps, extrapolated, skipped) = extrapolatedData[i];
                     var changeInBaseline = Math.Abs(off - average);
                     var (severity, reason) = GetSeverity(off, average);
                     if (skipped)
@@ -85,7 +92,7 @@ namespace AccurateReportSystem
             var curAverages = new List<double>(extrapolatedData.Count);
             for (int i = 0; i < extrapolatedData.Count; ++i)
             {
-                (foot, on, off, extrapolated, skipped) = extrapolatedData[i];
+                (foot, on, off, _, extrapolated, skipped) = extrapolatedData[i];
                 var within100 = extrapolatedData.Where(value => Within100(foot, value.Footage) && !value.isSkipped);
                 var average = (within100.Count() != 0 ? within100.Average(value => value.Off) : off);
                 curAverages.Add(average);
@@ -95,11 +102,11 @@ namespace AccurateReportSystem
             {
                 var start = Math.Max(center - 105, 0);
                 var end = Math.Min(center + 105, extrapolatedData.Count - 1);
-                var (centerFoot, centerOn, centerOff, centerExtrapolated, centerSkipped) = extrapolatedData[center];
+                var (centerFoot, centerOn, centerOff, _, centerExtrapolated, centerSkipped) = extrapolatedData[center];
                 var centerAverage = curAverages[center];
                 for (int i = start; i <= end; ++i)
                 {
-                    var (curFoot, _, _, _, _) = extrapolatedData[i];
+                    var (curFoot, _, _, _, _, _) = extrapolatedData[i];
                     var curAverage = curAverages[i];
                     if (Within100(centerFoot, curFoot))
                     {
