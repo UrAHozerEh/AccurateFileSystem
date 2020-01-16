@@ -37,7 +37,6 @@ using Colors = Windows.UI.Colors;
 using Color = Windows.UI.Color;
 using PageSetup = AccurateReportSystem.PageSetup;
 using DocumentFormat.OpenXml.Spreadsheet;
-
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
 namespace AFSTester
@@ -547,7 +546,7 @@ namespace AFSTester
 
             var topGlobalXAxis = new GlobalXAxis(report, true)
             {
-                Title = $"PGE IIT Survey {folderName}"
+                Title = file == null ? "Example Graph" : $"PGE IIT Survey {folderName}"
                 //Title = "PG&E X11134 HCA 1830 11-13-19"
             };
 
@@ -565,6 +564,7 @@ namespace AFSTester
             var dcvgClass = new Chart(report, "DCVG Severity");
             var dcvgIndicationSeries = new PgeDcvgIndicationChartSeries(dcvgData, dcvgClass, isDcvg);
             dcvgClass.Series.Add(dcvgIndicationSeries);
+            dcvgClass.LegendInfo.NameFontSize = 13f;
 
             var ecdaClassChart = new Chart(report, "ECDA Clas.");
             var ecdaClassSeries = new PGEDirectExaminationPriorityChartSeries(ecdaClassChart, cisIndication, dcvgIndicationSeries);
@@ -1579,7 +1579,7 @@ namespace AFSTester
             }
             catch
             {
-                //MakeIITGraphs(null);
+                MakeIITGraphs(null, null, true, "Example Graph");
                 //MakeNustarGraphs();
                 return;
             }
@@ -1592,141 +1592,155 @@ namespace AFSTester
             var folder = await folderPicker.PickSingleFolderAsync();
             if (folder == null)
                 return;
-            var isDcvg = folder.DisplayName == "DCVG";
-            var folders = await folder.GetFoldersAsync();
+
+            var curFolders = await folder.GetFoldersAsync();
+            var masterFolders = new List<StorageFolder>();
+
+            if (curFolders.Count(f => f.DisplayName == "DCVG" || f.DisplayName == "ACVG") == 0)
+            {
+                masterFolders.Add(folder);
+            }
+            else
+            {
+                masterFolders = curFolders.ToList();
+            }
             var correction = 15.563025007672872650175335959592166719366374913056088;
 
-
-            foreach (var curFolder in folders)
+            foreach (var masterFolder in masterFolders)
             {
-                var files = await curFolder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
-                var cisFiles = new List<AllegroCISFile>();
-                var dcvgFiles = new List<AllegroCISFile>();
-                var acvgReads = new List<(BasicGeoposition, double)>();
-                foreach (var file in files)
+                var isDcvg = masterFolder.DisplayName == "DCVG";
+                var folders = await masterFolder.GetFoldersAsync();
+                foreach (var curFolder in folders)
                 {
-                    var factory = new FileFactory(file);
-                    var newFile = await factory.GetFile();
-                    if (newFile != null)
+                    var files = await curFolder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
+                    var cisFiles = new List<AllegroCISFile>();
+                    var dcvgFiles = new List<AllegroCISFile>();
+                    var acvgReads = new List<(BasicGeoposition, double)>();
+                    foreach (var file in files)
                     {
-                        if (!(newFile is AllegroCISFile))
-                            continue;
-                        var allegroFile = newFile as AllegroCISFile;
-                        if (allegroFile.Type == FileType.OnOff)
-                            cisFiles.Add(allegroFile);
-                        if (allegroFile.Type == FileType.DCVG)
-                            dcvgFiles.Add(allegroFile);
-                    }
-                    else
-                    {
-                        if (file.FileType.ToLower() == ".acvg")
+                        var factory = new FileFactory(file);
+                        var newFile = await factory.GetFile();
+                        if (newFile != null)
                         {
-                            var buffer = await FileIO.ReadBufferAsync(file);
-                            using (var dataReader = Windows.Storage.Streams.DataReader.FromBuffer(buffer))
+                            if (!(newFile is AllegroCISFile))
+                                continue;
+                            var allegroFile = newFile as AllegroCISFile;
+                            if (allegroFile.Type == FileType.OnOff)
+                                cisFiles.Add(allegroFile);
+                            if (allegroFile.Type == FileType.DCVG)
+                                dcvgFiles.Add(allegroFile);
+                        }
+                        else
+                        {
+                            if (file.FileType.ToLower() == ".acvg")
                             {
-                                string text = dataReader.ReadString(buffer.Length);
-                                var lines = text.Split('\n');
-                                foreach (var line in lines)
+                                var buffer = await FileIO.ReadBufferAsync(file);
+                                using (var dataReader = Windows.Storage.Streams.DataReader.FromBuffer(buffer))
                                 {
-                                    if (string.IsNullOrWhiteSpace(line))
-                                        continue;
-                                    var splitLine = line.Split(',');
-                                    var lat = double.Parse(splitLine[0]);
-                                    var lon = double.Parse(splitLine[1]);
-                                    var read = double.Parse(splitLine[2]) - correction;
-                                    var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
-                                    acvgReads.Add((gps, read));
+                                    string text = dataReader.ReadString(buffer.Length);
+                                    var lines = text.Split('\n');
+                                    foreach (var line in lines)
+                                    {
+                                        if (string.IsNullOrWhiteSpace(line))
+                                            continue;
+                                        var splitLine = line.Split(',');
+                                        var lat = double.Parse(splitLine[0]);
+                                        var lon = double.Parse(splitLine[1]);
+                                        var read = double.Parse(splitLine[2]) - correction;
+                                        var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+                                        acvgReads.Add((gps, read));
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                if (cisFiles.Count == 0)
-                    return;
-                cisFiles.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
-                for (int i = 0; i < cisFiles.Count; ++i)
-                {
-                    var curFile = cisFiles[i];
-                    for (int j = i + 1; j < cisFiles.Count; ++j)
+                    if (cisFiles.Count == 0)
+                        return;
+                    cisFiles.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
+                    for (int i = 0; i < cisFiles.Count; ++i)
                     {
-                        var nextFile = cisFiles[j];
-                        if (curFile.Name != nextFile.Name)
-                            break;
-                        if (true)//curFile.IsEquivalent(nextFile))
+                        var curFile = cisFiles[i];
+                        for (int j = i + 1; j < cisFiles.Count; ++j)
                         {
-                            cisFiles.RemoveAt(j);
-                            --j;
-                        }
-                    }
-                }
-                dcvgFiles.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
-                for (int i = 0; i < dcvgFiles.Count; ++i)
-                {
-                    var curFile = dcvgFiles[i];
-                    for (int j = i + 1; j < dcvgFiles.Count; ++j)
-                    {
-                        var nextFile = dcvgFiles[j];
-                        if (curFile.Name != nextFile.Name)
-                            break;
-                        if (true)//curFile.IsEquivalent(nextFile))
-                        {
-                            dcvgFiles.RemoveAt(j);
-                            --j;
-                        }
-                    }
-                }
-                var combinedFile = CombinedAllegroCISFile.CombineOrderedFiles("Combined", cisFiles, 10);
-                var combinedFootages = new List<(double, BasicGeoposition)>();
-                foreach (var (foot, _, point, _, _) in combinedFile.Points)
-                {
-                    if (point.HasGPS)
-                        combinedFootages.Add((foot, point.GPS));
-                }
-                var dcvgData = new List<(double, double)>();
-                double lastFoot = double.MaxValue - 10;
-                BasicGeoposition lastGps = new BasicGeoposition();
-                double footage;
-                foreach (var file in dcvgFiles)
-                {
-                    foreach (var (foot, point) in file.Points)
-                    {
-                        if (point.HasIndication)
-                        {
-                            if (!point.HasGPS)
+                            var nextFile = cisFiles[j];
+                            if (curFile.Name != nextFile.Name)
+                                break;
+                            if (true)//curFile.IsEquivalent(nextFile))
                             {
-                                var dist = foot - lastFoot;
-                                if (dist <= 10)
-                                {
-                                    (footage, _) = combinedFootages.AlignPoint(lastGps, false);
-                                    dcvgData.Add((footage, point.IndicationPercent));
-                                    continue;
-                                }
-                                else
-                                    throw new ArgumentException();
+                                cisFiles.RemoveAt(j);
+                                --j;
                             }
-                            (footage, _) = combinedFootages.AlignPoint(point.GPS, false);
-                            dcvgData.Add((footage, point.IndicationPercent));
                         }
+                    }
+                    dcvgFiles.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
+                    for (int i = 0; i < dcvgFiles.Count; ++i)
+                    {
+                        var curFile = dcvgFiles[i];
+                        for (int j = i + 1; j < dcvgFiles.Count; ++j)
+                        {
+                            var nextFile = dcvgFiles[j];
+                            if (curFile.Name != nextFile.Name)
+                                break;
+                            if (true)//curFile.IsEquivalent(nextFile))
+                            {
+                                dcvgFiles.RemoveAt(j);
+                                --j;
+                            }
+                        }
+                    }
+                    var combinedFile = CombinedAllegroCISFile.CombineOrderedFiles("Combined", cisFiles, 10);
+                    var combinedFootages = new List<(double, BasicGeoposition)>();
+                    foreach (var (foot, _, point, _, _) in combinedFile.Points)
+                    {
                         if (point.HasGPS)
+                            combinedFootages.Add((foot, point.GPS));
+                    }
+                    var dcvgData = new List<(double, double)>();
+                    double lastFoot = double.MaxValue - 10;
+                    BasicGeoposition lastGps = new BasicGeoposition();
+                    double footage;
+                    foreach (var file in dcvgFiles)
+                    {
+                        foreach (var (foot, point) in file.Points)
                         {
-                            lastFoot = foot;
-                            lastGps = point.GPS;
+                            if (point.HasIndication)
+                            {
+                                if (!point.HasGPS)
+                                {
+                                    var dist = foot - lastFoot;
+                                    if (dist <= 10)
+                                    {
+                                        (footage, _) = combinedFootages.AlignPoint(lastGps, false);
+                                        dcvgData.Add((footage, point.IndicationPercent));
+                                        continue;
+                                    }
+                                    else
+                                        throw new ArgumentException();
+                                }
+                                (footage, _) = combinedFootages.AlignPoint(point.GPS, false);
+                                dcvgData.Add((footage, point.IndicationPercent));
+                            }
+                            if (point.HasGPS)
+                            {
+                                lastFoot = foot;
+                                lastGps = point.GPS;
+                            }
                         }
                     }
-                }
 
-                if (!isDcvg)
-                {
-                    foreach (var (gps, read) in acvgReads)
+                    if (!isDcvg)
                     {
-                        var (foot, _) = combinedFootages.AlignPoint(gps, false);
-                        dcvgData.Add((foot, read));
+                        foreach (var (gps, read) in acvgReads)
+                        {
+                            var (foot, _) = combinedFootages.AlignPoint(gps, false);
+                            dcvgData.Add((foot, read));
+                        }
                     }
+
+
+                    dcvgData.Sort((first, second) => first.Item1.CompareTo(second.Item1));
+                    await MakeIITGraphs(combinedFile, dcvgData, isDcvg, curFolder.DisplayName);
                 }
-
-
-                dcvgData.Sort((first, second) => first.Item1.CompareTo(second.Item1));
-                await MakeIITGraphs(combinedFile, dcvgData, isDcvg, curFolder.DisplayName);
             }
         }
 
