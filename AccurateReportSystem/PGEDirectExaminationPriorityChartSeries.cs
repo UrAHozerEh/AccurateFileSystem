@@ -18,6 +18,16 @@ namespace AccurateReportSystem
         public CisSeries CisSeries { get; set; } = null;
         public DcvgSeries DcvgSeries { get; set; } = null;
 
+        public class ShapeFileData
+        {
+            public double Station;
+            public DateTime Date;
+            public string PrimaryDescription;
+            public double Latitude;
+            public double Longitude;
+            public string EcdaCat;
+        }
+
         public PGEDirectExaminationPriorityChartSeries(Chart chart, CisSeries cisSeries = null, DcvgSeries dcvgSeries = null) : base(chart.LegendInfo, chart.YAxesInfo)
         {
             CisSeries = cisSeries;
@@ -30,6 +40,7 @@ namespace AccurateReportSystem
             var lastFoot = 0.0;
 
             var cisSeverities = new Dictionary<int, (PGESeverity, string)>();
+            var dataPoints = new Dictionary<double, ShapeFileData>();
             if (CisSeries != null)
             {
                 foreach (var (foot, _, _, _, _, severity, reason) in CisSeries.Data)
