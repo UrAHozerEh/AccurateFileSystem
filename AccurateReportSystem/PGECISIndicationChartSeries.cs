@@ -15,13 +15,15 @@ namespace AccurateReportSystem
         public Color MinorColor { get; set; } = Colors.Blue;
         public Color ModerateColor { get; set; } = Colors.Green;
         public Color SevereColor { get; set; } = Colors.Red;
-        public List<(double Footage, double On, double Off, bool IsExtrapolated, double Baseline, PGESeverity Severity, string Reason)> Data { get; set; }
+        public List<(double Footage, double On, double Off, string Comment, DateTime Date, double? Depth, bool IsExtrapolated, double Baseline, BasicGeoposition Gps, string Region, PGESeverity Severity, string Reason)> Data { get; set; }
         public double SkipDistance { get; set; } = 10;
         public List<(double Footage, AllegroDataPoint Point)> RawData { get; set; }
+        public List<(BasicGeoposition Start, BasicGeoposition End, string Region)> EcdaRegions { get; set; }
 
-        public PGECISIndicationChartSeries(List<(double, AllegroDataPoint)> data, Chart chart) : base(chart.LegendInfo, chart.YAxesInfo)
+        public PGECISIndicationChartSeries(List<(double, AllegroDataPoint)> data, Chart chart, List<(BasicGeoposition Start, BasicGeoposition End, string Region)> regions) : base(chart.LegendInfo, chart.YAxesInfo)
         {
             RawData = data;
+            EcdaRegions = regions;
             Data = ExtrapolateData(data);
         }
 
@@ -31,15 +33,38 @@ namespace AccurateReportSystem
             Data = ExtrapolateData(data);
         }
 
-        private List<(double Footage, double On, double Off, bool IsExtrapolated, double Baseline, PGESeverity Severity, string Reason)> ExtrapolateData(List<(double Footage, AllegroDataPoint Point)> data)
+        private string GetClosestRegion(BasicGeoposition gps)
         {
-            var extrapolatedData = new List<(double Footage, double On, double Off, BasicGeoposition gpsPoint, bool IsExtrapolated, bool isSkipped)>();
+            if (EcdaRegions == null)
+                return "";
+            if (EcdaRegions.Count == 0)
+                return "";
+            if (EcdaRegions.Count == 1)
+                return EcdaRegions[0].Region;
+            var closestDist = double.MaxValue;
+            var closestRegion = EcdaRegions[0].Region;
+            foreach (var (start, end, region) in EcdaRegions)
+            {
+                var curDistance = gps.DistanceToSegment(start, end);
+                if (curDistance < closestDist)
+                {
+                    closestDist = curDistance;
+                    closestRegion = region;
+                }
+            }
+            return closestRegion;
+        }
 
+        private List<(double Footage, double On, double Off, string Comment, DateTime Date, double? Depth, bool IsExtrapolated, double Baseline, BasicGeoposition Gps, string Region, PGESeverity Severity, string Reason)> ExtrapolateData(List<(double Footage, AllegroDataPoint Point)> data)
+        {
+            var extrapolatedData = new List<(double Footage, double On, double Off, string Comment, DateTime Date, double? Depth, BasicGeoposition GpsPoint, string Region, bool IsExtrapolated, bool isSkipped)>();
+            string curRegion;
             for (int i = 0; i < data.Count - 1; ++i)
             {
                 var (startFoot, startPoint) = data[i];
                 var (endFoot, endPoint) = data[i + 1];
-                extrapolatedData.Add((startFoot, startPoint.MirOn, startPoint.MirOff, startPoint.GPS, false, false));
+                curRegion = GetClosestRegion(startPoint.GPS);
+                extrapolatedData.Add((startFoot, startPoint.MirOn, startPoint.MirOff, startPoint.OriginalComment, startPoint.Times[0], startPoint.Depth, startPoint.GPS, curRegion, false, false));
                 var dist = endFoot - startFoot;
 
                 var onDiff = endPoint.MirOn - startPoint.MirOn;
@@ -56,28 +81,32 @@ namespace AccurateReportSystem
                 for (int offset = 1; offset < dist; ++offset)
                 {
                     var newOn = onPerFoot * offset + startPoint.MirOn;
-                    var newOff = offPerFoot * offset + startPoint.MirOn;
+                    var newOff = offPerFoot * offset + startPoint.MirOff;
                     var newFoot = startFoot + offset;
 
                     var newLat = latPerFoot * offset + startPoint.GPS.Latitude;
                     var newLong = longPerFoot * offset + startPoint.GPS.Longitude;
                     var newGps = new BasicGeoposition() { Latitude = newLat, Longitude = newLong };
 
-                    extrapolatedData.Add((newFoot, newOn, newOff, newGps, true, dist > SkipDistance));
+                    extrapolatedData.Add((newFoot, newOn, newOff, startPoint.OriginalComment, startPoint.Times[0], startPoint.Depth, newGps, curRegion, true, dist > SkipDistance));
                 }
             }
             var (foot, point) = data.Last();
-            extrapolatedData.Add((foot, point.MirOn, point.MirOff, point.GPS, false, false));
+            curRegion = GetClosestRegion(point.GPS);
+            extrapolatedData.Add((foot, point.MirOn, point.MirOff, point.OriginalComment, point.Times[0], point.Depth, point.GPS, curRegion, false, false));
             bool extrapolated, skipped;
             BasicGeoposition gps;
             double on, off;
-            var output = new List<(double, double, double, bool, double, PGESeverity, string)>(extrapolatedData.Count);
+            double? depth;
+            string comment;
+            DateTime date;
+            var output = new List<(double, double, double, string, DateTime, double?, bool, double, BasicGeoposition, string, PGESeverity, string)>(extrapolatedData.Count);
             if (foot <= 200)
             {
                 var average = extrapolatedData.Average(value => value.Off);
                 for (int i = 0; i < extrapolatedData.Count; ++i)
                 {
-                    (foot, on, off, gps, extrapolated, skipped) = extrapolatedData[i];
+                    (foot, on, off, comment, date, depth, gps, curRegion, extrapolated, skipped) = extrapolatedData[i];
                     var changeInBaseline = Math.Abs(off - average);
                     var (severity, reason) = GetSeverity(off, average);
                     if (skipped)
@@ -85,14 +114,14 @@ namespace AccurateReportSystem
                         severity = PGESeverity.NRI;
                         reason = "SKIP";
                     }
-                    output.Add((foot, on, off, extrapolated, average, severity, reason));
+                    output.Add((foot, on, off, comment, date, depth, extrapolated, average, gps, curRegion, severity, reason));
                 }
                 return output;
             }
             var curAverages = new List<double>(extrapolatedData.Count);
             for (int i = 0; i < extrapolatedData.Count; ++i)
             {
-                (foot, on, off, _, extrapolated, skipped) = extrapolatedData[i];
+                (foot, on, off, _, _, _, _, _, extrapolated, skipped) = extrapolatedData[i];
                 var within100 = extrapolatedData.Where(value => Within100(foot, value.Footage) && !value.isSkipped);
                 var average = (within100.Count() != 0 ? within100.Average(value => value.Off) : off);
                 curAverages.Add(average);
@@ -102,11 +131,11 @@ namespace AccurateReportSystem
             {
                 var start = Math.Max(center - 105, 0);
                 var end = Math.Min(center + 105, extrapolatedData.Count - 1);
-                var (centerFoot, centerOn, centerOff, _, centerExtrapolated, centerSkipped) = extrapolatedData[center];
+                var (centerFoot, centerOn, centerOff, centerComment, centerDate, centerDepth, centerGps, centerRegion, centerExtrapolated, centerSkipped) = extrapolatedData[center];
                 var centerAverage = curAverages[center];
                 for (int i = start; i <= end; ++i)
                 {
-                    var (curFoot, _, _, _, _, _) = extrapolatedData[i];
+                    var (curFoot, _, _, _, _, _, _, _, _, _) = extrapolatedData[i];
                     var curAverage = curAverages[i];
                     if (Within100(centerFoot, curFoot))
                     {
@@ -131,7 +160,7 @@ namespace AccurateReportSystem
                     severity = PGESeverity.NRI;
                     reason = "SKIP";
                 }
-                output.Add((centerFoot, centerOn, centerOff, centerExtrapolated, baseline, severity, reason));
+                output.Add((centerFoot, centerOn, centerOff, centerComment, centerDate, centerDepth, centerExtrapolated, baseline, centerGps, centerRegion, severity, reason));
             }
             return output;
         }
@@ -167,7 +196,7 @@ namespace AccurateReportSystem
             (double Footage, PGESeverity Severity)? lastData = null;
             for (int i = 0; i < Data.Count; ++i)
             {
-                var (curFoot, _, _, _, _, severity, _) = Data[i];
+                var (curFoot, _, _, _, _, _, _, _, _, _, severity, _) = Data[i];
                 if (curFoot < page.StartFootage)
                 {
                     firstData = (curFoot, severity);

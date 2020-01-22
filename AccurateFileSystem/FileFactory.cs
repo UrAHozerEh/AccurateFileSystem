@@ -50,6 +50,7 @@ namespace AccurateFileSystem
                 case ".pdf":
                 case ".acvg":
                 case ".png":
+                case ".regions":
                     return null;
                 default:
                     throw new Exception($"File is an unknown file format '{extension}'");
@@ -219,8 +220,14 @@ namespace AccurateFileSystem
                             point = ParseAllegroLineFromCSV(pointId, line);
                         if (startFoot == null)
                             startFoot = point.Footage;
+                        
                         if (extension != ".dvg")
                             point.Footage -= startFoot ?? 0;
+                        if (lastPoint != null && point.Footage - lastPoint.Footage > 20)
+                        {
+                            startFoot += point.Footage - lastPoint.Footage - 10;
+                            point.Footage -= point.Footage - lastPoint.Footage - 10;
+                        }
                         if (lastPoint != null && type == FileType.OnOff && lastPoint.Footage + 20 == point.Footage)
                         {
                             var extrapolatedOn = (lastPoint.On + point.On) / 2;
