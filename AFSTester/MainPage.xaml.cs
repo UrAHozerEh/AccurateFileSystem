@@ -53,6 +53,7 @@ namespace AFSTester
         List<(string Name, string Route, double Length, BasicGeoposition Start, BasicGeoposition End)> ShortList;
         string FolderName;
         bool IsAerial = false;
+        string ReportQ = "";
 
         public MainPage()
         {
@@ -390,7 +391,7 @@ namespace AFSTester
             return curValue + change;
         }
 
-        private async Task MakeIITGraphs(CombinedAllegroCISFile file, List<(double, double)> dcvgData, bool isDcvg, string folderName)
+        private async Task MakeIITGraphs(CombinedAllegroCISFile file, List<(double, double)> dcvgData, bool isDcvg, string folderName, List<(BasicGeoposition, BasicGeoposition, string)> regions = null, (string, string, string, string)? surveyInfos = null)
         {
             var curDepth = 50.0;
             var curOff = -1.0;
@@ -558,7 +559,7 @@ namespace AFSTester
             //};
             var surveyDirectionChart = new Chart(report, "Survey Direction");
             var cisClass = new Chart(report, "CIS Severity");
-            var cisIndication = new PGECISIndicationChartSeries(onData, offData, cisClass);
+            var cisIndication = new PGECISIndicationChartSeries(file.GetPoints(), cisClass, regions);
             cisClass.Series.Add(cisIndication);
 
             var dcvgClass = new Chart(report, "DCVG Severity");
@@ -634,13 +635,22 @@ namespace AFSTester
             }
             var skipReport = new StringBuilder();
             var reportLLengths = Enumerable.Repeat(0.0, 5).ToList();
-            foreach (var (startFoot, endFoot, cisSeverity, dcvgSeverity, priority, reason) in areas)
+            foreach (var (startFoot, endFoot, cisSeverity, dcvgSeverity, region, priority, reason) in areas)
             {
                 var depthInArea = extrapolatedDepth.Where(value => value.Item1 >= startFoot && value.Item1 <= endFoot);
                 var minDepth = depthInArea.Count() != 0 ? depthInArea.Min(value => value.Item2) : -1;
-                output.Append("\t\t\t\t");
+                if (surveyInfos.HasValue)
+                {
+                    var (hcaId, route, startMp, endMp) = surveyInfos.Value;
+                    output.Append($"{hcaId}\t{route}\t{startMp}\t{endMp}\t");
+                }
+                else
+                {
+                    output.Append("\t\t\t\t");
+                }
                 var length = Math.Max(endFoot - startFoot, 1);
-                output.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t\t{length.ToString("F0")}\t{minDepth.ToString("F0")}\t");
+                var minDepthString = minDepth == -1 ? "" : minDepth.ToString("F0");
+                output.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{region}\t{length.ToString("F0")}\t{minDepthString}\t");
                 var startGps = file.GetClosesetGps(startFoot);
                 output.Append($"{startGps.Latitude.ToString("F5")}\t{startGps.Longitude.ToString("F5")}\t");
                 var endGps = file.GetClosesetGps(endFoot);
@@ -659,7 +669,13 @@ namespace AFSTester
                     reportLLengths[priority] += length;
                 }
             }
-            var reportQ = output.ToString();
+            ReportQ += output.ToString();
+            var shapeFileStringBuilder = new StringBuilder();
+            foreach (var line in ecdaClassSeries.ShapeFileOutput)
+            {
+                var lineString = string.Join('\t', line);
+                shapeFileStringBuilder.AppendLine(lineString);
+            }
             var skipReportString = skipReport.ToString();
             var testStation = file.GetTestStationData();
             var depthException = new StringBuilder();
@@ -700,22 +716,12 @@ namespace AFSTester
             }
             reportLString += "\n" + reportLNext;
 
-            reportQ = "\n\n" + reportQ;
             skipReportString = "\n\n" + skipReportString;
             depthString = "\n\n" + depthString;
 
-            var outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{folderName} Reports.xlsx", CreationCollisionOption.ReplaceExisting);
-            var outputString = "Report Q\n";
-            outputString += reportQ;
-            outputString += "\nSkip Report\n";
-            outputString += skipReportString;
-            outputString += "\nTest Station\n";
-            outputString += testStation;
-            outputString += "\nDepth\n";
-            outputString += depthString;
-            outputString += "\nReport L\n";
-            outputString += reportLString;
+
             //await FileIO.WriteTextAsync(outputFile, outputString);
+            var outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{folderName} Reports.xlsx", CreationCollisionOption.ReplaceExisting);
             using (var outStream = await outputFile.OpenStreamForWriteAsync())
             using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
             {
@@ -723,12 +729,22 @@ namespace AFSTester
                 wbPart.Workbook = new Workbook();
                 wbPart.Workbook.AppendChild(new Sheets());
                 AddData(wbPart, reportLString, 1, "Report L", new List<string>());
-                AddData(wbPart, reportQ, 2, "Report Q", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
-                AddData(wbPart, skipReportString, 3, "CIS Skip Report", new List<string>() { "A1:B1", "C1:C2", "D1:G1" });
-                AddData(wbPart, skipReportString, 4, $"{indicationLabel} Skip Report", new List<string>() { "A1:B1", "C1:C2", "D1:G1" });
-                AddData(wbPart, testStation, 5, "Test Station and Coupon Data", new List<string>());
-                AddData(wbPart, depthString, 6, "Depth Exception", new List<string>() { "A1:B1", "C1:C2", "D1:D2", "E1:H1" });
+                AddData(wbPart, skipReportString, 2, "CIS Skip Report", new List<string>() { "A1:B1", "C1:C2", "D1:G1" });
+                AddData(wbPart, skipReportString, 3, $"{indicationLabel} Skip Report", new List<string>() { "A1:B1", "C1:C2", "D1:G1" });
+                AddData(wbPart, testStation, 4, "Test Station and Coupon Data", new List<string>());
+                AddData(wbPart, depthString, 5, "Depth Exception", new List<string>() { "A1:B1", "C1:C2", "D1:D2", "E1:H1" });
                 AddData(wbPart, "Survey Stationing\tAC Read\tComments\tLatitude\tLongitude", 7, "AC Touch Voltage", new List<string>());
+                wbPart.Workbook.Save();
+            }
+
+            outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{folderName} Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
+            using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            {
+                var wbPart = spreadDoc.AddWorkbookPart();
+                wbPart.Workbook = new Workbook();
+                wbPart.Workbook.AppendChild(new Sheets());
+                AddData(wbPart, shapeFileStringBuilder.ToString(), 1, "Shapefile", new List<string>());
                 wbPart.Workbook.Save();
             }
         }
@@ -1557,22 +1573,6 @@ namespace AFSTester
                 }
                 var correction = 15.563025007672872650175335959592166719366374913056088;
 
-                var curHardGps = new BasicGeoposition()
-                {
-                    Latitude = 38.468252981,
-                    Longitude = -122.745688108
-                };
-                var curHardFoot = combinedFootages.AlignPoint(curHardGps, false);
-                //dcvgData.Add((curHardFoot.Footage, 29 - correction));
-
-                curHardGps = new BasicGeoposition()
-                {
-                    Latitude = 38.328751459,
-                    Longitude = -122.737339361
-                };
-                curHardFoot = combinedFootages.AlignPoint(curHardGps, false);
-                //dcvgData.Add((curHardFoot.Footage, 67 - correction));
-
 
                 dcvgData.Sort((first, second) => first.Item1.CompareTo(second.Item1));
                 MakeIITGraphs(combinedFile, dcvgData, false, FolderName);
@@ -1605,17 +1605,45 @@ namespace AFSTester
                 masterFolders = curFolders.ToList();
             }
             var correction = 15.563025007672872650175335959592166719366374913056088;
+            var masterFiles = await folder.GetFilesAsync();
+            StorageFile regionFile = null;
+            StorageFile surveysFile = null;
+            foreach (var masterFile in masterFiles)
+            {
+                if (masterFile.FileType.ToLower() == ".regions")
+                    regionFile = masterFile;
+                if (masterFile.FileType.ToLower() == ".surveys")
+                    surveysFile = masterFile;
+            }
+
+            var surveyInfo = new Dictionary<string, (string HcaId, string Route, string StartMilepost, string EndMilepost)>();
+            var buffer = await FileIO.ReadBufferAsync(surveysFile);
+            using (var dataReader = Windows.Storage.Streams.DataReader.FromBuffer(buffer))
+            {
+                string text = dataReader.ReadString(buffer.Length);
+                var lines = text.Split('\n');
+                foreach (var line in lines)
+                {
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+
+                    var split = line.Split('\t');
+                    surveyInfo.Add(split[0].ToLower(), (split[1], split[2], split[3], split[4]));
+                }
+            }
 
             foreach (var masterFolder in masterFolders)
             {
                 var isDcvg = masterFolder.DisplayName == "DCVG";
                 var folders = await masterFolder.GetFoldersAsync();
+                ReportQ = "";
                 foreach (var curFolder in folders)
                 {
                     var files = await curFolder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
                     var cisFiles = new List<AllegroCISFile>();
                     var dcvgFiles = new List<AllegroCISFile>();
                     var acvgReads = new List<(BasicGeoposition, double)>();
+                    var regions = new List<(BasicGeoposition Start, BasicGeoposition End, string Region)>();
                     foreach (var file in files)
                     {
                         var factory = new FileFactory(file);
@@ -1634,7 +1662,7 @@ namespace AFSTester
                         {
                             if (file.FileType.ToLower() == ".acvg")
                             {
-                                var buffer = await FileIO.ReadBufferAsync(file);
+                                buffer = await FileIO.ReadBufferAsync(file);
                                 using (var dataReader = Windows.Storage.Streams.DataReader.FromBuffer(buffer))
                                 {
                                     string text = dataReader.ReadString(buffer.Length);
@@ -1651,6 +1679,37 @@ namespace AFSTester
                                         acvgReads.Add((gps, read));
                                     }
                                 }
+                            }
+                        }
+                    }
+                    if (regionFile != null)
+                    {
+                        buffer = await FileIO.ReadBufferAsync(regionFile);
+                        using (var dataReader = Windows.Storage.Streams.DataReader.FromBuffer(buffer))
+                        {
+                            string text = dataReader.ReadString(buffer.Length);
+                            var lines = text.Split('\n');
+                            foreach (var line in lines)
+                            {
+                                if (string.IsNullOrWhiteSpace(line))
+                                    continue;
+                                var splitLine = line.Split(',');
+                                if (splitLine.Length == 1)
+                                {
+                                    regions.Add((new BasicGeoposition(), new BasicGeoposition(), line));
+                                    continue;
+                                }
+                                var surveyName = splitLine[0].Trim();
+                                if (surveyName.ToLower() != curFolder.DisplayName.Trim().ToLower())
+                                    continue;
+                                var startLat = double.Parse(splitLine[1]);
+                                var startLon = double.Parse(splitLine[2]);
+                                var endLat = double.Parse(splitLine[3]);
+                                var endLon = double.Parse(splitLine[4]);
+                                var region = splitLine[5].Trim();
+                                var startGps = new BasicGeoposition() { Latitude = startLat, Longitude = startLon };
+                                var endGps = new BasicGeoposition() { Latitude = endLat, Longitude = endLon };
+                                regions.Add((startGps, endGps, region));
                             }
                         }
                     }
@@ -1688,7 +1747,8 @@ namespace AFSTester
                             }
                         }
                     }
-                    var combinedFile = CombinedAllegroCISFile.CombineOrderedFiles("Combined", cisFiles, 10);
+                    var combinedFile = CombinedAllegroCISFile.CombineFiles("Combined", cisFiles);
+                    //var combinedFile = CombinedAllegroCISFile.CombineOrderedFiles("Combined", cisFiles, 10);
                     var combinedFootages = new List<(double, BasicGeoposition)>();
                     foreach (var (foot, _, point, _, _) in combinedFile.Points)
                     {
@@ -1739,7 +1799,21 @@ namespace AFSTester
 
 
                     dcvgData.Sort((first, second) => first.Item1.CompareTo(second.Item1));
-                    await MakeIITGraphs(combinedFile, dcvgData, isDcvg, curFolder.DisplayName);
+                    if (regions == null || regions.Count == 0)
+                        regions = null;
+                    if (!surveyInfo.ContainsKey(curFolder.DisplayName.ToLower()))
+                        regions = null;
+                    await MakeIITGraphs(combinedFile, dcvgData, isDcvg, curFolder.DisplayName, regions, surveyInfo[curFolder.DisplayName.ToLower()]);
+                }
+                var outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{masterFolder.DisplayName} Report Q.xlsx", CreationCollisionOption.ReplaceExisting);
+                using (var outStream = await outputFile.OpenStreamForWriteAsync())
+                using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+                {
+                    var wbPart = spreadDoc.AddWorkbookPart();
+                    wbPart.Workbook = new Workbook();
+                    wbPart.Workbook.AppendChild(new Sheets());
+                    AddData(wbPart, ReportQ, 1, "Report Q", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
+                    wbPart.Workbook.Save();
                 }
             }
         }

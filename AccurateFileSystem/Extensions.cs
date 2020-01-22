@@ -12,15 +12,15 @@ namespace AccurateFileSystem
     {
         public static double Distance(this BasicGeoposition pos1, BasicGeoposition pos2)
         {
-            double R = 3960 * 5280;
-            double dLat = ToRadian(pos2.Latitude - pos1.Latitude);
-            double dLon = ToRadian(pos2.Longitude - pos1.Longitude);
-            double a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+            double earthRadius = 3960 * 5280;
+            double deltaLat = ToRadian(pos2.Latitude - pos1.Latitude);
+            double deltaLon = ToRadian(pos2.Longitude - pos1.Longitude);
+            double a = Math.Sin(deltaLat / 2) * Math.Sin(deltaLat / 2) +
                 Math.Cos(ToRadian(pos1.Latitude)) * Math.Cos(ToRadian(pos2.Latitude)) *
-                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+                Math.Sin(deltaLon / 2) * Math.Sin(deltaLon / 2);
             double c = 2 * Math.Asin(Math.Min(1, Math.Sqrt(a)));
-            double d = R * c;
-            return d;
+            double distance = earthRadius * c;
+            return distance;
         }
 
         private static double ToRadian(double value)
@@ -79,6 +79,40 @@ namespace AccurateFileSystem
                 Longitude = maxLong
             };
             return new GeoboundingBox(nwPoint, sePoint);
+        }
+
+        public static double DistanceToSegment(this BasicGeoposition point, BasicGeoposition start, BasicGeoposition end)
+        {
+            var A = point.Latitude - start.Latitude;
+            var B = point.Longitude - start.Longitude;
+            var C = end.Latitude - start.Latitude;
+            var D = end.Longitude - start.Longitude;
+
+            var dot = A * C + B * D;
+            var len_sq = C * C + D * D;
+            var param = dot / len_sq;
+
+            double xx, yy;
+
+            if (param < 0)
+            {
+                xx = start.Latitude;
+                yy = start.Longitude;
+            }
+            else if (param > 1)
+            {
+                xx = end.Latitude;
+                yy = end.Longitude;
+            }
+            else
+            {
+                xx = start.Latitude + param * C;
+                yy = start.Longitude + param * D;
+            }
+
+            var dx = point.Latitude - xx;
+            var dy = point.Longitude - yy;
+            return Math.Sqrt(dx * dx + dy * dy);
         }
     }
 }

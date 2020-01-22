@@ -467,6 +467,16 @@ namespace AccurateFileSystem
             return list;
         }
 
+        public List<(double Footage, AllegroDataPoint Point)> GetPoints()
+        {
+            var list = new List<(double, AllegroDataPoint)>();
+            for (int i = 0; i < Points.Count; ++i)
+            {
+                list.Add((Points[i].Footage, Points[i].Point));
+            }
+            return list;
+        }
+
         private List<(double footage, double value)> GetOnCompensatedData()
         {
             var list = new List<(double, double)>();
