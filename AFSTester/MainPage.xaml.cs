@@ -1426,6 +1426,7 @@ namespace AFSTester
             {
                 LineColor = Colors.Green,
                 PointShape = GraphSeries.Shape.None,
+                MaxDrawDistance = 100
             };
             var acvgIndication = new PointWithLabelGraphSeries("ACVG Anomaly", acvgAnoms)
             {
