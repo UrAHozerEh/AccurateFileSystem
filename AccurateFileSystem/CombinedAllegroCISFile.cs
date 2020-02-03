@@ -49,7 +49,7 @@ namespace AccurateFileSystem
         {
             var output = new StringBuilder();
             var readFormat = $"F{readDecimals}";
-            var curLine = new string[31];
+            var curLine = new string[30];
             curLine[0] = "Footage";
             curLine[1] = "Compensated On";
             curLine[2] = "Compensated Off";
@@ -79,8 +79,7 @@ namespace AccurateFileSystem
             curLine[26] = "Foreign On";
             curLine[27] = "Foreign Off";
             curLine[28] = "ACV";
-            curLine[29] = "Full Comment";
-            curLine[30] = "DoC";
+            curLine[29] = "DoC";
             output.AppendLine(string.Join("\t", curLine));
 
             foreach (var (footage, isReverse, point, useMir, file) in Points)
@@ -106,7 +105,6 @@ namespace AccurateFileSystem
                     curLine[7] = "N/A";
                 }
                 curLine[8] = point.StrippedComment ?? "";
-                curLine[29] = point.OriginalComment ?? "";
                 if (point.TestStationReads.Count > 0)
                 {
                     foreach (TestStationRead read in point.TestStationReads)
@@ -191,7 +189,7 @@ namespace AccurateFileSystem
                             curLine[i] = "N/A";
                     }
                 }
-                curLine[30] = point.Depth?.ToString("F0") ?? "";
+                curLine[29] = point.Depth?.ToString("F0") ?? "";
                 output.AppendLine(string.Join("\t", curLine));
             }
 
@@ -340,6 +338,153 @@ namespace AccurateFileSystem
             return output.ToString();
         }
 
+        public string GetShapeFile(int readDecimals = 4)
+        {
+            var output = new StringBuilder();
+            var readFormat = $"F{readDecimals}";
+            var curLine = new string[34];
+            curLine[0] = "LABEL";
+            curLine[1] = "STATION";
+            curLine[2] = "DATEOFCIS";
+            curLine[3] = "PRIMARYDES";
+            curLine[4] = "SECONDDESC";
+            curLine[5] = "TOPO";
+            curLine[6] = "DCVGREMOTE";
+            curLine[7] = "DEPTH";
+            curLine[8] = "ECDAREGION";
+            curLine[9] = "SEGMENT";
+            curLine[10] = "NORTHING";
+            curLine[11] = "EASTING";
+            curLine[12] = "LATITUDE";
+            curLine[13] = "LONGITUDE";
+            curLine[14] = "ECDACAT";
+            curLine[15] = "ILICAT";
+            curLine[16] = "PCMCAT";
+            curLine[17] = "DCVGCAT";
+            curLine[18] = "CISCAT";
+            curLine[19] = "ONREAD";
+            curLine[20] = "OFFREAD";
+            curLine[21] = "STATCREAD";
+            curLine[22] = "ELEVATION";
+            curLine[23] = "LINE_NUM";
+            curLine[24] = "NSEG";
+            curLine[25] = "PROCESS";
+            curLine[26] = "ROUTE";
+            curLine[27] = "IMA";
+            curLine[28] = "PCM";
+            curLine[29] = "META";
+            curLine[30] = "PRIMARYGPS";
+            curLine[31] = "SECONDGPS";
+            curLine[32] = "ACVG";
+            curLine[33] = "ACVGCAT";
+            output.AppendLine(string.Join("\t", curLine));
+
+            foreach (var (footage, isReverse, point, useMir, file) in Points)
+            {
+                curLine = new string[31];
+                curLine[0] = $"On: {point.MirOn.ToString(readFormat)}, Off: {point.MirOff.ToString(readFormat)}";
+                curLine[1] = point.Footage.ToString("F0");
+                if (point.HasTime)
+                    curLine[2] = point.Times[0].ToString("MM/dd/yyyy");
+                else
+                    curLine[2] = "N/A";
+                curLine[3] = point.OriginalComment;
+                if (point.Depth.HasValue)
+                    curLine[7] = point.Depth.Value.ToString("F0");
+
+                if (point.HasGPS)
+                {
+                    curLine[12] = point.GPS.Latitude.ToString("F8");
+                    curLine[13] = point.GPS.Longitude.ToString("F8");
+                }
+                else
+                {
+                    curLine[12] = "N/A";
+                    curLine[13] = "N/A";
+                }
+                curLine[19] = point.MirOn.ToString(readFormat);
+                curLine[20] = point.MirOff.ToString(readFormat);
+                curLine[25] = "CECIS";
+                output.AppendLine(string.Join("\t", curLine));
+            }
+            return output.ToString();
+        }
+
+        public void FixGps()
+        {
+            if (!Points.First().Point.HasGPS || !Points.Last().Point.HasGPS)
+                return;
+            var (firstFoot, _, firstPoint, _, _) = Points.First();
+            for (int i = 1; i < Points.Count; ++i)
+            {
+                var (_, _, point, _, _) = Points[i];
+                if (!point.HasGPS)
+                {
+                    for (int j = i + 1; j < Points.Count; ++j)
+                    {
+                        var (nextFoot, _, nextPoint, _, _) = Points[j];
+                        if (!nextPoint.HasGPS)
+                            continue;
+                        var dist = nextFoot - firstFoot;
+                        var latFactor = (nextPoint.GPS.Latitude - firstPoint.GPS.Latitude) / dist;
+                        var lonFactor = (nextPoint.GPS.Longitude - firstPoint.GPS.Longitude) / dist;
+                        for (int k = i; k < j; ++k)
+                        {
+                            var (curFoot, _, curPoint, _, _) = Points[k];
+                            if (curPoint.HasGPS)
+                                return;
+                            var curDist = curFoot - firstFoot;
+                            var curLat = firstPoint.GPS.Latitude + (latFactor * curDist);
+                            var curLon = firstPoint.GPS.Longitude + (lonFactor * curDist);
+                            curPoint.GPS = new BasicGeoposition() { Latitude = curLat, Longitude = curLon };
+                        }
+                        break;
+                    }
+                }
+                else
+                {
+                    (firstFoot, _, firstPoint, _, _) = Points[i];
+                }
+            }
+        }
+
+        public void FixContactSpikes()
+        {
+            for (int curIndex = 1; curIndex < Points.Count - 1; ++curIndex)
+            {
+                var prevIndex = curIndex - 1;
+                var nextIndex = curIndex + 1;
+                var (curFoot, _, curPoint, _, _) = Points[curIndex];
+                var (prevFoot, _, prevPoint, _, _) = Points[prevIndex];
+                var (nextFoot, _, nextPoint, _, _) = Points[nextIndex];
+
+                var curOn = curPoint.On;
+                var curOff = curPoint.Off;
+
+                var prevOn = prevPoint.On;
+                var prevOff = prevPoint.Off;
+                var prevOnDiff = curOn - prevOn;
+                var prevOffDiff = curOff - prevOff;
+
+                var nextOn = nextPoint.On;
+                var nextOff = nextPoint.Off;
+                var nextOnDiff = curOn - nextOn;
+                var nextOffDiff = curOff - nextOff;
+
+                if (curFoot - 10 == prevFoot && curFoot + 10 == nextFoot)
+                {
+                    if ((prevOnDiff > 0.1 && nextOnDiff > 0.1) || (prevOnDiff < -0.1 && nextOnDiff < -0.1))
+                    {
+                        curPoint.On = (prevOn + nextOn) / 2;
+                    }
+                    if ((prevOffDiff > 0.1 && nextOffDiff > 0.1) || (prevOffDiff < -0.1 && nextOffDiff < -0.1))
+                    {
+                        curPoint.Off = (prevOff + nextOff) / 2;
+                    }
+                }
+            }
+        }
+
         public string FilterMir(List<string> blacklist)
         {
             StringBuilder output = new StringBuilder();
@@ -378,7 +523,7 @@ namespace AccurateFileSystem
                 if (!useMir)
                 {
                     var reasonCaps = (curReason == "anode" ? "Anode" : "Rectifier");
-                    output.AppendLine($"{start},{end},{reasonCaps}");
+                    output.AppendLine($"{start}\t{end}\t{reasonCaps}");
                 }
             }
 
@@ -558,12 +703,12 @@ namespace AccurateFileSystem
             return output;
         }
 
-        public static CombinedAllegroCISFile CombineFiles(string name, List<AllegroCISFile> files)
+        public static CombinedAllegroCISFile CombineFiles(string name, List<AllegroCISFile> files, double maxGap = 1500)
         {
             var first = files.First();
             var type = first.Type;
 
-            var calc = new OrderCalculator(files);
+            var calc = new OrderCalculator(files, maxGap);
             calc.AsyncSolve();
             //TODO: Maybe look at TS MP to determine if we should reverse the new file.
             var allSolution = calc.GetAllUsedSolution();
@@ -686,6 +831,19 @@ namespace AccurateFileSystem
                     output = $"'{File.Name}'{(IsReversed ? " Rev Run" : "")} offset {Offset} feet ALL {File.Points.Count} reads over {numFoot} feet.";
                 return output;
             }
+
+            public string GetExcelDataHeader()
+            {
+                return $"File Name\tIs Reversed\tOffset\tNumber of Points Used\tNumber of Points Total\tStart Index\tStart Footage\tEnd Index\tEnd Footage\tLength";
+            }
+
+            public string GetExcelData()
+            {
+                var numPoints = Math.Abs(End - Start) + 1;
+                var numFoot = Math.Abs(File.Points[Start].Footage - File.Points[End].Footage);
+                var output = $"{File.Name}\t{(IsReversed ? "Reverse" : "")}\t{Offset}\t{numPoints}\t{File.Points.Count}\t{Start}\t{File.Points[Start].Footage}\t{End}\t{File.Points[End].Footage}\t{numFoot}";
+                return output;
+            }
         }
 
         public class FileInfoLinkedList
@@ -701,6 +859,13 @@ namespace AccurateFileSystem
             public override string ToString()
             {
                 return Info.ToString() + "\n" + Next?.ToString() ?? "";
+            }
+
+            public string GetExcelData()
+            {
+                if(Prev == null)
+                    return Info.GetExcelDataHeader() + "\n" + Info.GetExcelData() + "\n" + Next?.GetExcelData() ?? "";
+                return Info.GetExcelData() + "\n" + Next?.GetExcelData() ?? "";
             }
 
             public FileInfoLinkedList(FileInfo info)
@@ -761,6 +926,8 @@ namespace AccurateFileSystem
                     var myStart = Info.Start;
                     Info.Offset = Math.Max(myFile.OffsetDistance(myStart, otherFile, otherEnd, roundTo), roundTo);
                 }
+                else
+                    Info.Offset = 0;
                 if (Next != null)
                     Next.CalculateOffset(roundTo);
             }
@@ -789,11 +956,12 @@ namespace AccurateFileSystem
             Dictionary<string, List<(int Index, int Start, int End)>> Solutions = new Dictionary<string, List<(int Index, int Start, int End)>>();
             string BaseUsings;
             string AllUsed;
-            public double MaxGap { get; set; } = 1500;
+            public double MaxGap { get; set; }
             ulong NumberOfChecks = 0;
             ulong NumberOFTestStations;
-            public OrderCalculator(List<AllegroCISFile> files)
+            public OrderCalculator(List<AllegroCISFile> files, double maxGap = 1500)
             {
+                MaxGap = maxGap;
                 ulong numTestStations = 0;
                 foreach (var file in files)
                 {
@@ -926,7 +1094,7 @@ namespace AccurateFileSystem
                             {
                                 if (start != file.Indicies[0] && start != file.Indicies[file.Indicies.Count - 1])
                                     continue;
-                                if (end != lastIndicies[0] && end != lastIndicies[lastIndicies.Count - 1])
+                                if (end != file.Indicies[0] && end != file.Indicies[file.Indicies.Count - 1])
                                     continue;
                             }
                             lock (MinimumValues)

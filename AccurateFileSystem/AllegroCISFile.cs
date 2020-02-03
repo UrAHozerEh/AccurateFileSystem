@@ -456,7 +456,7 @@ namespace AccurateFileSystem
                 var leftCheck = otherIndex - prevOffset;
                 var leftPoint = leftCheck >= 0 ? otherFile.Points[leftCheck] : null;
                 var leftDist = prevPoint.Footage - (leftPoint?.Footage ?? double.MinValue);
-                var rightCheck = otherIndex - prevOffset;
+                var rightCheck = otherIndex + prevOffset;
                 var rightPoint = rightCheck < otherFile.Points.Count ? otherFile.Points[rightCheck] : null;
                 var rightDist = (rightPoint?.Footage ?? double.MaxValue) - prevPoint.Footage;
                 if (leftPoint != null || rightPoint != null)

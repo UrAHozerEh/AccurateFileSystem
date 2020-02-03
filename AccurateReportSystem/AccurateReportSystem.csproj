@@ -124,6 +124,7 @@
     <Compile Include="ChartSeries.cs" />
     <Compile Include="CommentSeries.cs" />
     <Compile Include="Container.cs" />
+    <Compile Include="DataMetrics.cs" />
     <Compile Include="ExceptionsChartSeries.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="GeometryInfo.cs" />
