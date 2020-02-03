@@ -167,11 +167,27 @@ namespace AFSTester
                     var nextFile = NewFiles[j];
                     if (curFile.Name != nextFile.Name)
                         break;
-                    if (true)//curFile.IsEquivalent(nextFile))
+                    if (curFile is AllegroCISFile curAllegro && nextFile is AllegroCISFile nextAllegro)
                     {
-                        NewFiles.RemoveAt(j);
-                        --j;
+                        if (nextAllegro.Extension.ToLower() == ".bak")
+                        {
+                            NewFiles.RemoveAt(j);
+                            --j;
+                        }
+                        else if (curAllegro.Points.Count >= nextAllegro.Points.Count)//curFile.IsEquivalent(nextFile))
+                        {
+                            NewFiles.RemoveAt(j);
+                            --j;
+                        }
+                        else
+                        {
+                            NewFiles.RemoveAt(i);
+                            --j;
+                            --i;
+                            curFile = nextFile;
+                        }
                     }
+
                 }
             }
             if (ShortList != null)
@@ -230,6 +246,10 @@ namespace AFSTester
             var graph1 = new Graph(report);
             var graph2 = new Graph(report);
             var graph3 = new Graph(report);
+            if (IsReversed.IsChecked ?? false)
+                allegroFile.Reverse();
+            var mirFilterData = allegroFile.FilterMir(new List<string>() { "anode", "rectifier" });
+            allegroFile.FixGps();
             var on = new GraphSeries("On", allegroFile.GetDoubleData("On"))
             {
                 LineColor = Colors.Blue
@@ -322,7 +342,12 @@ namespace AFSTester
                 //Title = "PG&E LS 3008-01 MP 6.58 to MP 8.01"
                 //Title = "PG&E LS 191-1 MP 16.79 to MP 30.1000"
                 //Title = "PG&E LS 191A MP 0 to MP 4.83"
-                Title = "PG&E LS 210B MP 13.03 to MP 25.98"
+                //Title = "PG&E LS 191-1 MP 10.33 to MP 35.83"
+                //Title = "PG&E LS 191 MP 0.0 to MP 10.6"
+                //Title = "PG&E LS SR5 MP 0.0 to MP 5.78"
+                //Title = "PG&E LS 057A MP 6.33 to MP 16.6981"
+                //Title = "PG&E LS 057B MP 0.0 to MP 16.68"
+                Title = "PG&E LS 131 MP 24.88 to MP 46.32"
                 //Title = "PG&E LS 3017-01 MP 0.4300 to MP 7.5160"
                 //Title = "PG&E LS L131 MP 26.1018 to MP 27.0150"
                 //Title = "PG&E DREG11309 MP 0.0000 to MP 0.0100"
@@ -370,16 +395,44 @@ namespace AFSTester
             report.Container = splitContainer;
             var pages = report.PageSetup.GetAllPages(0, allegroFile.Points.Last().Footage);
             var tabular = allegroFile.GetTabularData();
+            await CreateExcelFile($"{topGlobalXAxis.Title} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) });
+            var dataMetrics = new DataMetrics(allegroFile.GetPoints());
+            await CreateExcelFile($"{topGlobalXAxis.Title} Data Metrics", dataMetrics.GetSheets());
+            var testStation = allegroFile.GetTestStationData();
+            await CreateExcelFile($"{topGlobalXAxis.Title} Test Station Data", new List<(string Name, string Data)>() { ("Test Station Data", testStation) });
+            var shapefile = allegroFile.GetShapeFile();
+            await CreateExcelFile($"{topGlobalXAxis.Title} Shapefile", new List<(string Name, string Data)>() { ("Shapefile", shapefile) });
+            await CreateExcelFile($"{topGlobalXAxis.Title} MIR Skips", new List<(string Name, string Data)>() { ("MIR Skips", mirFilterData) });
+            await CreateExcelFile($"{topGlobalXAxis.Title} Files Order", new List<(string Name, string Data)>() { ("Order", allegroFile.FileInfos.GetExcelData()) });
             for (int i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
-                var image = report.GetImage(page, 300);
                 var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{topGlobalXAxis.Title} Page {pageString}" + ".png", CreationCollisionOption.ReplaceExisting);
+                using (var image = report.GetImage(page, 300))
                 using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
                 {
                     await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
                 }
+            }
+        }
+
+        public async Task CreateExcelFile(string fileName, List<(string Name, string Data)> sheets)
+        {
+            var outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync(fileName + ".xlsx", CreationCollisionOption.ReplaceExisting);
+            using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            {
+                var wbPart = spreadDoc.AddWorkbookPart();
+                wbPart.Workbook = new Workbook();
+                wbPart.Workbook.AppendChild(new Sheets());
+                var id = 1;
+                foreach (var (name, data) in sheets)
+                {
+                    AddData(wbPart, data, id, name, new List<string>());
+                    ++id;
+                }
+                wbPart.Workbook.Save();
             }
         }
 
@@ -827,7 +880,7 @@ namespace AFSTester
                 if (file is AllegroCISFile allegroFile && allegroFile.Header.ContainsKey("segment"))
                 {
 
-                    var segmentName = Regex.Replace(Regex.Replace(allegroFile.Header["segment"], "\\s+", ""), "(?i)ls", "").Replace('.', '-');
+                    var segmentName = Regex.Replace(Regex.Replace(allegroFile.Header["segment"], "\\s+", ""), "(?i)ls", "").Replace('.', '-').ToLower().Trim();
                     if (!treeNodes.ContainsKey(segmentName))
                     {
                         var newSegmentNode = new TreeViewNode() { Content = segmentName };
@@ -1062,6 +1115,8 @@ namespace AFSTester
 
         private void CombineButtonClick(object sender, RoutedEventArgs e)
         {
+            if (!double.TryParse(CombineMaxGap.Text, out var maxGap))
+                return;
             var fileNodes = FileTreeView.SelectedNodes.Where(node => node.Content is AllegroCISFile).ToList();
             var files = new List<AllegroCISFile>();
             var fileNames = new HashSet<string>();
@@ -1090,7 +1145,8 @@ namespace AFSTester
                 }
             }
 
-            var test = CombinedAllegroCISFile.CombineFiles(files.First().Header["segment"].Trim(), files);
+            var test = CombinedAllegroCISFile.CombineFiles(files.First().Header["segment"].Trim(), files, maxGap);
+            test.FixContactSpikes();
             MakeGraphs(test);
         }
 
@@ -1710,6 +1766,8 @@ namespace AFSTester
                                 var region = splitLine[5].Trim();
                                 var startGps = new BasicGeoposition() { Latitude = startLat, Longitude = startLon };
                                 var endGps = new BasicGeoposition() { Latitude = endLat, Longitude = endLon };
+                                if (region.Trim() == "0")
+                                    region = "Buffer";
                                 regions.Add((startGps, endGps, region));
                             }
                         }

@@ -32,7 +32,19 @@
             <Button Content="Do Map" Click="Button_Click_1" Grid.Row="1" HorizontalAlignment="Center"/>
             <Button Content="Hide Map" Click="Button_Click_2" Grid.Row="2" HorizontalAlignment="Center"/>
             <Button Content="Zoom Map" Click="Button_Click_3" Grid.Row="3" HorizontalAlignment="Center"/>
-            <Button Content="Combine" Click="CombineButtonClick" Grid.Row="4" HorizontalAlignment="Center"/>
+            <Grid Grid.Row="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="1*"/>
+                    <RowDefinition Height="1*"/>
+                    <RowDefinition Height="1*"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*"/>
+                </Grid.ColumnDefinitions>
+                <Button Content="Combine" Click="CombineButtonClick" Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center"/>
+                <TextBox x:Name="CombineMaxGap" Text="1500" VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Row="1" InputScope="Number"/>
+                <CheckBox x:Name="IsReversed" Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Left" Content="Rev?"/>
+            </Grid>
             <Button Content="Hide" Click="HideButtonClick" Grid.Row="5" HorizontalAlignment="Center"/>
             <Button Content="IIT" Click="IITClick"  Grid.Row="6" HorizontalAlignment="Center"/>
             <Button Content="Batch IIT" Click="BatchIITClick"  Grid.Row="7" HorizontalAlignment="Center"/>

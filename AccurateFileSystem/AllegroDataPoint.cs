@@ -24,7 +24,7 @@ namespace AccurateFileSystem
         public string OriginalComment { get; private set; }
         public string CommentTemplate { get; private set; }
         public string StrippedComment { get; set; }
-        public BasicGeoposition GPS { get; private set; }
+        public BasicGeoposition GPS { get; set; }
         public bool HasGPS => !GPS.Equals(new BasicGeoposition());
         public List<DateTime> Times { get; private set; }
         public bool HasTime => Times.Count != 0;
