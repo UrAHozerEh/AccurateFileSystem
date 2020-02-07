@@ -141,6 +141,7 @@ namespace AccurateFileSystem
             string extension = File.FileType.ToLower();
             string headerDelimiter;
             int pointId = 0;
+            bool noGaps = true;
             switch (extension)
             {
                 case ".svy":
@@ -223,17 +224,17 @@ namespace AccurateFileSystem
                         
                         if (extension != ".dvg")
                             point.Footage -= startFoot ?? 0;
-                        if (lastPoint != null && point.Footage - lastPoint.Footage > 20)
+                        if (noGaps && lastPoint != null && point.Footage - lastPoint.Footage > 20)
                         {
                             startFoot += point.Footage - lastPoint.Footage - 10;
                             point.Footage -= point.Footage - lastPoint.Footage - 10;
                         }
-                        if (lastPoint != null && type == FileType.OnOff && lastPoint.Footage + 20 == point.Footage)
+                        if (noGaps && lastPoint != null && type == FileType.OnOff && lastPoint.Footage + 20 == point.Footage)
                         {
                             var extrapolatedOn = (lastPoint.On + point.On) / 2;
                             var extrapolatedOff = (lastPoint.Off + point.Off) / 2;
                             var curGps = point.HasGPS ? point.GPS : lastPoint.GPS;
-                            var extrapolatedPoint = new AllegroDataPoint(point.Id, lastPoint.Footage + 10, extrapolatedOn, extrapolatedOff, curGps, point.Times, point.IndicationValue, "");
+                            var extrapolatedPoint = new AllegroDataPoint(point.Id, lastPoint.Footage + 10, extrapolatedOn, extrapolatedOff, curGps, point.Times, point.IndicationValue, "", false);
                             point.Id = point.Id + 1;
                             points.Add(extrapolatedPoint.Id, extrapolatedPoint);
                             ++pointId;
@@ -305,6 +306,7 @@ namespace AccurateFileSystem
             double lat = double.Parse(split[10]);
             double lon = double.Parse(split[11]);
             double alt = double.Parse(split[12]);
+            var dColumn = split[14].Trim();
             BasicGeoposition gps = new BasicGeoposition();
             if (lat != 0 && lon != 0)
             {
@@ -316,7 +318,7 @@ namespace AccurateFileSystem
                 };
             }
 
-            var output = new AllegroDataPoint(id, footage, on, off, gps, times, indicationValue, comment.Trim());
+            var output = new AllegroDataPoint(id, footage, on, off, gps, times, indicationValue, comment.Trim(), dColumn.ToLower().Contains("d"));
             return output;
         }
 
@@ -341,7 +343,7 @@ namespace AccurateFileSystem
         private AllegroDataPoint ParseAllegroLineFromACI(int id, string line)
         {
             string firstPattern = @"^([^\s]+) M?\s+([^\s]+)\s+([^\s]+)";
-            string gpsPattern = @"\{GD?E? ([^\}]+)\}";
+            string gpsPattern = @"\{(GD?E?) ([^\}]+)\}";
             string timePattern = @"\{T ([^g\}]+)g?\}";
             var indicationMatch = Regex.Match(line, "\\{Indication [^,]*, UN, 0, (\\d+\\.?\\d*), 0\\}");
             double indicationValue = double.NaN;
@@ -360,9 +362,12 @@ namespace AccurateFileSystem
             line = Regex.Replace(line, match.Value, "").Trim();
             match = Regex.Match(line, gpsPattern);
             BasicGeoposition gps = new BasicGeoposition();
+            var isCorrected = false;
             if (match.Success)
             {
-                var split = match.Groups[1].Value.Split(',');
+                var gpsLabel = match.Groups[1].Value.ToLower();
+                isCorrected = gpsLabel.Contains("d");
+                var split = match.Groups[2].Value.Split(',');
                 if (split.Length != 4)
                     throw new Exception();
                 double lat = double.Parse(split[0]);
@@ -385,7 +390,7 @@ namespace AccurateFileSystem
                 times.Add(time);
                 line = line = Regex.Replace(line, timeMatch.Value, "").Trim();
             }
-            var output = new AllegroDataPoint(id, footage, on, off, gps, times, indicationValue, line);
+            var output = new AllegroDataPoint(id, footage, on, off, gps, times, indicationValue, line, isCorrected);
             return output;
         }
 

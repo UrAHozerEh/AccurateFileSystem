@@ -248,7 +248,7 @@ namespace AFSTester
             var graph3 = new Graph(report);
             if (IsReversed.IsChecked ?? false)
                 allegroFile.Reverse();
-            var mirFilterData = allegroFile.FilterMir(new List<string>() { "anode", "rectifier" });
+            var mirFilterData = "";//allegroFile.FilterMir(new List<string>() { "anode", "rectifier" });
             allegroFile.FixGps();
             var on = new GraphSeries("On", allegroFile.GetDoubleData("On"))
             {
@@ -347,7 +347,8 @@ namespace AFSTester
                 //Title = "PG&E LS SR5 MP 0.0 to MP 5.78"
                 //Title = "PG&E LS 057A MP 6.33 to MP 16.6981"
                 //Title = "PG&E LS 057B MP 0.0 to MP 16.68"
-                Title = "PG&E LS 131 MP 24.88 to MP 46.32"
+                //Title = "PG&E LS 131 MP 24.88 to MP 46.32"
+                Title = "Sempra Plaster City ETS 1 to ETS 54"
                 //Title = "PG&E LS 3017-01 MP 0.4300 to MP 7.5160"
                 //Title = "PG&E LS L131 MP 26.1018 to MP 27.0150"
                 //Title = "PG&E DREG11309 MP 0.0000 to MP 0.0100"
@@ -444,7 +445,7 @@ namespace AFSTester
             return curValue + change;
         }
 
-        private async Task MakeIITGraphs(CombinedAllegroCISFile file, List<(double, double)> dcvgData, bool isDcvg, string folderName, List<(BasicGeoposition, BasicGeoposition, string)> regions = null, (string, string, string, string)? surveyInfos = null)
+        private async Task MakeIITGraphs(CombinedAllegroCISFile file, List<(double, double, BasicGeoposition)> dcvgData, bool isDcvg, string folderName, List<(BasicGeoposition, BasicGeoposition, string)> regions = null, (string, string, string, string)? surveyInfos = null)
         {
             var curDepth = 50.0;
             var curOff = -1.0;
@@ -469,7 +470,7 @@ namespace AFSTester
             }
             else
             {
-                dcvgData = new List<(double, double)>();
+                dcvgData = new List<(double, double, BasicGeoposition)>();
                 for (double footage = 0; footage <= 4000; footage += 10)
                 {
                     var direction = false;
@@ -505,22 +506,22 @@ namespace AFSTester
 
                     if (footage % 1000 == 200)
                     {
-                        dcvgData.Add((footage, 12.0));
+                        dcvgData.Add((footage, 12.0, new BasicGeoposition()));
                         commentData.Add((footage, "NRI DCVG"));
                     }
                     else if (footage % 1000 == 400)
                     {
-                        dcvgData.Add((footage, 20.0));
+                        dcvgData.Add((footage, 20.0, new BasicGeoposition()));
                         commentData.Add((footage, "Minor DCVG"));
                     }
                     else if (footage % 1000 == 600)
                     {
-                        dcvgData.Add((footage, 50.0));
+                        dcvgData.Add((footage, 50.0, new BasicGeoposition()));
                         commentData.Add((footage, "Moderate DCVG"));
                     }
                     else if (footage % 1000 == 800)
                     {
-                        dcvgData.Add((footage, 75.0));
+                        dcvgData.Add((footage, 75.0, new BasicGeoposition()));
                         commentData.Add((footage, "Severe DCVG"));
                     }
                 }
@@ -1597,10 +1598,10 @@ namespace AFSTester
                     if (point.HasGPS)
                         combinedFootages.Add((foot, point.GPS));
                 }
-                var dcvgData = new List<(double, double)>();
+                var dcvgData = new List<(double, double, BasicGeoposition)>();
                 double lastFoot = double.MaxValue - 10;
                 BasicGeoposition lastGps = new BasicGeoposition();
-                double footage;
+                double regFoot, regDist, extrapFoot, extrapDist;
                 foreach (var file in dcvgFiles)
                 {
                     foreach (var (foot, point) in file.Points)
@@ -1612,14 +1613,14 @@ namespace AFSTester
                                 var dist = foot - lastFoot;
                                 if (dist <= 10)
                                 {
-                                    (footage, _) = combinedFootages.AlignPoint(lastGps, false);
-                                    dcvgData.Add((footage, point.IndicationPercent));
+                                    (regFoot, regDist, extrapFoot, extrapDist) = combinedFootages.AlignPoint(lastGps);
+                                    dcvgData.Add((regFoot, point.IndicationPercent, lastGps));
                                 }
                                 else
                                     throw new ArgumentException();
                             }
-                            (footage, _) = combinedFootages.AlignPoint(point.GPS, false);
-                            dcvgData.Add((footage, point.IndicationPercent));
+                            (regFoot, regDist, extrapFoot, extrapDist) = combinedFootages.AlignPoint(point.GPS);
+                            dcvgData.Add((regFoot, point.IndicationPercent, point.GPS));
                         }
                         if (point.HasGPS)
                         {
@@ -1652,6 +1653,10 @@ namespace AFSTester
 
             var curFolders = await folder.GetFoldersAsync();
             var masterFolders = new List<StorageFolder>();
+            var totalCisPoints = 0;
+            var correctedCisPoints = 0;
+            var totalDcvgPoints = 0;
+            var correctedDcvgPoints = 0;
 
             if (curFolders.Count(f => f.DisplayName == "DCVG" || f.DisplayName == "ACVG") == 0)
             {
@@ -1688,7 +1693,7 @@ namespace AFSTester
                     surveyInfo.Add(split[0].ToLower(), (split[1], split[2], split[3], split[4]));
                 }
             }
-
+            var globalAlignData = new List<(double, double, double, double)>();
             foreach (var masterFolder in masterFolders)
             {
                 var isDcvg = masterFolder.DisplayName == "DCVG";
@@ -1701,6 +1706,7 @@ namespace AFSTester
                     var dcvgFiles = new List<AllegroCISFile>();
                     var acvgReads = new List<(BasicGeoposition, double)>();
                     var regions = new List<(BasicGeoposition Start, BasicGeoposition End, string Region)>();
+                    var alignData = new List<(double, double, double, double)>();
                     foreach (var file in files)
                     {
                         var factory = new FileFactory(file);
@@ -1807,17 +1813,27 @@ namespace AFSTester
                         }
                     }
                     var combinedFile = CombinedAllegroCISFile.CombineFiles("Combined", cisFiles);
+                    if (curFolder.DisplayName.Contains("628"))
+                    {
+                        combinedFile.FileInfos.SetOffset(10);
+                        combinedFile.UpdatePoints();
+                    }
+
                     //var combinedFile = CombinedAllegroCISFile.CombineOrderedFiles("Combined", cisFiles, 10);
                     var combinedFootages = new List<(double, BasicGeoposition)>();
                     foreach (var (foot, _, point, _, _) in combinedFile.Points)
                     {
                         if (point.HasGPS)
                             combinedFootages.Add((foot, point.GPS));
+                        ++totalCisPoints;
+                        if (point.IsCorrected)
+                            ++correctedCisPoints;
                     }
-                    var dcvgData = new List<(double, double)>();
+                    var dcvgData = new List<(double, double, BasicGeoposition)>();
                     double lastFoot = double.MaxValue - 10;
                     BasicGeoposition lastGps = new BasicGeoposition();
-                    double footage;
+                    var lastCorrected = false;
+                    double regFoot, regDist, extrapFoot, extrapDist;
                     foreach (var file in dcvgFiles)
                     {
                         foreach (var (foot, point) in file.Points)
@@ -1829,20 +1845,29 @@ namespace AFSTester
                                     var dist = foot - lastFoot;
                                     if (dist <= 10)
                                     {
-                                        (footage, _) = combinedFootages.AlignPoint(lastGps, false);
-                                        dcvgData.Add((footage, point.IndicationPercent));
+                                        (regFoot, regDist, extrapFoot, extrapDist) = combinedFootages.AlignPoint(lastGps);
+                                        alignData.Add((regFoot, regDist, extrapFoot, extrapDist));
+                                        dcvgData.Add((extrapFoot, point.IndicationPercent, lastGps));
+                                        ++totalDcvgPoints;
+                                        if (lastCorrected)
+                                            ++correctedDcvgPoints;
                                         continue;
                                     }
                                     else
                                         throw new ArgumentException();
                                 }
-                                (footage, _) = combinedFootages.AlignPoint(point.GPS, false);
-                                dcvgData.Add((footage, point.IndicationPercent));
+                                (regFoot, regDist, extrapFoot, extrapDist) = combinedFootages.AlignPoint(point.GPS);
+                                alignData.Add((regFoot, regDist, extrapFoot, extrapDist));
+                                dcvgData.Add((extrapFoot, point.IndicationPercent, point.GPS));
+                                ++totalDcvgPoints;
+                                if (point.IsCorrected)
+                                    ++correctedDcvgPoints;
                             }
                             if (point.HasGPS)
                             {
                                 lastFoot = foot;
                                 lastGps = point.GPS;
+                                lastCorrected = point.IsCorrected;
                             }
                         }
                     }
@@ -1851,8 +1876,9 @@ namespace AFSTester
                     {
                         foreach (var (gps, read) in acvgReads)
                         {
-                            var (foot, _) = combinedFootages.AlignPoint(gps, false);
-                            dcvgData.Add((foot, read));
+                            var (acvgRegFoot, acvgRegDist, acvgExtrapFoot, acvgExtrapDist) = combinedFootages.AlignPoint(gps);
+                            alignData.Add((acvgRegFoot, acvgRegDist, acvgExtrapFoot, acvgExtrapDist));
+                            dcvgData.Add((acvgExtrapFoot, read, gps));
                         }
                     }
 
@@ -1862,7 +1888,27 @@ namespace AFSTester
                         regions = null;
                     if (!surveyInfo.ContainsKey(curFolder.DisplayName.ToLower()))
                         regions = null;
+                    //if (alignData.Count == 0)
+                    //    continue;
+                    //var hasNew = false;
+                    //foreach(var (curRegFoot, _, curExtrapFoot, _) in alignData)
+                    //{
+                    //    if (curRegFoot != curExtrapFoot)
+                    //        hasNew = true;
+                    //}
+                    //if (!hasNew)
+                    //    continue;
                     await MakeIITGraphs(combinedFile, dcvgData, isDcvg, curFolder.DisplayName, regions, surveyInfo[curFolder.DisplayName.ToLower()]);
+                    if (alignData.Count > 0)
+                    {
+                        globalAlignData.AddRange(alignData);
+                        var diffList1 = alignData.Select(value => value.Item2 - value.Item4).ToList();
+                        diffList1.Sort();
+                        var averageDiff1 = diffList1.Average();
+                        var meanDiff1 = diffList1[diffList1.Count / 2];
+                        var maxDiff1 = diffList1.Max();
+                        var minDiff1 = diffList1.Min();
+                    }
                 }
                 var outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{masterFolder.DisplayName} Report Q.xlsx", CreationCollisionOption.ReplaceExisting);
                 using (var outStream = await outputFile.OpenStreamForWriteAsync())
@@ -1875,6 +1921,19 @@ namespace AFSTester
                     wbPart.Workbook.Save();
                 }
             }
+            var diffList = globalAlignData.Select(value => value.Item2 - value.Item4).ToList();
+            diffList.Sort();
+            var averageDiff = diffList.Average();
+            var medianDiff = diffList[diffList.Count / 2];
+            var maxDiff = diffList.Max();
+            var minDiff = diffList.Min();
+
+            var diffList2 = globalAlignData.Select(value => Math.Abs(value.Item1 - value.Item3)).ToList();
+            diffList2.Sort();
+            var averageDiff2 = diffList2.Average();
+            var medianDiff2 = diffList2[diffList2.Count / 2];
+            var maxDiff2 = diffList2.Max();
+            var minDiff2 = diffList2.Min();
         }
 
         private void ToggleAerial(object sender, RoutedEventArgs e)

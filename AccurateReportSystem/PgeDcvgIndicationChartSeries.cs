@@ -3,29 +3,30 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Devices.Geolocation;
 using Windows.UI;
 
 namespace AccurateReportSystem
 {
     public class PgeDcvgIndicationChartSeries : ExceptionsChartSeries
     {
-        public List<(double Footage, double ActualFoot, double Percent, PGESeverity Severity, string Reason)> Data { get; set; }
+        public List<(double Footage, double ActualFoot, double Percent, PGESeverity Severity, string Reason, BasicGeoposition gps)> Data { get; set; }
         public Color MinorColor { get; set; } = Colors.Blue;
         public Color ModerateColor { get; set; } = Colors.Green;
         public Color SevereColor { get; set; } = Colors.Red;
         public double MinimumFeet { get; set; } = 3;
         public bool IsDcvg { get; set; }
 
-        public PgeDcvgIndicationChartSeries(List<(double, double)> data, Chart chart, bool isDcvg) : this(data, chart.LegendInfo, chart.YAxesInfo, isDcvg)
+        public PgeDcvgIndicationChartSeries(List<(double, double, BasicGeoposition)> data, Chart chart, bool isDcvg) : this(data, chart.LegendInfo, chart.YAxesInfo, isDcvg)
         {
 
         }
 
-        public PgeDcvgIndicationChartSeries(List<(double, double)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo, bool isDcvg) : base(masterLegendInfo, masterYAxesInfo)
+        public PgeDcvgIndicationChartSeries(List<(double, double, BasicGeoposition)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo, bool isDcvg) : base(masterLegendInfo, masterYAxesInfo)
         {
-            Data = new List<(double Footage, double ActualFoot, double Percent, PGESeverity Severity, string)>();
+            Data = new List<(double Footage, double ActualFoot, double Percent, PGESeverity Severity, string, BasicGeoposition)>();
             IsDcvg = isDcvg;
-            foreach (var (foot, percent) in data)
+            foreach (var (foot, percent, gps) in data)
             {
                 if (!isDcvg)
                 {
@@ -49,7 +50,7 @@ namespace AccurateReportSystem
                     }
                     for (double curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
                     {
-                        Data.Add((curFoot, foot, percent, severity, reason));
+                        Data.Add((curFoot, foot, percent, severity, reason, gps));
                     }
                 }
                 else
@@ -74,7 +75,7 @@ namespace AccurateReportSystem
                     }
                     for (double curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
                     {
-                        Data.Add((curFoot, foot, percent, severity, reason));
+                        Data.Add((curFoot, foot, percent, severity, reason, gps));
                     }
                 }
             }
@@ -88,7 +89,7 @@ namespace AccurateReportSystem
             (double Start, double end, PGESeverity Severity)? prevData = null;
             for (int i = 0; i < Data.Count; ++i)
             {
-                var (curFoot, _, _, severity, _) = Data[i];
+                var (curFoot, _, _, severity, _, _) = Data[i];
                 if (curFoot < page.StartFootage)
                 {
                     continue;

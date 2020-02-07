@@ -102,15 +102,15 @@ namespace AccurateReportSystem
                     cisSeverities.Add((int)foot, (on, off, comment, date, depth, isExtrapolated, severity, reason, gps, region));
                 }
             }
-            var dcvgSeverities = new Dictionary<int, (double, PGESeverity, string)>();
+            var dcvgSeverities = new Dictionary<int, (double, PGESeverity, string, BasicGeoposition)>();
             if (DcvgSeries != null)
             {
-                foreach (var (_, foot, value, severity, reason) in DcvgSeries.Data)
+                foreach (var (_, foot, value, severity, reason, gps) in DcvgSeries.Data)
                 {
                     if (foot > lastFoot)
                         lastFoot = foot;
                     if (!dcvgSeverities.ContainsKey((int)foot))
-                        dcvgSeverities.Add((int)foot, (value, severity, reason));
+                        dcvgSeverities.Add((int)foot, (value, severity, reason, gps));
                 }
             }
             var lastStartFoot = 0;
@@ -119,7 +119,7 @@ namespace AccurateReportSystem
             var lastDcvgReason = "";
             var lastDcvgValue = 0.0;
             if (dcvgSeverities.ContainsKey(0))
-                (lastDcvgValue, lastDcvgSeverity, lastDcvgReason) = dcvgSeverities[0];
+                (lastDcvgValue, lastDcvgSeverity, lastDcvgReason, _) = dcvgSeverities[0];
 
             var lastCisSeverity = PGESeverity.NRI;
             var lastCisReason = "";
@@ -218,19 +218,20 @@ namespace AccurateReportSystem
 
             for (var curFoot = 1; curFoot <= lastFoot; ++curFoot)
             {
-                var (curDcvgValue, curDcvgSeverity, curDcvgReason) = (0.0, PGESeverity.NRI, "");
+                var (curDcvgValue, curDcvgSeverity, curDcvgReason, curDcvgGps) = (0.0, PGESeverity.NRI, "", new BasicGeoposition());
                 if (dcvgSeverities.ContainsKey(curFoot))
-                    (curDcvgValue, curDcvgSeverity, curDcvgReason) = dcvgSeverities[curFoot];
+                    (curDcvgValue, curDcvgSeverity, curDcvgReason, curDcvgGps) = dcvgSeverities[curFoot];
 
                 var (curOn, curOff, curPrimaryDes, curDate, curDepth, curIsExtrapolated, curCisSeverity, curCisReason, curGps, curRegion) = (0.0, 0.0, "", new DateTime(), (double?)null, true, PGESeverity.NRI, "", new BasicGeoposition(), "");
                 if (cisSeverities.ContainsKey(curFoot))
                     (curOn, curOff, curPrimaryDes, curDate, curDepth, curIsExtrapolated, curCisSeverity, curCisReason, curGps, curRegion) = cisSeverities[curFoot];
 
                 var curPrio = GetPriority(curCisSeverity, curDcvgSeverity, PGESeverity.NRI);
-                if (!curIsExtrapolated)
+                if (!curIsExtrapolated || dcvgSeverities.ContainsKey(curFoot))
                 {
                     var shapeValues = new string[34];
-                    shapeValues[LABEL] = $"On: {curOn}, Off: {curOff}";
+                    var extrapolatedLabel = curIsExtrapolated ? "Extrapolated. " : "";
+                    shapeValues[LABEL] = $"{extrapolatedLabel}On: {curOn}, Off: {curOff}";
                     shapeValues[STATION] = curFoot.ToString("F0");
                     shapeValues[DATE] = curDate.ToShortDateString();
                     shapeValues[PRIMARYDES] = curPrimaryDes;
@@ -239,8 +240,16 @@ namespace AccurateReportSystem
                     if (curDepth.HasValue)
                         shapeValues[DEPTH] = curDepth.Value.ToString("F0");
                     shapeValues[ECDAREGION] = curRegion;
-                    shapeValues[LAT] = curGps.Latitude.ToString("F8");
-                    shapeValues[LON] = curGps.Longitude.ToString("F8");
+                    if (!curIsExtrapolated || curDcvgGps.Equals(new BasicGeoposition()))
+                    {
+                        shapeValues[LAT] = curGps.Latitude.ToString("F8");
+                        shapeValues[LON] = curGps.Longitude.ToString("F8");
+                    }
+                    else
+                    {
+                        shapeValues[LAT] = curDcvgGps.Latitude.ToString("F8");
+                        shapeValues[LON] = curDcvgGps.Longitude.ToString("F8");
+                    }
                     shapeValues[ECDACAT] = "Priority " + curPrio.ToString();
                     if (dcvgSeverities.ContainsKey(curFoot) && DcvgSeries.IsDcvg)
                     {
@@ -355,7 +364,7 @@ namespace AccurateReportSystem
             var dcvgSeverities = new Dictionary<int, PGESeverity>();
             if (DcvgSeries != null)
             {
-                foreach (var (foot, _, _, severity, _) in DcvgSeries.Data)
+                foreach (var (foot, _, _, severity, _, _) in DcvgSeries.Data)
                 {
                     if (foot < page.StartFootage)
                         continue;
