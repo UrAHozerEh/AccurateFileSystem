@@ -932,6 +932,16 @@ namespace AccurateFileSystem
                     Next.CalculateOffset(roundTo);
             }
 
+            public void SetOffset(double value)
+            {
+                if (Prev != null)
+                    Info.Offset = value;
+                else
+                    Info.Offset = 0;
+                if (Next != null)
+                    Next.SetOffset(value);
+            }
+
             public FileInfoLinkedList Reverse()
             {
                 var tempPrev = Prev;

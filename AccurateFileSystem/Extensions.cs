@@ -28,40 +28,54 @@ namespace AccurateFileSystem
             return Math.PI * value / 180.0; ;
         }
 
-        public static (double Footage, double Distance) AlignPoint(this List<(double, BasicGeoposition)> points, BasicGeoposition otherGps, bool extrapolated)
+        public static (double Footage, double Distance, double ExtrapolatedFootage, double ExtrapolatedDistance) AlignPoint(this List<(double, BasicGeoposition)> points, BasicGeoposition otherGps)
         {
             int closestIndex = 0;
             double closestDistance = double.MaxValue;
             double footage = 0;
-            for(int i = 0; i < points.Count; ++i)
+            for (int i = 0; i < points.Count; ++i)
             {
                 var (foot, gps) = points[i];
                 var curDistance = gps.Distance(otherGps);
-                if(curDistance < closestDistance)
+                if (curDistance < closestDistance)
                 {
                     closestDistance = curDistance;
                     closestIndex = i;
                     footage = foot;
                 }
             }
-            if (extrapolated)
+            var startIndex = Math.Max(0, closestIndex - 1);
+            var endIndex = Math.Min(points.Count - 1, closestIndex + 1);
+            var extrapolatedPoints = new List<(double, BasicGeoposition)>();
+            var extrapolatedDist = closestDistance;
+            double extrapolatedFoot = footage;
+            for (int i = startIndex; i < endIndex; ++i)
             {
-                var startIndex = Math.Max(0, closestIndex - 1);
-                var endIndex = Math.Min(points.Count - 1, closestIndex + 1);
-                var extrapolatedPoints = new List<(double, BasicGeoposition)>();
-                for(int i = startIndex; i < endIndex; ++i)
-                {
-                    var (startFoot, startGps) = points[i];
-                    var (endFoot, endGps) = points[i + 1];
+                var (startFoot, startGps) = points[i];
+                var (endFoot, endGps) = points[i + 1];
+                var footDist = endFoot - startFoot;
 
-                    //TODO: Finish this.
-                    throw new NotImplementedException();
+                var latFactor = (endGps.Latitude - startGps.Latitude) / footDist;
+                var lonFactor = (endGps.Longitude - startGps.Longitude) / footDist;
+                for (int j = 1; j < footDist; ++j)
+                {
+                    var fakeGps = new BasicGeoposition()
+                    {
+                        Latitude = startGps.Latitude + latFactor * j,
+                        Longitude = startGps.Longitude + lonFactor * j
+                    };
+                    var curDist = fakeGps.Distance(otherGps);
+                    if(curDist < extrapolatedDist)
+                    {
+                        extrapolatedDist = curDist;
+                        extrapolatedFoot = startFoot + j;
+                    }
                 }
             }
-            return (footage, closestDistance);
+            return (footage, closestDistance, extrapolatedFoot, extrapolatedDist);
         }
 
-        public static GeoboundingBox CombineAreas (this GeoboundingBox rect1, GeoboundingBox rect2)
+        public static GeoboundingBox CombineAreas(this GeoboundingBox rect1, GeoboundingBox rect2)
         {
             var minLong = Math.Min(rect1.NorthwestCorner.Longitude, rect2.NorthwestCorner.Longitude);
             var maxLat = Math.Max(rect1.NorthwestCorner.Latitude, rect2.NorthwestCorner.Latitude);

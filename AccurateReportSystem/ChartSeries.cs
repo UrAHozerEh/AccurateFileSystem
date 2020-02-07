@@ -21,7 +21,7 @@ namespace AccurateReportSystem
         public abstract void Draw(PageInformation page, CanvasDrawingSession session, Rect drawArea, TransformInformation1d transform);
     }
 
-    public struct ArrowInfo
+    public class ArrowInfo
     {
         public float HeightInches { get; set; }
         public float Height => (float)Math.Round(HeightInches * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
@@ -61,6 +61,7 @@ namespace AccurateReportSystem
 
             FontSize = fontSize;
             FontColor = fontColor ?? Colors.Black;
+
         }
 
         public void Draw(CanvasDrawingSession session, float x, float y, Direction direction, string text = null)

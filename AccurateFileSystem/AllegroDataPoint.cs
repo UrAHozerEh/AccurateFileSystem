@@ -54,8 +54,9 @@ namespace AccurateFileSystem
         public bool IsHiLo { get; private set; } = false;
         public List<TestStationRead> TestStationReads = new List<TestStationRead>();
         public bool HasReconnect { get; private set; } = false;
+        public bool IsCorrected { get; set; }
 
-        public AllegroDataPoint(int id, double footage, double on, double off, BasicGeoposition gps, List<DateTime> times, double indicationValue, string comment)
+        public AllegroDataPoint(int id, double footage, double on, double off, BasicGeoposition gps, List<DateTime> times, double indicationValue, string comment, bool isCorrected)
         {
             Id = id;
             Footage = footage;
@@ -67,6 +68,7 @@ namespace AccurateFileSystem
             GPS = gps;
             Times = times;
             IndicationValue = indicationValue;
+            IsCorrected = isCorrected;
             ParseComment(true);
         }
 
