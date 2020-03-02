@@ -37,6 +37,7 @@ using Colors = Windows.UI.Colors;
 using Color = Windows.UI.Color;
 using PageSetup = AccurateReportSystem.PageSetup;
 using DocumentFormat.OpenXml.Spreadsheet;
+using ClosedXML.Excel;
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
 namespace AFSTester
@@ -53,7 +54,7 @@ namespace AFSTester
         List<(string Name, string Route, double Length, BasicGeoposition Start, BasicGeoposition End)> ShortList;
         string FolderName;
         bool IsAerial = false;
-        string ReportQ = "";
+        string ReportQ { get; set; } = "";
 
         public MainPage()
         {
@@ -445,7 +446,7 @@ namespace AFSTester
             return curValue + change;
         }
 
-        private async Task MakeIITGraphs(CombinedAllegroCISFile file, List<(double, double, BasicGeoposition)> dcvgData, bool isDcvg, string folderName, List<(BasicGeoposition, BasicGeoposition, string)> regions = null, (string, string, string, string)? surveyInfos = null)
+        private async Task MakeIITGraphs(CombinedAllegroCISFile file, List<(double, double, BasicGeoposition)> dcvgData, bool isDcvg, string folderName, List<RegionInfo> regions = null, (string, string, string, string)? surveyInfos = null)
         {
             var curDepth = 50.0;
             var curOff = -1.0;
@@ -587,12 +588,36 @@ namespace AFSTester
                 PointColor = Colors.Red,
                 BackdropOpacity = 1f
             };
-
             onOffGraph.Series.Add(dcvgIndication);
+
+            var pcmLables = new List<(double, string)>()
+            {
+                (0, "59.12"),
+                (50, "58.02"),
+                (100, "60.57"),
+                (150, "57.1"),
+                (200, "59.6"),
+                (250, "59.65"),
+                (300, "59.31"),
+                (350, "58.89"),
+                (400, "59.79"),
+                (450, "57.52")
+            };
+            var pcmData = pcmLables.Select(value => (value.Item1, double.Parse(value.Item2))).ToList();
+            var pcm2 = new GraphSeries("PCM", pcmData)
+            {
+                LineColor = Colors.Black,
+                PointColor = Colors.Navy,
+                IsY1Axis = false,
+                PointShape = GraphSeries.Shape.Square,
+                GraphType = GraphSeries.Type.Point
+            };
+            //onOffGraph.Series.Add(pcm2);
 
             report.XAxisInfo.IsEnabled = false;
             report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
             report.LegendInfo.SeriesNameFontSize = report.YAxesInfo.Y1LabelFontSize;
+            //onOffGraph.YAxesInfo.Y2Title += " & PCM (dBmA)";
 
             var bottomGlobalXAxis = new GlobalXAxis(report)
             {
@@ -613,7 +638,8 @@ namespace AFSTester
             //};
             var surveyDirectionChart = new Chart(report, "Survey Direction");
             var cisClass = new Chart(report, "CIS Severity");
-            var cisIndication = new PGECISIndicationChartSeries(file.GetPoints(), cisClass, regions);
+            var tempRegions = regions.Select(region => (region.Start, region.End, region.Name)).ToList();
+            var cisIndication = new PGECISIndicationChartSeries(file.GetPoints(), cisClass, tempRegions);
             cisClass.Series.Add(cisIndication);
 
             var dcvgClass = new Chart(report, "DCVG Severity");
@@ -773,6 +799,25 @@ namespace AFSTester
             skipReportString = "\n\n" + skipReportString;
             depthString = "\n\n" + depthString;
 
+            foreach (var (foot, _, point, _, _) in file.Points)
+            {
+                foreach (var tsRead in point.TestStationReads)
+                {
+                    var ac = tsRead as ACTestStationRead;
+                    if (ac == null)
+                        continue;
+                    if (ac.Value >= 10)
+                        return;
+                }
+            }
+
+            //var testFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{folderName} Reports V2.xlsx", CreationCollisionOption.ReplaceExisting);
+            //using (var outStream = await testFile.OpenStreamForWriteAsync())
+            //using (var workbook = new XLWorkbook())
+            //{
+
+            //    workbook.SaveAs(outStream);
+            //}
 
             //await FileIO.WriteTextAsync(outputFile, outputString);
             var outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{folderName} Reports.xlsx", CreationCollisionOption.ReplaceExisting);
@@ -801,6 +846,24 @@ namespace AFSTester
                 AddData(wbPart, shapeFileStringBuilder.ToString(), 1, "Shapefile", new List<string>());
                 wbPart.Workbook.Save();
             }
+        }
+
+        private void MakeReportLWorksheet(XLWorkbook book)
+        {
+            var worksheet = book.Worksheets.Add("Report L");
+
+            #region Title Cell
+            var titleCell = worksheet.Cell("A8");
+            titleCell.Value = "HCA Indication Summary";
+            titleCell.Style.Font.Italic = true;
+            titleCell.Style.Font.Bold = true;
+            titleCell.Style.Font.FontColor = XLColor.Blue;
+            #endregion
+            #region Date of Cell
+            var dateOfCell = worksheet.Cell("A10");
+            dateOfCell.Value = $"Date of Report: {DateTime.Now.ToShortDateString()}"; 
+            #endregion
+
         }
 
         private void AddData(WorkbookPart workbook, string data, int worksheetId, string worksheetName, List<string> mergeCellStrings)
@@ -1310,14 +1373,23 @@ namespace AFSTester
 (892,"Left: 5.7mV, Right: 1mV"),
 (902,"Dirt Road, Dyke tank rd"),
 (912,"Left: 8.7mV, Right: 4.9mV"),
-(982,"Side Drain Reading , Emergency valve"),
+(980, "Leadk Grade 3: Reading 150 ppm at rock pile"),
+(982,"Side Drain Reading, Emergency valve"),
+(990, "Leak Grade 3: reading 4500 ppm at tank wall"),
 (992,"Side Drain Reading , Tank farm Left: -94.6mV, Right: -22.4mV"),
+(995, "Leak Grade 3: reading 5200 ppm south of tank wall"),
+(1000, "Leak Grade 1: reading 20% gas at edge of tank"),
+(1005, "Leak Grade 3: reading 450 ppm at NE tank 30-02"),
+(1010, "Leak Grade 3: reading 8000 ppm west of tank 30-04"),
+(1020, "Leak Grade 3: reading 6500 ppm east of tank 30-04"),
 (1022,"Left: -0.4mV, Right: -6.1mV"),
 (1052,"Left: 1mV, Right: -4mV"),
 (1152,"Left: 7.7mV, Right: -10.6mV"),
 (1202,"Left: -0.4mV, Right: -17.7mV"),
 (1232,"Left: -12.9mV, Right: -7.5mV"),
 (1292,"Left: -2.3mV, Right: -1.9mV"),
+(1320, "Leak Grade 3: reading 3000 ppm west of end of line"),
+(1330, "Leak Grade 1: reading 100% gas at end of line riser at warehouse"),
 (1332,"Cultivated Field, End of main line Left: 5.7mV, Right: -6.4mV"),
             };
             var mainHotAnoms = new List<(double, double, string)>
@@ -1393,6 +1465,7 @@ namespace AFSTester
 (1412,"Bend in Pipe"),
 (1432,"Left: -0.0148, Right: 0.0047"),
 (1452,"Bend in Pipe"),
+(1460,"Leak Grade 3: 80 ppm at lat 2 boiler room riser - above ground flange"),
 (1462,"Side Drain Reading , End at boiler room riser"),
             };
             var lat2HotAnoms = new List<(double, double, string)>
@@ -1405,7 +1478,7 @@ namespace AFSTester
             {
             };
 
-            await CreateNustarGraph("Lateral 2", "Lateral 2", lat2OnOffData, lat2Comments, lat2HotAnoms, lat2ACVG);
+            await CreateNustarGraph("Boiler Room", "Boiler Room", lat2OnOffData, lat2Comments, lat2HotAnoms, lat2ACVG);
 
             var lat1OnOffData = new List<(double, double)>
             {
@@ -1455,6 +1528,7 @@ namespace AFSTester
                 (1542,"Left: -0.0047, Right: -0.0019"),
 (1612,"Left: -0.0038, Right: -0.0012"),
 (1642,"House, pipe runs under building"),
+(1650,"Leak Grade 3: reading 1300 ppm at 3/4\" union"),
 (1652,"Side Drain Reading , End of Svy at 3/4 riser RO room Left: 0.0007, Right: -0.008"),
             };
             var toBuildingHotAnoms = new List<(double, double, string)>
@@ -1467,7 +1541,7 @@ namespace AFSTester
             {
             };
 
-            await CreateNustarGraph("To Building", "To Building", toBuildingOnOffData, toBuildingComments, toBuildingHotAnoms, toBuildingACVG);
+            await CreateNustarGraph("RO Room", "RO Room", toBuildingOnOffData, toBuildingComments, toBuildingHotAnoms, toBuildingACVG);
         }
 
         private async Task CreateNustarGraph(string fileName, string title, List<(double, double)> onData, List<(double, string)> comments, List<(double, double, string)> hotspotAnoms, List<(double, double, string)> acvgAnoms)
@@ -1546,6 +1620,8 @@ namespace AFSTester
             {
                 report.PageSetup.Overlap = 10;
                 report.PageSetup.FootagePerPage = 100;
+                report.XAxisInfo.MajorGridline.Offset = 10;
+                report.XAxisInfo.MinorGridline.IsEnabled = false;
             }
 
             var pages = report.PageSetup.GetAllPages(start, distance);
@@ -1648,6 +1724,7 @@ namespace AFSTester
             var folderPicker = new FolderPicker();
             folderPicker.FileTypeFilter.Add(".");
             var folder = await folderPicker.PickSingleFolderAsync();
+            var dcvgfjdsak = "HCA\tFootage\tPercent\tValue\tStart Footage\tStart On\tStart Off\tStart IR Drop\tEnd Footage\tEnd On\tEnd Off\tEnd IR Drop\tLatitude\tLongitude";
             if (folder == null)
                 return;
 
@@ -1699,13 +1776,14 @@ namespace AFSTester
                 var isDcvg = masterFolder.DisplayName == "DCVG";
                 var folders = await masterFolder.GetFoldersAsync();
                 ReportQ = "";
+                var reportQ = "";
                 foreach (var curFolder in folders)
                 {
                     var files = await curFolder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
                     var cisFiles = new List<AllegroCISFile>();
                     var dcvgFiles = new List<AllegroCISFile>();
                     var acvgReads = new List<(BasicGeoposition, double)>();
-                    var regions = new List<(BasicGeoposition Start, BasicGeoposition End, string Region)>();
+                    var regions = new List<RegionInfo>();
                     var alignData = new List<(double, double, double, double)>();
                     foreach (var file in files)
                     {
@@ -1759,7 +1837,13 @@ namespace AFSTester
                                 var splitLine = line.Split(',');
                                 if (splitLine.Length == 1)
                                 {
-                                    regions.Add((new BasicGeoposition(), new BasicGeoposition(), line));
+                                    var onlyRegion = new RegionInfo()
+                                    {
+                                        Start = new BasicGeoposition(),
+                                        End = new BasicGeoposition(),
+                                        Name = line
+                                    };
+                                    regions.Add(onlyRegion);
                                     continue;
                                 }
                                 var surveyName = splitLine[0].Trim();
@@ -1774,7 +1858,13 @@ namespace AFSTester
                                 var endGps = new BasicGeoposition() { Latitude = endLat, Longitude = endLon };
                                 if (region.Trim() == "0")
                                     region = "Buffer";
-                                regions.Add((startGps, endGps, region));
+                                var curRegion = new RegionInfo()
+                                {
+                                    Start = startGps,
+                                    End = endGps,
+                                    Name = region
+                                };
+                                regions.Add(curRegion);
                             }
                         }
                     }
@@ -1840,6 +1930,21 @@ namespace AFSTester
                         {
                             if (point.HasIndication)
                             {
+                                var startOn = double.Parse(file.Header["DCVG_Begin_PS_ON"]);
+                                var startOff = double.Parse(file.Header["DCVG_Begin_PS_OFF"]);
+                                var endOn = double.Parse(file.Header["DCVG_End_PS_ON"]);
+                                var endOff = double.Parse(file.Header["DCVG_End_PS_OFF"]);
+
+                                var startIrDrop = startOff - startOn;
+                                var endIrDrop = endOff - endOn;
+                                //var irDropFactor = (endIrDrop - startIrDrop) / TotalFootage;
+
+                                var dcvgFileInfo = $"0\t{startOn.ToString("F4")}\t{startOff.ToString("F4")}\t{startIrDrop.ToString("F4")}\t{file.TotalFootage}\t{endOn.ToString("F4")}\t{endOff.ToString("F4")}\t{endIrDrop.ToString("F4")}";
+                                dcvgfjdsak += $"\n{curFolder.DisplayName}\t{point.Footage}\t{point.IndicationPercent.ToString("F2")}%\t{point.IndicationValue}\t{dcvgFileInfo}";
+                                if (point.HasGPS)
+                                    dcvgfjdsak += $"\t{ point.GPS.Latitude}\t{ point.GPS.Longitude}";
+                                else
+                                    dcvgfjdsak += $"\t{ lastGps.Latitude}\t{ lastGps.Longitude}";
                                 if (!point.HasGPS)
                                 {
                                     var dist = foot - lastFoot;
@@ -1847,7 +1952,7 @@ namespace AFSTester
                                     {
                                         (regFoot, regDist, extrapFoot, extrapDist) = combinedFootages.AlignPoint(lastGps);
                                         alignData.Add((regFoot, regDist, extrapFoot, extrapDist));
-                                        dcvgData.Add((extrapFoot, point.IndicationPercent, lastGps));
+                                        dcvgData.Add((extrapFoot, point.IndicationPercent, lastGps)); // Extgrap Foot
                                         ++totalDcvgPoints;
                                         if (lastCorrected)
                                             ++correctedDcvgPoints;
@@ -1858,7 +1963,7 @@ namespace AFSTester
                                 }
                                 (regFoot, regDist, extrapFoot, extrapDist) = combinedFootages.AlignPoint(point.GPS);
                                 alignData.Add((regFoot, regDist, extrapFoot, extrapDist));
-                                dcvgData.Add((extrapFoot, point.IndicationPercent, point.GPS));
+                                dcvgData.Add((extrapFoot, point.IndicationPercent, point.GPS));// Extgrap Foot
                                 ++totalDcvgPoints;
                                 if (point.IsCorrected)
                                     ++correctedDcvgPoints;
@@ -1881,9 +1986,9 @@ namespace AFSTester
                             dcvgData.Add((acvgExtrapFoot, read, gps));
                         }
                     }
-
-
                     dcvgData.Sort((first, second) => first.Item1.CompareTo(second.Item1));
+
+
                     if (regions == null || regions.Count == 0)
                         regions = null;
                     if (!surveyInfo.ContainsKey(curFolder.DisplayName.ToLower()))
@@ -1898,7 +2003,27 @@ namespace AFSTester
                     //}
                     //if (!hasNew)
                     //    continue;
-                    await MakeIITGraphs(combinedFile, dcvgData, isDcvg, curFolder.DisplayName, regions, surveyInfo[curFolder.DisplayName.ToLower()]);
+                    var fromHcaFile = surveyInfo[curFolder.DisplayName.ToLower()];
+                    var hcaInfo = new HcaInfo()
+                    {
+                        HcaId = fromHcaFile.HcaId,
+                        Route = fromHcaFile.Route,
+                        StartMilepost = fromHcaFile.StartMilepost,
+                        EndMilepost = fromHcaFile.EndMilepost,
+                        Regions = regions
+                    };
+                    PgeEcdaReportInformation reportInfo;
+                    if(isDcvg)
+                    {
+                        reportInfo = new PgeEcdaReportInformation(combinedFile, dcvgFiles, hcaInfo, 10);
+                    }
+                    else
+                    {
+                        reportInfo = new PgeEcdaReportInformation(combinedFile, acvgReads, hcaInfo, 10);
+                    }
+                    reportQ += reportInfo.GetReportQ();
+                    if (regions != null)
+                        await MakeIITGraphs(reportInfo.CisFile, dcvgData, isDcvg, curFolder.DisplayName, regions, surveyInfo[curFolder.DisplayName.ToLower()]);
                     if (alignData.Count > 0)
                     {
                         globalAlignData.AddRange(alignData);
@@ -1918,6 +2043,7 @@ namespace AFSTester
                     wbPart.Workbook = new Workbook();
                     wbPart.Workbook.AppendChild(new Sheets());
                     AddData(wbPart, ReportQ, 1, "Report Q", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
+                    AddData(wbPart, reportQ, 2, "Report Q2", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
                     wbPart.Workbook.Save();
                 }
             }

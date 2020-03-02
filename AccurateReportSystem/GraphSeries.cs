@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Foundation;
 using Windows.UI;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Shapes;
@@ -192,6 +193,9 @@ namespace AccurateReportSystem
                 switch (PointShape)
                 {
                     case Shape.Square:
+                        var rect = new Rect() { X = x - ShapeRadius, Y = y - ShapeRadius, Height = ShapeRadius * 2, Width = ShapeRadius * 2 };
+                        session.FillRectangle(rect, PointColor);
+                        session.DrawRectangle(rect, PointColor);
                         break;
                     case Shape.Circle:
                         session.FillCircle(x, y, ShapeRadius, PointColor);

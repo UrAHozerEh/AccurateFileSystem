@@ -41,7 +41,6 @@ namespace AccurateFileSystem
         public void Reverse()
         {
             FileInfos = FileInfos.Reverse();
-            FileInfos.CalculateOffset(10);
             UpdatePoints();
         }
 
@@ -951,6 +950,7 @@ namespace AccurateFileSystem
                 Info.Start = tempEnd;
                 Info.End = tempStart;
                 Prev = tempNext;
+                Info.Offset = Prev?.Info.Offset ?? 0;
                 Next = tempPrev;
                 if (Prev == null)
                     return this;

@@ -18,6 +18,7 @@ namespace AccurateReportSystem
         public float FontSize { get; set; } = 8f;
         public float BackdropOpacity { get; set; } = 0.75f;
         public Color BackdropColor { get; set; } = Colors.White;
+        public float BackdropIncrease { get; set; } = 0.25f;
 
         public PointWithLabelGraphSeries(string name, List<(double Footage, double Value, string Label)> labels) : base(name, labels.Select(label => (label.Footage, label.Value)).ToList())
         {
@@ -89,7 +90,11 @@ namespace AccurateReportSystem
                             {
                                 using (var _ = session.CreateLayer(BackdropOpacity))
                                 {
-                                    session.FillRectangle(translatedGeo.ComputeBounds(), BackdropColor);
+                                    var translatedBounds = translatedGeo.ComputeBounds();
+                                    var yShift = translatedBounds.Height * (BackdropIncrease / 2);
+                                    translatedBounds.Height *= 1 + BackdropIncrease;
+                                    translatedBounds.Y -= yShift;
+                                    session.FillRectangle(translatedBounds, BackdropColor);
                                 }
                                 session.FillGeometry(translatedGeo, Colors.Black);
                             }
