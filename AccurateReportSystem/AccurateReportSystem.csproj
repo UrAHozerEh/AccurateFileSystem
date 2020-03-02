@@ -139,6 +139,7 @@
     <Compile Include="PGECISIndicationChartSeries.cs" />
     <Compile Include="PgeDcvgIndicationChartSeries.cs" />
     <Compile Include="PGEDirectExaminationPriorityChartSeries.cs" />
+    <Compile Include="PgeEcdaReportInformation.cs" />
     <Compile Include="PointWithLabelGraphSeries.cs" />
     <Compile Include="Series.cs" />
     <Compile Include="SingleValueGraphSeries.cs" />

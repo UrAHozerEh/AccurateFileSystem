@@ -64,11 +64,11 @@ namespace AccurateReportSystem
                 var (startFoot, startPoint) = data[i];
                 var (endFoot, endPoint) = data[i + 1];
                 curRegion = GetClosestRegion(startPoint.GPS);
-                extrapolatedData.Add((startFoot, startPoint.MirOn, startPoint.MirOff, startPoint.OriginalComment, startPoint.Times[0], startPoint.Depth, startPoint.GPS, curRegion, false, false));
+                extrapolatedData.Add((startFoot, startPoint.On, startPoint.Off, startPoint.OriginalComment, startPoint.Times[0], startPoint.Depth, startPoint.GPS, curRegion, false, false));
                 var dist = endFoot - startFoot;
 
-                var onDiff = endPoint.MirOn - startPoint.MirOn;
-                var offDiff = endPoint.MirOff - startPoint.MirOff;
+                var onDiff = endPoint.On - startPoint.On;
+                var offDiff = endPoint.Off - startPoint.Off;
                 var onPerFoot = onDiff / dist;
                 var offPerFoot = offDiff / dist;
 
@@ -80,8 +80,8 @@ namespace AccurateReportSystem
 
                 for (int offset = 1; offset < dist; ++offset)
                 {
-                    var newOn = onPerFoot * offset + startPoint.MirOn;
-                    var newOff = offPerFoot * offset + startPoint.MirOff;
+                    var newOn = onPerFoot * offset + startPoint.On;
+                    var newOff = offPerFoot * offset + startPoint.Off;
                     var newFoot = startFoot + offset;
 
                     var newLat = latPerFoot * offset + startPoint.GPS.Latitude;
@@ -93,7 +93,7 @@ namespace AccurateReportSystem
             }
             var (foot, point) = data.Last();
             curRegion = GetClosestRegion(point.GPS);
-            extrapolatedData.Add((foot, point.MirOn, point.MirOff, point.OriginalComment, point.Times[0], point.Depth, point.GPS, curRegion, false, false));
+            extrapolatedData.Add((foot, point.On, point.Off, point.OriginalComment, point.Times[0], point.Depth, point.GPS, curRegion, false, false));
             bool extrapolated, skipped;
             BasicGeoposition gps;
             double on, off;
