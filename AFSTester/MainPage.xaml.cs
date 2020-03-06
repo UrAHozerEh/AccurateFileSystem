@@ -592,17 +592,16 @@ namespace AFSTester
 
             var pcmLables = new List<(double, string)>()
             {
-                (0, "59.12"),
-                (50, "58.02"),
-                (100, "60.57"),
-                (150, "57.1"),
-                (200, "59.6"),
-                (250, "59.65"),
-                (300, "59.31"),
-                (350, "58.89"),
-                (400, "59.79"),
-                (450, "57.52")
+                (0, "49.72")
             };
+            if (folderName.Contains("1-2"))
+            {
+                pcmLables = new List<(double, string)>() { (45, "44.49") };
+            }
+            if (folderName.Contains("7-8"))
+            {
+                pcmLables = new List<(double, string)>() { (0, "48.52") };
+            }
             var pcmData = pcmLables.Select(value => (value.Item1, double.Parse(value.Item2))).ToList();
             var pcm2 = new GraphSeries("PCM", pcmData)
             {
@@ -861,7 +860,7 @@ namespace AFSTester
             #endregion
             #region Date of Cell
             var dateOfCell = worksheet.Cell("A10");
-            dateOfCell.Value = $"Date of Report: {DateTime.Now.ToShortDateString()}"; 
+            dateOfCell.Value = $"Date of Report: {DateTime.Now.ToShortDateString()}";
             #endregion
 
         }
@@ -2013,7 +2012,7 @@ namespace AFSTester
                         Regions = regions
                     };
                     PgeEcdaReportInformation reportInfo;
-                    if(isDcvg)
+                    if (isDcvg)
                     {
                         reportInfo = new PgeEcdaReportInformation(combinedFile, dcvgFiles, hcaInfo, 10);
                     }
