@@ -18,7 +18,8 @@ namespace AccurateReportSystem
         public Color ThreeColor { get; set; } = Colors.Blue;
         public CisSeries CisSeries { get; set; } = null;
         public DcvgSeries DcvgSeries { get; set; } = null;
-        public List<string[]> ShapeFileOutput { get; set; }
+        public List<string[]> CISShapeFileOutput { get; set; }
+        public List<string[]> IndicationShapeFileOutput { get; set; }
 
         private static int LABEL = 0;
         private static int STATION = 1;
@@ -80,8 +81,10 @@ namespace AccurateReportSystem
             header[31] = "SECONDGPS";
             header[32] = "ACVG";
             header[33] = "ACVGCAT";
-            ShapeFileOutput = new List<string[]>();
-            ShapeFileOutput.Add(header);
+            CISShapeFileOutput = new List<string[]>();
+            CISShapeFileOutput.Add(header);
+            IndicationShapeFileOutput = new List<string[]>();
+            IndicationShapeFileOutput.Add(header);
         }
 
         public List<(double Start, double End, PGESeverity CisSeverity, PGESeverity DcvgSeverity, string Region, int Overall, string Comments)> GetReportQ()
@@ -118,8 +121,9 @@ namespace AccurateReportSystem
             var lastDcvgSeverity = PGESeverity.NRI;
             var lastDcvgReason = "";
             var lastDcvgValue = 0.0;
+            var lastDcvgGps = new BasicGeoposition();
             if (dcvgSeverities.ContainsKey(0))
-                (lastDcvgValue, lastDcvgSeverity, lastDcvgReason, _) = dcvgSeverities[0];
+                (lastDcvgValue, lastDcvgSeverity, lastDcvgReason, lastDcvgGps) = dcvgSeverities[0];
 
             var lastCisSeverity = PGESeverity.NRI;
             var lastCisReason = "";
@@ -142,36 +146,13 @@ namespace AccurateReportSystem
                 firstShapeValues[STATION] = "0";
                 firstShapeValues[DATE] = lastDate.ToShortDateString();
                 firstShapeValues[PRIMARYDES] = lastPrimaryDes;
-                if (dcvgSeverities.ContainsKey(0) && DcvgSeries.IsDcvg)
-                    firstShapeValues[DCVGREMOTE] = lastDcvgValue.ToString("F2");
                 if (lastDepth.HasValue)
                     firstShapeValues[DEPTH] = lastDepth.Value.ToString("F0");
                 firstShapeValues[ECDAREGION] = lastRegion;
                 firstShapeValues[LAT] = lastGps.Latitude.ToString("F8");
                 firstShapeValues[LON] = lastGps.Longitude.ToString("F8");
                 firstShapeValues[ECDACAT] = "Priority " + lastPrio.ToString();
-                if (dcvgSeverities.ContainsKey(0) && DcvgSeries.IsDcvg)
-                {
-                    switch (lastDcvgSeverity)
-                    {
-                        case PGESeverity.NRI:
-                            catString = "NRI";
-                            break;
-                        case PGESeverity.Minor:
-                            catString = "Minor";
-                            break;
-                        case PGESeverity.Moderate:
-                            catString = "Moderate";
-                            break;
-                        case PGESeverity.Severe:
-                            catString = "Severe";
-                            break;
-                        default:
-                            break;
-                    }
-                    firstShapeValues[DCVGCAT] = catString;
-                }
-                switch (lastDcvgSeverity)
+                switch (lastCisSeverity)
                 {
                     case PGESeverity.NRI:
                         catString = "NRI";
@@ -191,8 +172,48 @@ namespace AccurateReportSystem
                 firstShapeValues[CISCAT] = catString;
                 firstShapeValues[ON] = lastOn.ToString("F4");
                 firstShapeValues[OFF] = lastOff.ToString("F4");
+                CISShapeFileOutput.Add(firstShapeValues);
+                if (dcvgSeverities.ContainsKey(0) && DcvgSeries.IsDcvg)
+                {
+                    firstShapeValues = new string[34];
+                    firstShapeValues[LABEL] = $"DCVG: {lastDcvgValue.ToString("F1")}%";
+                    firstShapeValues[STATION] = "0";
+                    firstShapeValues[DATE] = lastDate.ToShortDateString();
+                    firstShapeValues[DCVGREMOTE] = lastDcvgValue.ToString("F1");
+                    firstShapeValues[ECDAREGION] = lastRegion;
+                    firstShapeValues[LAT] = lastDcvgGps.Latitude.ToString("F8");
+                    firstShapeValues[LON] = lastDcvgGps.Longitude.ToString("F8");
+                    firstShapeValues[ECDACAT] = "Priority " + lastPrio.ToString();
+                    switch (lastDcvgSeverity)
+                    {
+                        case PGESeverity.NRI:
+                            catString = "NRI";
+                            break;
+                        case PGESeverity.Minor:
+                            catString = "Minor";
+                            break;
+                        case PGESeverity.Moderate:
+                            catString = "Moderate";
+                            break;
+                        case PGESeverity.Severe:
+                            catString = "Severe";
+                            break;
+                        default:
+                            break;
+                    }
+                    firstShapeValues[DCVGCAT] = catString;
+                    IndicationShapeFileOutput.Add(firstShapeValues);
+                }
                 if (dcvgSeverities.ContainsKey(0) && !DcvgSeries.IsDcvg)
                 {
+                    firstShapeValues = new string[34];
+                    firstShapeValues[LABEL] = $"ACVG: {lastDcvgValue.ToString("F2")}";
+                    firstShapeValues[STATION] = "0";
+                    firstShapeValues[DATE] = lastDate.ToShortDateString();
+                    firstShapeValues[ECDAREGION] = lastRegion;
+                    firstShapeValues[LAT] = lastDcvgGps.Latitude.ToString("F8");
+                    firstShapeValues[LON] = lastDcvgGps.Longitude.ToString("F8");
+                    firstShapeValues[ECDACAT] = "Priority " + lastPrio.ToString();
                     firstShapeValues[ACVG] = lastDcvgValue.ToString("F2");
                     switch (lastDcvgSeverity)
                     {
@@ -212,8 +233,9 @@ namespace AccurateReportSystem
                             break;
                     }
                     firstShapeValues[ACVGCAT] = catString;
+                    IndicationShapeFileOutput.Add(firstShapeValues);
                 }
-                ShapeFileOutput.Add(firstShapeValues);
+
             }
 
             for (var curFoot = 1; curFoot <= lastFoot; ++curFoot)
@@ -227,11 +249,10 @@ namespace AccurateReportSystem
                     (curOn, curOff, curPrimaryDes, curDate, curDepth, curIsExtrapolated, curCisSeverity, curCisReason, curGps, curRegion) = cisSeverities[curFoot];
 
                 var curPrio = GetPriority(curCisSeverity, curDcvgSeverity, PGESeverity.NRI);
-                if (!curIsExtrapolated || dcvgSeverities.ContainsKey(curFoot))
+                if (!curIsExtrapolated)
                 {
                     var shapeValues = new string[34];
-                    var extrapolatedLabel = curIsExtrapolated ? "Extrapolated. " : "";
-                    shapeValues[LABEL] = $"{extrapolatedLabel}On: {curOn}, Off: {curOff}";
+                    shapeValues[LABEL] = $"On: {curOn}, Off: {curOff}";
                     shapeValues[STATION] = curFoot.ToString("F0");
                     shapeValues[DATE] = curDate.ToShortDateString();
                     shapeValues[PRIMARYDES] = curPrimaryDes;
@@ -314,9 +335,65 @@ namespace AccurateReportSystem
                         shapeValues[ACVG] = curDcvgValue.ToString("F2");
                         shapeValues[ACVGCAT] = catString;
                     }
-                    ShapeFileOutput.Add(shapeValues);
+                    CISShapeFileOutput.Add(shapeValues);
                 }
+                if (dcvgSeverities.ContainsKey(curFoot))
+                {
+                    var shapeValues = new string[34];
+                    shapeValues[LABEL] = DcvgSeries.IsDcvg ? $"DCVG: {lastDcvgValue.ToString("F1")}%" : $"ACVG: {curDcvgValue.ToString("F2")}";
+                    shapeValues[STATION] = curFoot.ToString("F0");
+                    shapeValues[DATE] = curDate.ToShortDateString();                        
+                    shapeValues[ECDAREGION] = curRegion;
+                    shapeValues[LAT] = curDcvgGps.Latitude.ToString("F8");
+                    shapeValues[LON] = curDcvgGps.Longitude.ToString("F8");
+                    shapeValues[ECDACAT] = "Priority " + curPrio.ToString();
+                    if (DcvgSeries.IsDcvg)
+                    {
+                        switch (curDcvgSeverity)
+                        {
+                            case PGESeverity.NRI:
+                                catString = "NRI";
+                                break;
+                            case PGESeverity.Minor:
+                                catString = "Minor";
+                                break;
+                            case PGESeverity.Moderate:
+                                catString = "Moderate";
+                                break;
+                            case PGESeverity.Severe:
+                                catString = "Severe";
+                                break;
+                            default:
+                                break;
+                        }
+                        shapeValues[DCVGCAT] = catString;
+                        shapeValues[DCVGREMOTE] = curDcvgValue.ToString("F1");
+                    }
 
+                    if (!DcvgSeries.IsDcvg)
+                    {
+                        switch (curDcvgSeverity)
+                        {
+                            case PGESeverity.NRI:
+                                catString = "NRI";
+                                break;
+                            case PGESeverity.Minor:
+                                catString = "Minor";
+                                break;
+                            case PGESeverity.Moderate:
+                                catString = "Moderate";
+                                break;
+                            case PGESeverity.Severe:
+                                catString = "Severe";
+                                break;
+                            default:
+                                break;
+                        }
+                        shapeValues[ACVG] = curDcvgValue.ToString("F2");
+                        shapeValues[ACVGCAT] = catString;
+                    }
+                    IndicationShapeFileOutput.Add(shapeValues);
+                }
                 if (curCisSeverity != lastCisSeverity || curCisReason != lastCisReason || curDcvgSeverity != lastDcvgSeverity || curDcvgReason != lastDcvgReason || curRegion != lastRegion)
                 {
                     var fullReason = lastCisReason;
