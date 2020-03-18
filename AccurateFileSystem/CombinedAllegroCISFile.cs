@@ -382,7 +382,7 @@ namespace AccurateFileSystem
             {
                 curLine = new string[31];
                 curLine[0] = $"On: {point.MirOn.ToString(readFormat)}, Off: {point.MirOff.ToString(readFormat)}";
-                curLine[1] = point.Footage.ToString("F0");
+                curLine[1] = footage.ToString("F0");
                 if (point.HasTime)
                     curLine[2] = point.Times[0].ToString("MM/dd/yyyy");
                 else
@@ -706,7 +706,14 @@ namespace AccurateFileSystem
         {
             var first = files.First();
             var type = first.Type;
-
+            for(int i = 0; i < files.Count; ++i)
+            {
+                if(files[i].Points.Count == 0)
+                {
+                    files.RemoveAt(i);
+                    --i;
+                }
+            }
             var calc = new OrderCalculator(files, maxGap);
             calc.AsyncSolve();
             //TODO: Maybe look at TS MP to determine if we should reverse the new file.

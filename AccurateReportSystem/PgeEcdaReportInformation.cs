@@ -235,8 +235,6 @@ namespace AccurateReportSystem
                         var gps = point.GPS;
                         if (!point.HasGPS)
                         {
-                            if (point.Footage - lastGpsPoint.Footage > 10)
-                                throw new Exception();
                             gps = lastGpsPoint.GPS;
                         }
                         var closestDistance = double.MaxValue;
@@ -254,7 +252,7 @@ namespace AccurateReportSystem
                         }
                         if (closestPoint == null)
                             throw new Exception();
-                        closestPoint.IndicationValue = point.IndicationValue;
+                        closestPoint.IndicationValue = point.IndicationPercent;
                         closestPoint.IndicationGps = gps;
                     }
                     if (point.HasGPS)
@@ -292,6 +290,19 @@ namespace AccurateReportSystem
                 closestPoint.IndicationValue = value;
                 closestPoint.IndicationGps = gps;
             }
+        }
+
+        public List<(double, double, BasicGeoposition)> GetIndicationData()
+        {
+            var output = new List<(double, double, BasicGeoposition)>();
+            foreach(var point in EcdaData)
+            {
+                if(!double.IsNaN(point.IndicationValue))
+                {
+                    output.Add((point.Footage, point.IndicationValue, point.IndicationGps.Value));
+                }
+            }
+            return output;
         }
 
         private void ExtrapolateCisData()

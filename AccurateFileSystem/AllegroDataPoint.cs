@@ -21,7 +21,7 @@ namespace AccurateFileSystem
         public double MirOff => Off - MirOffOffset;
         public double? MirOffPerFoot { get; set; } = null;
         public double? Depth { get; private set; }
-        public string OriginalComment { get; private set; }
+        public string OriginalComment { get; set; }
         public string CommentTemplate { get; private set; }
         public string StrippedComment { get; set; }
         public BasicGeoposition GPS { get; set; }
@@ -77,15 +77,28 @@ namespace AccurateFileSystem
             if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
             string docPattern = @"(?i)DOC:?\s?(\d+)\s?(in)?";
+            string docFootPattern = @"(?i)DOC:?\s?(\d+)\s?ft";
             string docFootInchPattern = @"(?i)DOC:?\s?(\d+)'(\d*)\s?(in)?";
             var doc = Regex.Match(OriginalComment, docPattern);
-            var docFoot = Regex.Match(OriginalComment, docFootInchPattern);
-            if (docFoot.Success)
+            var docFoot = Regex.Match(OriginalComment, docFootPattern);
+            var docFootInch = Regex.Match(OriginalComment, docFootInchPattern);
+            if (docFootInch.Success)
             {
-                var feet = double.Parse(docFoot.Groups[1].Value);
+                var feet = double.Parse(docFootInch.Groups[1].Value);
                 double inches = 0;
-                double.TryParse(docFoot.Groups[2].Value, out inches);
+                double.TryParse(docFootInch.Groups[2].Value, out inches);
                 Depth = feet * 12 + inches;
+                if (removeDoc)
+                {
+                    OriginalComment = OriginalComment.Replace(docFootInch.Value, "");
+
+                    OriginalComment = Regex.Replace(OriginalComment, "^\\s*,\\s*", "");
+                    OriginalComment = Regex.Replace(OriginalComment, "\\s*,\\s*$", "");
+                }
+            }
+            else if (docFoot.Success)
+            {
+                Depth = double.Parse(docFoot.Groups[1].Value) * 12;
                 if (removeDoc)
                 {
                     OriginalComment = OriginalComment.Replace(docFoot.Value, "");
