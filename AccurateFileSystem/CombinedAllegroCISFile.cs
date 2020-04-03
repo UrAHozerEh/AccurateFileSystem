@@ -755,16 +755,6 @@ namespace AccurateFileSystem
             return output;
         }
 
-        public List<(double Footage, bool IsReverseRun, string Date)> GetDirectionWithDateData()
-        {
-            var output = new List<(double, bool, string)>();
-            foreach (var point in Points)
-            {
-                output.Add((point.Footage, point.IsReverse, point.File.Header["date"]));
-            }
-            return output;
-        }
-
         public static CombinedAllegroCISFile CombineFiles(string name, List<AllegroCISFile> files, double maxGap = 1500)
         {
             var first = files.First();

@@ -9,6 +9,7 @@ using Windows.UI;
 
 namespace AccurateReportSystem
 {
+    //TODO: Rename file to just split container
     public class SplitContainer : Container
     {
         private bool IsHorizontal => Orientation == SplitContainerOrientation.Horizontal;
@@ -19,14 +20,6 @@ namespace AccurateReportSystem
         public SplitContainer(SplitContainerOrientation orientation)
         {
             Orientation = orientation;
-        }
-
-        public SplitContainerMeasurement this[int index]
-        {
-             get
-            {
-                return ContainerMeasurements[index];
-            }
         }
 
         public override void Draw(PageInformation pageInformation, CanvasDrawingSession session, Rect drawArea)
