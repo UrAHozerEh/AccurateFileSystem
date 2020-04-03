@@ -13,7 +13,7 @@ namespace AccurateFileSystem
         public FileInfoLinkedList FileInfos { get; set; }
         public FileType Type { get; set; }
         public string Name { get; set; }
-        public List<(double Footage, bool IsReverse, AllegroDataPoint Point, bool UseMir, AllegroCISFile File)> Points = null;
+        public List<CombinedDataPoint> Points = null;
 
         private CombinedAllegroCISFile(string name, FileType type, FileInfoLinkedList fileInfos)
         {
@@ -42,6 +42,59 @@ namespace AccurateFileSystem
         {
             FileInfos = FileInfos.Reverse();
             UpdatePoints();
+        }
+
+        public void StraightenGps()
+        {
+            CombinedDataPoint lastData = Points[0];
+            var lastPointIndex = 0;
+            for (int index = 1; index < Points.Count; ++index)
+            {
+                var curData = Points[index];
+                var curPoint = curData.Point;
+
+                if ((!string.IsNullOrWhiteSpace(curPoint.OriginalComment) || curPoint.Depth.HasValue) && curPoint.HasGPS)
+                {
+                    if (index - lastPointIndex != 1) // IF comments are next to eachother then just skip. Nothing to extrapolate.
+                    {
+                        var lastPoint = lastData.Point;
+                        var distance = curData.Footage - lastData.Footage;
+                        var startGps = lastPoint.GPS;
+                        var endGps = curPoint.GPS;
+
+                        var latFactor = (endGps.Latitude - startGps.Latitude) / distance;
+                        var lonFactor = (endGps.Longitude - startGps.Longitude) / distance;
+
+                        for (int curIndex = lastPointIndex + 1; curIndex < index; ++curIndex)
+                        {
+                            var curExtrapolatedData = Points[curIndex];
+                            var curExtrapolatedPoint = curExtrapolatedData.Point;
+                            var curExtrapolatedDistance = curExtrapolatedData.Footage - lastData.Footage;
+
+                            var curLat = startGps.Latitude + (latFactor * curExtrapolatedDistance);
+                            var curLon = startGps.Longitude + (lonFactor * curExtrapolatedDistance);
+                            curExtrapolatedPoint.GPS = new BasicGeoposition() { Latitude = curLat, Longitude = curLon };
+                        }
+                    }
+                    lastPointIndex = index;
+                    lastData = curData;
+                }
+            }
+        }
+
+        public void SetFootageFromGps(int roundDecimals = 0)
+        {
+            var distances = new List<double>();
+            for (int index = 1; index < Points.Count; ++index)
+            {
+                var lastData = Points[index - 1];
+                var curData = Points[index];
+
+                var distance = Math.Max(Math.Round(lastData.Point.GPS.Distance(curData.Point.GPS), roundDecimals), 1);
+                distances.Add(distance);
+                curData.Footage = lastData.Footage + distance;
+                Points[index] = curData;
+            }
         }
 
         public string GetTabularData(int readDecimals = 4)
@@ -563,7 +616,7 @@ namespace AccurateFileSystem
 
         public void UpdatePoints()
         {
-            var list = new List<(double Footage, bool IsReverse, AllegroDataPoint Point, bool UseMir, AllegroCISFile File)>();
+            var list = new List<CombinedDataPoint>();
             var tempFileInfoNode = FileInfos;
             var offset = 0.0;
             while (tempFileInfoNode != null)
@@ -706,14 +759,16 @@ namespace AccurateFileSystem
         {
             var first = files.First();
             var type = first.Type;
-            for(int i = 0; i < files.Count; ++i)
+            for (int i = 0; i < files.Count; ++i)
             {
-                if(files[i].Points.Count == 0)
+                if (files[i].Points.Count == 0)
                 {
                     files.RemoveAt(i);
                     --i;
                 }
             }
+            if (files.Count == 0)
+                return null;
             var calc = new OrderCalculator(files, maxGap);
             calc.AsyncSolve();
             //TODO: Maybe look at TS MP to determine if we should reverse the new file.
@@ -869,7 +924,7 @@ namespace AccurateFileSystem
 
             public string GetExcelData()
             {
-                if(Prev == null)
+                if (Prev == null)
                     return Info.GetExcelDataHeader() + "\n" + Info.GetExcelData() + "\n" + Next?.GetExcelData() ?? "";
                 return Info.GetExcelData() + "\n" + Next?.GetExcelData() ?? "";
             }
@@ -1282,6 +1337,64 @@ namespace AccurateFileSystem
                 MinimumValues = null;
                 Solutions = null;
             }
+        }
+    }
+
+    public struct CombinedDataPoint
+    {
+        public double Footage;
+        public bool IsReverse;
+        public AllegroDataPoint Point;
+        public bool UseMir;
+        public AllegroCISFile File;
+
+        public CombinedDataPoint(double footage, bool isReverse, AllegroDataPoint point, bool useMir, AllegroCISFile file)
+        {
+            Footage = footage;
+            IsReverse = isReverse;
+            Point = point;
+            UseMir = useMir;
+            File = file;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is CombinedDataPoint other &&
+                   Footage == other.Footage &&
+                   IsReverse == other.IsReverse &&
+                   EqualityComparer<AllegroDataPoint>.Default.Equals(Point, other.Point) &&
+                   UseMir == other.UseMir &&
+                   EqualityComparer<AllegroCISFile>.Default.Equals(File, other.File);
+        }
+
+        public override int GetHashCode()
+        {
+            var hashCode = 443624357;
+            hashCode = hashCode * -1521134295 + Footage.GetHashCode();
+            hashCode = hashCode * -1521134295 + IsReverse.GetHashCode();
+            hashCode = hashCode * -1521134295 + EqualityComparer<AllegroDataPoint>.Default.GetHashCode(Point);
+            hashCode = hashCode * -1521134295 + UseMir.GetHashCode();
+            hashCode = hashCode * -1521134295 + EqualityComparer<AllegroCISFile>.Default.GetHashCode(File);
+            return hashCode;
+        }
+
+        public void Deconstruct(out double footage, out bool isReverse, out AllegroDataPoint point, out bool useMir, out AllegroCISFile file)
+        {
+            footage = Footage;
+            isReverse = IsReverse;
+            point = Point;
+            useMir = UseMir;
+            file = File;
+        }
+
+        public static implicit operator (double Footage, bool IsReverse, AllegroDataPoint Point, bool UseMir, AllegroCISFile File)(CombinedDataPoint value)
+        {
+            return (value.Footage, value.IsReverse, value.Point, value.UseMir, value.File);
+        }
+
+        public static implicit operator CombinedDataPoint((double Footage, bool IsReverse, AllegroDataPoint Point, bool UseMir, AllegroCISFile File) value)
+        {
+            return new CombinedDataPoint(value.Footage, value.IsReverse, value.Point, value.UseMir, value.File);
         }
     }
 }
