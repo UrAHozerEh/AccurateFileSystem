@@ -132,6 +132,7 @@
     <Compile Include="Graph.cs" />
     <Compile Include="GraphicalReport.cs" />
     <Compile Include="GraphSeries.cs" />
+    <Compile Include="Grid.cs" />
     <Compile Include="GridlineInfo.cs" />
     <Compile Include="LegendInfo.cs" />
     <Compile Include="MirDirection.cs" />
