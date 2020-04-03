@@ -23,6 +23,13 @@ namespace AccurateFileSystem
             return distance;
         }
 
+        public static BasicGeoposition MiddleTowards(this BasicGeoposition pos1, BasicGeoposition pos2)
+        {
+            var lat = (pos1.Latitude + pos2.Latitude) / 2;
+            var lon = (pos1.Longitude + pos2.Longitude) / 2;
+            return new BasicGeoposition() { Latitude = lat, Longitude = lon };
+        }
+
         private static double ToRadian(double value)
         {
             return Math.PI * value / 180.0; ;
@@ -65,7 +72,7 @@ namespace AccurateFileSystem
                         Longitude = startGps.Longitude + lonFactor * j
                     };
                     var curDist = fakeGps.Distance(otherGps);
-                    if(curDist < extrapolatedDist)
+                    if (curDist < extrapolatedDist)
                     {
                         extrapolatedDist = curDist;
                         extrapolatedFoot = startFoot + j;
@@ -95,7 +102,7 @@ namespace AccurateFileSystem
             return new GeoboundingBox(nwPoint, sePoint);
         }
 
-        public static double DistanceToSegment(this BasicGeoposition point, BasicGeoposition start, BasicGeoposition end)
+        public static (double Distance, BasicGeoposition PointOnSegment) DistanceToSegment(this BasicGeoposition point, BasicGeoposition start, BasicGeoposition end)
         {
             var A = point.Latitude - start.Latitude;
             var B = point.Longitude - start.Longitude;
@@ -126,7 +133,7 @@ namespace AccurateFileSystem
 
             var dx = point.Latitude - xx;
             var dy = point.Longitude - yy;
-            return Math.Sqrt(dx * dx + dy * dy);
+            return (Math.Sqrt(dx * dx + dy * dy), new BasicGeoposition() { Latitude = xx, Longitude = yy });
         }
     }
 }

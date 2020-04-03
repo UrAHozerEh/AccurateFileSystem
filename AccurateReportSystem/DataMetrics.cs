@@ -189,7 +189,7 @@ namespace AccurateReportSystem
             var sheets = new List<(string, string)>();
             var summary = "Listing\tTotal Reads\tListed Readings\tPercentage\tLength\n";
 
-            var on850 = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts\n";
+            var on850 = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             var curCount = 0;
             var curLength = 0.0;
             foreach (var row in On850)
@@ -200,7 +200,7 @@ namespace AccurateReportSystem
             }
             summary += $"On < -0.850V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads).ToString("P")}\t{curLength}\n";
 
-            var off850 = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts\n";
+            var off850 = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
             curLength = 0.0;
             foreach (var row in Off850)
@@ -211,7 +211,7 @@ namespace AccurateReportSystem
             }
             summary += $"Off < -0.850V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads).ToString("P")}\t{curLength}\n";
 
-            var off1250 = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts\n";
+            var off1250 = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
             curLength = 0.0;
             foreach (var row in Off1250)
@@ -222,7 +222,7 @@ namespace AccurateReportSystem
             }
             summary += $"Off > -1.250V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads).ToString("P")}\t{curLength}\n";
 
-            var offBetween = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts\n";
+            var offBetween = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
             curLength = 0.0;
             foreach (var row in OffBetween)
@@ -233,7 +233,7 @@ namespace AccurateReportSystem
             }
             summary += $"Off Between -0.600V and -0.750V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads).ToString("P")}\t{curLength}\n";
 
-            var ac = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts\n";
+            var ac = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
             curLength = 0.0;
             foreach (var row in Ac)

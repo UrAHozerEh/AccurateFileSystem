@@ -256,8 +256,6 @@ namespace AccurateReportSystem
                     shapeValues[STATION] = curFoot.ToString("F0");
                     shapeValues[DATE] = curDate.ToShortDateString();
                     shapeValues[PRIMARYDES] = curPrimaryDes;
-                    if (dcvgSeverities.ContainsKey(curFoot) && DcvgSeries.IsDcvg)
-                        shapeValues[DCVGREMOTE] = curDcvgValue.ToString("F2");
                     if (curDepth.HasValue)
                         shapeValues[DEPTH] = curDepth.Value.ToString("F0");
                     shapeValues[ECDAREGION] = curRegion;
@@ -272,27 +270,6 @@ namespace AccurateReportSystem
                         shapeValues[LON] = curDcvgGps.Longitude.ToString("F8");
                     }
                     shapeValues[ECDACAT] = "Priority " + curPrio.ToString();
-                    if (dcvgSeverities.ContainsKey(curFoot) && DcvgSeries.IsDcvg)
-                    {
-                        switch (curDcvgSeverity)
-                        {
-                            case PGESeverity.NRI:
-                                catString = "NRI";
-                                break;
-                            case PGESeverity.Minor:
-                                catString = "Minor";
-                                break;
-                            case PGESeverity.Moderate:
-                                catString = "Moderate";
-                                break;
-                            case PGESeverity.Severe:
-                                catString = "Severe";
-                                break;
-                            default:
-                                break;
-                        }
-                        shapeValues[DCVGCAT] = catString;
-                    }
                     switch (curCisSeverity)
                     {
                         case PGESeverity.NRI:
@@ -313,34 +290,12 @@ namespace AccurateReportSystem
                     shapeValues[CISCAT] = catString;
                     shapeValues[ON] = curOn.ToString("F4");
                     shapeValues[OFF] = curOff.ToString("F4");
-                    if (dcvgSeverities.ContainsKey(curFoot) && !DcvgSeries.IsDcvg)
-                    {
-                        switch (curDcvgSeverity)
-                        {
-                            case PGESeverity.NRI:
-                                catString = "NRI";
-                                break;
-                            case PGESeverity.Minor:
-                                catString = "Minor";
-                                break;
-                            case PGESeverity.Moderate:
-                                catString = "Moderate";
-                                break;
-                            case PGESeverity.Severe:
-                                catString = "Severe";
-                                break;
-                            default:
-                                break;
-                        }
-                        shapeValues[ACVG] = curDcvgValue.ToString("F2");
-                        shapeValues[ACVGCAT] = catString;
-                    }
                     CISShapeFileOutput.Add(shapeValues);
                 }
                 if (dcvgSeverities.ContainsKey(curFoot))
                 {
                     var shapeValues = new string[34];
-                    shapeValues[LABEL] = DcvgSeries.IsDcvg ? $"DCVG: {lastDcvgValue.ToString("F1")}%" : $"ACVG: {curDcvgValue.ToString("F2")}";
+                    shapeValues[LABEL] = DcvgSeries.IsDcvg ? $"DCVG: {curDcvgValue.ToString("F1")}%" : $"ACVG: {curDcvgValue.ToString("F2")}";
                     shapeValues[STATION] = curFoot.ToString("F0");
                     shapeValues[DATE] = curDate.ToShortDateString();                        
                     shapeValues[ECDAREGION] = curRegion;
@@ -462,7 +417,6 @@ namespace AccurateReportSystem
                 var cis = cisSeverities.TryGetValue(curFoot, out curSeverity) ? curSeverity : PGESeverity.NRI;
                 var dcvg = dcvgSeverities.TryGetValue(curFoot, out curSeverity) ? curSeverity : PGESeverity.NRI;
                 var acvg = PGESeverity.NRI;
-                //TODO: Add acvg
 
                 var prio = GetPriority(cis, dcvg, acvg);
                 if (!prevData.HasValue)

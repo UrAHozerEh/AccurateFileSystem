@@ -16,7 +16,7 @@ namespace AccurateReportSystem
         public Color ModerateColor { get; set; } = Colors.Green;
         public Color SevereColor { get; set; } = Colors.Red;
         public List<(double Footage, double On, double Off, string Comment, DateTime Date, double? Depth, bool IsExtrapolated, double Baseline, BasicGeoposition Gps, string Region, PGESeverity Severity, string Reason)> Data { get; set; }
-        public double SkipDistance { get; set; } = 10;
+        public double SkipDistance { get; set; } = 20;
         public List<(double Footage, AllegroDataPoint Point)> RawData { get; set; }
         public List<(BasicGeoposition Start, BasicGeoposition End, string Region)> EcdaRegions { get; set; }
 
@@ -45,7 +45,7 @@ namespace AccurateReportSystem
             var closestRegion = EcdaRegions[0].Region;
             foreach (var (start, end, region) in EcdaRegions)
             {
-                var curDistance = gps.DistanceToSegment(start, end);
+                var curDistance = gps.DistanceToSegment(start, end).Distance;
                 if (curDistance < closestDist)
                 {
                     closestDist = curDistance;

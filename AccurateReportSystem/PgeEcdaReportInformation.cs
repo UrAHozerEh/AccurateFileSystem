@@ -1,10 +1,13 @@
 ﻿using AccurateFileSystem;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 using Windows.Devices.Geolocation;
+using Windows.Storage;
 
 namespace AccurateReportSystem
 {
@@ -17,6 +20,7 @@ namespace AccurateReportSystem
         public bool IsAcvg => !IsDcvg;
         public bool UseMir { get; set; }
         public double MaxSpacing { get; set; }
+        public GpsInfo? GpsInfo { get; set; }
 
         public class PgeEcdaDataPoint
         {
@@ -149,7 +153,7 @@ namespace AccurateReportSystem
             {
                 if (IsCisSkipped)
                     return (PGESeverity.NRI, "Skip");
-                if(double.IsNaN(IndicationValue))
+                if (double.IsNaN(IndicationValue))
                     return (PGESeverity.NRI, "");
                 if (!IsDcvg)
                 {
@@ -216,8 +220,9 @@ namespace AccurateReportSystem
             }
         }
 
-        public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<AllegroCISFile> dcvgFiles, HcaInfo hcaInfo, double maxSpacing, bool useMir = false)
+        public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<AllegroCISFile> dcvgFiles, HcaInfo hcaInfo, double maxSpacing, bool useMir = false, GpsInfo? gpsInfo = null)
         {
+            GpsInfo = gpsInfo;
             MaxSpacing = maxSpacing;
             IsDcvg = true;
             UseMir = useMir;
@@ -253,7 +258,8 @@ namespace AccurateReportSystem
                         if (closestPoint == null)
                             throw new Exception();
                         closestPoint.IndicationValue = point.IndicationPercent;
-                        closestPoint.IndicationGps = gps;
+                        var middleGps = closestPoint.CisGps.MiddleTowards(gps);
+                        closestPoint.IndicationGps = middleGps;
                     }
                     if (point.HasGPS)
                         lastGpsPoint = point;
@@ -295,14 +301,33 @@ namespace AccurateReportSystem
         public List<(double, double, BasicGeoposition)> GetIndicationData()
         {
             var output = new List<(double, double, BasicGeoposition)>();
-            foreach(var point in EcdaData)
+            foreach (var point in EcdaData)
             {
-                if(!double.IsNaN(point.IndicationValue))
+                if (!double.IsNaN(point.IndicationValue))
                 {
                     output.Add((point.Footage, point.IndicationValue, point.IndicationGps.Value));
                 }
             }
             return output;
+        }
+
+        public void StraightenGps(CombinedAllegroCISFile file, GpsInfo info)
+        {
+            foreach (var point in file.Points)
+            {
+                var curPoint = point.Point;
+                var region = HcaInfo.ClosestRegion(curPoint.GPS);
+                if (region == "0" || region.ToLower() == "buffer")
+                    continue;
+                if ((!string.IsNullOrWhiteSpace(curPoint.OriginalComment) || curPoint.Depth.HasValue) && curPoint.HasGPS)
+                {
+                    var (newPoint, distance) = info.GetClosestGps(curPoint.GPS);
+                    var lat = (curPoint.GPS.Latitude + (newPoint.Latitude * 9)) / 10;
+                    var lon = (curPoint.GPS.Longitude + (newPoint.Longitude * 9)) / 10;
+                    curPoint.GPS = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+                }
+            }
+            file.StraightenGps();
         }
 
         private void ExtrapolateCisData()
@@ -330,7 +355,14 @@ namespace AccurateReportSystem
                     CisFile = CisFile;
                 CisFile.Reverse();
             }
-
+            if (CisFile.Points.Count > 10)
+            {
+                if (GpsInfo == null)
+                    CisFile.StraightenGps();
+                else
+                    StraightenGps(CisFile, GpsInfo.Value);
+                CisFile.SetFootageFromGps();
+            }
             double lastFootage = double.NaN;
             AllegroDataPoint lastPoint = null;
             EcdaData = new List<PgeEcdaDataPoint>();
@@ -533,8 +565,6 @@ namespace AccurateReportSystem
         }
     }
 
-
-
     public struct HcaInfo
     {
         public string HcaId;
@@ -549,7 +579,7 @@ namespace AccurateReportSystem
             var closestRegion = "";
             foreach (var regionInfo in Regions)
             {
-                var curDist = gps.DistanceToSegment(regionInfo.Start, regionInfo.End);
+                var curDist = gps.DistanceToSegment(regionInfo.Start, regionInfo.End).Distance;
                 if (curDist < closestDistance)
                 {
                     closestDistance = curDist;
@@ -565,5 +595,146 @@ namespace AccurateReportSystem
         public BasicGeoposition Start;
         public BasicGeoposition End;
         public string Name;
+    }
+
+    public struct ScopeKml
+    {
+        public readonly Dictionary<string, GpsInfo> GpsInfos;
+
+        public ScopeKml(Dictionary<string, List<GpsLine>> info)
+        {
+            GpsInfos = new Dictionary<string, GpsInfo>();
+            foreach (var (name, lines) in info)
+            {
+                GpsInfos.Add(name, new GpsInfo(lines));
+            }
+        }
+
+        public async static Task<ScopeKml> GetScopeKmlAsync(StorageFile file)
+        {
+            var buffer = await FileIO.ReadBufferAsync(file);
+            using (var dataReader = Windows.Storage.Streams.DataReader.FromBuffer(buffer))
+            {
+                string text = dataReader.ReadString(buffer.Length);
+                var xml = new XmlDocument();
+                try
+                {
+                    xml.LoadXml(text);
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine(e.Message);
+                }
+
+                var curNode = FirstNodeWithName(xml, "kml");
+                curNode = FirstNodeWithName(curNode, "Document");
+                curNode = FirstNodeWithName(curNode, "Folder");
+                var gpsInfos = new Dictionary<string, List<GpsLine>>();
+                foreach (XmlNode node in curNode.ChildNodes)
+                {
+                    if (node.Name == "Placemark")
+                    {
+                        var name = FirstNodeWithName(node, "name").InnerText.Trim();
+                        var miltiGeo = FirstNodeWithName(node, "MultiGeometry");
+                        if (miltiGeo == null)
+                            continue;
+                        var lineString = FirstNodeWithName(miltiGeo, "LineString");
+                        var coordsNode = FirstNodeWithName(lineString, "coordinates");
+                        var coords = GetCoords(coordsNode.InnerText.Trim().Split(' '));
+                        if (!gpsInfos.ContainsKey(name))
+                            gpsInfos.Add(name, new List<GpsLine>());
+                        gpsInfos[name].Add(new GpsLine(coords));
+                    }
+                }
+                return new ScopeKml(gpsInfos);
+            }
+        }
+
+        private static XmlNode FirstNodeWithName(XmlNode node, string name)
+        {
+            foreach (XmlNode curNode in node)
+            {
+                if (curNode.Name == name)
+                    return curNode;
+            }
+            return null;
+        }
+
+        private static List<BasicGeoposition> GetCoords(string[] split)
+        {
+            var output = new List<BasicGeoposition>();
+            foreach (var value in split)
+            {
+                var valueSplit = value.Split(',');
+                var lon = double.Parse(valueSplit[0]);
+                var lat = double.Parse(valueSplit[1]);
+                output.Add(new BasicGeoposition() { Latitude = lat, Longitude = lon });
+            }
+            return output;
+        }
+    }
+
+    public struct GpsInfo
+    {
+        readonly List<GpsLine> Lines;
+
+        public GpsInfo(List<GpsLine> lines)
+        {
+            Lines = lines;
+        }
+
+        public (BasicGeoposition ClosestGps, double Distance) GetClosestGps(BasicGeoposition point)
+        {
+            var distance = double.NaN;
+            var newPoint = new BasicGeoposition();
+            foreach (var line in Lines)
+            {
+                var (curPoint, curDistance) = line.GetClosestGps(point);
+                if (double.IsNaN(distance) || curDistance < distance)
+                {
+                    distance = curDistance;
+                    newPoint = curPoint;
+                }
+            }
+            if (double.IsNaN(distance))
+            {
+                Debug.WriteLine("FAIL!");
+                throw new Exception();
+            }
+            return (newPoint, distance);
+        }
+    }
+
+    public struct GpsLine
+    {
+        readonly List<BasicGeoposition> Points;
+
+        public GpsLine(List<BasicGeoposition> points)
+        {
+            Points = points;
+        }
+
+        public (BasicGeoposition ClosestGps, double Distance) GetClosestGps(BasicGeoposition point)
+        {
+            var distance = double.NaN;
+            var newPoint = new BasicGeoposition();
+            for (int i = 1; i < Points.Count; ++i)
+            {
+                var start = Points[i - 1];
+                var end = Points[i];
+                var (curDistance, curPoint) = point.DistanceToSegment(start, end);
+                if (double.IsNaN(distance) || curDistance < distance)
+                {
+                    distance = curDistance;
+                    newPoint = curPoint;
+                }
+            }
+            if (double.IsNaN(distance))
+            {
+                Debug.WriteLine("FAIL@");
+                throw new Exception();
+            }
+            return (newPoint, distance);
+        }
     }
 }

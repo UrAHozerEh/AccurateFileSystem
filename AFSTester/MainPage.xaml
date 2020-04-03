@@ -27,6 +27,7 @@
                 <RowDefinition Height="1*"/>
                 <RowDefinition Height="1*"/>
                 <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
             </Grid.RowDefinitions>
             <Button Content="Import" Click="Button_Click" Grid.Row="0" HorizontalAlignment="Center"/>
             <Button Content="Do Map" Click="Button_Click_1" Grid.Row="1" HorizontalAlignment="Center"/>
@@ -49,7 +50,8 @@
             <Button Content="IIT" Click="IITClick"  Grid.Row="6" HorizontalAlignment="Center"/>
             <Button Content="Batch IIT" Click="BatchIITClick"  Grid.Row="7" HorizontalAlignment="Center"/>
             <Button Content="NuStar" Click="MakeNustarGraphs"  Grid.Row="8" HorizontalAlignment="Center"/>
-            <Button Content="Aerial" Click="ToggleAerial"  Grid.Row="9" HorizontalAlignment="Center"/>
+            <Button Content="Combine All" Grid.Row="9" HorizontalAlignment="Center" Click="Button_Click_4"/>
+            <Button Content="Aerial" Click="ToggleAerial"  Grid.Row="10" HorizontalAlignment="Center"/>
         </Grid>
 
         <Maps:MapControl x:Name="MapControl" Grid.Column="0"/>

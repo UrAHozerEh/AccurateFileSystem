@@ -52,7 +52,8 @@ namespace AFSTester
         Dictionary<AllegroCISFile, MapLayer> Layers = new Dictionary<AllegroCISFile, MapLayer>();
         private Random Random = new Random(1984);
         TreeViewNode HiddenNode = new TreeViewNode() { Content = "Hidden Files" };
-        List<(string Name, string Route, double Length, BasicGeoposition Start, BasicGeoposition End)> ShortList;
+        List<(string Name, string Route, double Length, BasicGeoposition Start, BasicGeoposition End)> ShortList { get; set; }
+        List<(string Name, string Route, double Length, BasicGeoposition Start, BasicGeoposition End)> LongList { get; set; }
         string FolderName;
         bool IsAerial = false;
         string ReportQ { get; set; } = "";
@@ -70,6 +71,7 @@ namespace AFSTester
                 xmlStringTask.Wait();
                 var xmlString = xmlStringTask.Result;
                 ShortList = null;
+                LongList = null;
                 try { xml.LoadXml(xmlString); } catch { return; }
 
                 var curNode = xml.ChildNodes.First(n => n.NodeName == "kml");
@@ -114,18 +116,15 @@ namespace AFSTester
                         var coords = coordsNode.InnerText.Trim().Split(' ');
                         var start = GetGeoposition(coords[0].Split(','));
                         var end = GetGeoposition(coords[coords.Length - 1].Split(','));
-                        if (isLat)
-                        {
-                            lateralList.Add((name, route, length, start, end));
-                        }
+                        lateralList.Add((name, route, length, start, end));
                     }
                 }
 
                 ShortList = lateralList.Where(info => info.Length < 100).ToList();
                 var shortListStrings = ShortList.Select(info => $"{info.Name}\t{info.Route}\t{info.Length}\t{info.Start.Latitude}\t{info.Start.Longitude}\t{info.End.Latitude}\t{info.End.Longitude}");
                 var shortString = string.Join('\n', shortListStrings);
-                var longList = lateralList.Where(info => info.Length >= 100).ToList();
-                var longListStrings = longList.Select(info => $"{info.Name}\t{info.Route}\t{info.Length}\t{info.Start.Latitude}\t{info.Start.Longitude}\t{info.End.Latitude}\t{info.End.Longitude}");
+                LongList = lateralList.Where(info => info.Length >= 100).ToList();
+                var longListStrings = LongList.Select(info => $"{info.Name}\t{info.Route}\t{info.Length}\t{info.Start.Latitude}\t{info.Start.Longitude}\t{info.End.Latitude}\t{info.End.Longitude}");
                 var longString = string.Join('\n', longListStrings);
             }
             catch { return; }
@@ -208,11 +207,22 @@ namespace AFSTester
         private void DoStuff()
         {
             var shortListDistance = new List<(double Dist, AllegroDataPoint Point)>();
+            var longListDistance = new List<(double Dist, AllegroDataPoint Point)>();
+            var testStationComments = new List<(AllegroDataPoint, BasicGeoposition)>();
+            var allOtherComments = new List<(AllegroDataPoint, BasicGeoposition)>();
+
             for (int i = 0; i < NewFiles.Count; ++i)
             {
                 var file = NewFiles[i];
                 if (file is AllegroCISFile allegroFile)
                 {
+                    foreach (var (_, point) in allegroFile.Points)
+                    {
+                        if (point.TestStationReads.Count > 0)
+                            testStationComments.Add((point, point.GPS));
+                        else if(!string.IsNullOrWhiteSpace(point.OriginalComment))
+                            allOtherComments.Add((point, point.GPS));
+                    }
                     for (int j = 0; j < ShortList.Count; ++j)
                     {
                         var (_, _, _, start, end) = ShortList[j];
@@ -226,10 +236,32 @@ namespace AFSTester
                         if (newShort < curShort)
                             shortListDistance[j] = (newShort, newPoint);
                     }
+                    for (int j = 0; j < LongList.Count; ++j)
+                    {
+                        var (_, _, _, start, end) = LongList[j];
+                        var (newShort, newPoint) = allegroFile.GetClosestPoint(start, end);
+                        if (longListDistance.Count == j)
+                        {
+                            longListDistance.Add((newShort, newPoint));
+                            continue;
+                        }
+                        var (curShort, _) = longListDistance[j];
+                        if (newShort < curShort)
+                            longListDistance[j] = (newShort, newPoint);
+                    }
                 }
             }
             var shortCloseStringList = shortListDistance.Select(info => $"{info.Dist}\t{RoundDist(info.Dist)}\t{info.Point.On}\t{info.Point.Off}\t{info.Point.GPS.Latitude}\t{info.Point.GPS.Longitude}\t{info.Point.OriginalComment}");
             var shortCloseString = string.Join('\n', shortCloseStringList);
+
+            var longCloseStringList = longListDistance.Select(info => $"{info.Dist}\t{RoundDist(info.Dist)}\t{info.Point.On}\t{info.Point.Off}\t{info.Point.GPS.Latitude}\t{info.Point.GPS.Longitude}\t{info.Point.OriginalComment}");
+            var longCloseString = string.Join('\n', longCloseStringList);
+
+            var commentsStringList = testStationComments.Select(value => $"{value.Item1.MirOn.ToString("F3")}\t{value.Item1.MirOff.ToString("F3")}\t{value.Item1.OriginalComment}\t{value.Item2.Latitude.ToString("F8")}\t{value.Item2.Longitude.ToString("F8")}");
+            var commentsOutput = string.Join("\n", commentsStringList);
+
+            var allCommentsStringList = allOtherComments.Select(value => $"{value.Item1.MirOn.ToString("F3")}\t{value.Item1.MirOff.ToString("F3")}\t{value.Item1.OriginalComment}\t{value.Item2.Latitude.ToString("F8")}\t{value.Item2.Longitude.ToString("F8")}");
+            var allCommentsOutput = string.Join("\n", allCommentsStringList);
         }
 
         private double RoundDist(double dist)
@@ -242,10 +274,12 @@ namespace AFSTester
             return floorDiff < ceilDiff ? floor : ceil;
         }
 
-        private async void MakeGraphs(CombinedAllegroCISFile allegroFile)
+        private async Task MakeGraphs(CombinedAllegroCISFile allegroFile)
         {
             var testStationInitial = allegroFile.GetTestStationData();
-            var response = await InputTextDialogAsync("Test", testStationInitial);
+            var startComment = allegroFile.Points.First().Point.StrippedComment;
+            var endComment = allegroFile.Points.Last().Point.StrippedComment;
+            var response = await InputTextDialogAsync(allegroFile.Name, testStationInitial, startComment, endComment);
             if (response == null)
                 return;
             if (response.Value.Item2)
@@ -407,21 +441,21 @@ namespace AFSTester
             report.Container = splitContainer;
             var pages = report.PageSetup.GetAllPages(0, allegroFile.Points.Last().Footage);
             var tabular = allegroFile.GetTabularData();
-            await CreateExcelFile($"{topGlobalXAxis.Title} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) });
+            await CreateExcelFile($"{allegroFile.Name}\\{topGlobalXAxis.Title} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) });
             var dataMetrics = new DataMetrics(allegroFile.GetPoints());
-            await CreateExcelFile($"{topGlobalXAxis.Title} Data Metrics", dataMetrics.GetSheets());
+            await CreateExcelFile($"{allegroFile.Name}\\{topGlobalXAxis.Title} Data Metrics", dataMetrics.GetSheets());
             var testStation = allegroFile.GetTestStationData();
-            await CreateExcelFile($"{topGlobalXAxis.Title} Test Station Data", new List<(string Name, string Data)>() { ("Test Station Data", testStation) });
+            await CreateExcelFile($"{allegroFile.Name}\\{topGlobalXAxis.Title} Test Station Data", new List<(string Name, string Data)>() { ("Test Station Data", testStation) });
             var shapefile = allegroFile.GetShapeFile();
-            await CreateExcelFile($"{topGlobalXAxis.Title} Shapefile", new List<(string Name, string Data)>() { ("Shapefile", shapefile) });
-            await CreateExcelFile($"{topGlobalXAxis.Title} MIR Skips", new List<(string Name, string Data)>() { ("MIR Skips", mirFilterData) });
-            await CreateExcelFile($"{topGlobalXAxis.Title} Files Order", new List<(string Name, string Data)>() { ("Order", allegroFile.FileInfos.GetExcelData()) });
+            await CreateExcelFile($"{allegroFile.Name}\\{topGlobalXAxis.Title} Shapefile", new List<(string Name, string Data)>() { ("Shapefile", shapefile) });
+            await CreateExcelFile($"{allegroFile.Name}\\{topGlobalXAxis.Title} MIR Skips", new List<(string Name, string Data)>() { ("MIR Skips", mirFilterData) });
+            await CreateExcelFile($"{allegroFile.Name}\\{topGlobalXAxis.Title} Files Order", new List<(string Name, string Data)>() { ("Order", allegroFile.FileInfos.GetExcelData()) });
             var imageFiles = new List<StorageFile>();
             for (int i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
-                var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{topGlobalXAxis.Title} Page {pageString}" + ".png", CreationCollisionOption.ReplaceExisting);
+                var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{allegroFile.Name}\\{topGlobalXAxis.Title} Page {pageString}" + ".png", CreationCollisionOption.ReplaceExisting);
                 using (var image = report.GetImage(page, 300))
                 using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
                 {
@@ -430,37 +464,45 @@ namespace AFSTester
                 imageFiles.Add(imageFile);
             }
             var dialog = new MessageDialog($"Finished making {topGlobalXAxis.Title}");
-            await dialog.ShowAsync();
+            //await dialog.ShowAsync();
         }
 
-        private async Task<(string, bool)?> InputTextDialogAsync(string title, string testStationData)
+        private async Task<(string, bool)?> InputTextDialogAsync(string title, string testStationData, string firstComment, string lastComment)
         {
             StackPanel panel = new StackPanel()
             {
                 Orientation = Orientation.Vertical
             };
-            TextBox inputTextBox = new TextBox();
-            inputTextBox.AcceptsReturn = false;
-            inputTextBox.Height = 32;
-            inputTextBox.Text = "PG&E LS LINE MP START to MP END";
-
-            ListBox testStationList = new ListBox();
-            var lineSplit = testStationData.Split('\n');
-
-            for(int i = 1; i < lineSplit.Length; ++i)
+            TextBox inputTextBox = new TextBox
             {
-                if (i > 2 && i < lineSplit.Length - 3)
-                    continue;
+                AcceptsReturn = false,
+                Height = 32,
+                Text = $"PG&E LS {title} MP START to MP END"
+            };
+
+            var lineSplit = testStationData.Split('\n');
+            ListBox testStationList = new ListBox();
+            testStationList.Items.Add(new ListBoxItem() { Content = firstComment });
+
+            for (int i = 1; i < lineSplit.Length; ++i)
+            {
                 var curSplit = lineSplit[i].Split('\t');
-                if (curSplit.Length < 5)
+                if (curSplit.Length < 7)
                     continue;
                 var line = curSplit[4];
                 var item = new ListBoxItem()
                 {
                     Content = line
                 };
+                if (lineSplit.Length < 5)
+                {
+                    testStationList.Items.Add(item);
+                    continue;
+                }
+                if (i > 2 && i < lineSplit.Length - 3)
+                    continue;
                 testStationList.Items.Add(item);
-                if(i == 2)
+                if (i == 2)
                 {
                     item = new ListBoxItem()
                     {
@@ -469,6 +511,7 @@ namespace AFSTester
                     testStationList.Items.Add(item);
                 }
             }
+            testStationList.Items.Add(new ListBoxItem() { Content = lastComment });
 
             CheckBox isReverse = new CheckBox()
             {
@@ -522,7 +565,7 @@ namespace AFSTester
 
         private async Task MakeIITGraphs(CombinedAllegroCISFile file, List<(double, double, BasicGeoposition)> dcvgData, bool isDcvg, string folderName, List<RegionInfo> regions = null, (string, string, string, string)? surveyInfos = null)
         {
-            var maxDepth = 150;
+            var maxDepth = 200;
             var curDepth = 50.0;
             var curOff = -1.0;
             var curOn = -1.1;
@@ -531,9 +574,9 @@ namespace AFSTester
             var offData = new List<(double, double)>();
             var commentData = new List<(double, string)>();
             var directionData = new List<(double, bool)>();
-            foreach(var point in file.Points)
+            foreach (var point in file.Points)
             {
-                if((point.Point.Depth ?? 0) > maxDepth)
+                if ((point.Point.Depth ?? 0) > maxDepth)
                 {
                     var tempDepthString = $" Depth: {point.Point.Depth.Value} Inches";
                     point.Point.OriginalComment += tempDepthString;
@@ -620,7 +663,7 @@ namespace AFSTester
             report.LegendInfo.NameFontSize = 16f;
             if (file != null && file.Points.Last().Footage < 100)
             {
-                report.PageSetup = new PageSetup(100, 0);
+                report.PageSetup = new PageSetup(100, 10);
                 report.XAxisInfo.MajorGridline.Offset = 10;
             }
             var onOffGraph = new Graph(report);
@@ -629,14 +672,16 @@ namespace AFSTester
                 LineColor = Colors.Blue,
                 PointShape = GraphSeries.Shape.Circle,
                 PointColor = Colors.Blue,
-                ShapeRadius = 2
+                ShapeRadius = 2,
+                MaxDrawDistance = 19
             };
             var off = new GraphSeries("Off", offData)
             {
                 LineColor = Colors.Green,
                 PointShape = GraphSeries.Shape.Circle,
                 PointColor = Colors.Green,
-                ShapeRadius = 2
+                ShapeRadius = 2,
+                MaxDrawDistance = 19
             };
             var depth = new GraphSeries("Depth", depthData)
             {
@@ -657,11 +702,17 @@ namespace AFSTester
 
             onOffGraph.Series.Add(depth);
             onOffGraph.YAxesInfo.Y2IsDrawn = true;
+            onOffGraph.YAxesInfo.Y2MaximumValue = maxDepth;
             onOffGraph.CommentSeries = commentSeries;
             onOffGraph.Series.Add(on);
             onOffGraph.Series.Add(off);
             onOffGraph.Series.Add(redLine);
             onOffGraph.DrawTopBorder = false;
+
+            if (file != null && file.Points.Last().Footage < 100)
+            {
+                onOffGraph.CommentSeries.PercentOfGraph = 0.25f;
+            }
 
             var dcvgLabels = dcvgData.Select((value) => (value.Item1, value.Item2.ToString("F1") + (isDcvg ? "%" : ""))).ToList();
 
@@ -673,18 +724,24 @@ namespace AFSTester
                 BackdropOpacity = 1f
             };
             onOffGraph.Series.Add(dcvgIndication);
-
-            var pcmLables = new List<(double, string)>()
+            var pcmList = new List<double>()
             {
-                (0, "49.72")
+                59.12,58.02,60.57,57.10,59.6,59.65,59.31,58.89,59.79,57.52
             };
-            if (folderName.Contains("1-2"))
+            var pcmLables = new List<(double, string)>();
+            var curPcmIndex = 0;
+            foreach (var point in file.Points)
             {
-                pcmLables = new List<(double, string)>() { (45, "44.49") };
+                if (point.Point.Depth.HasValue && curPcmIndex < pcmList.Count)
+                {
+                    pcmLables.Add((point.Footage, pcmList[curPcmIndex].ToString("F2")));
+                    ++curPcmIndex;
+                }
             }
-            if (folderName.Contains("7-8"))
+            if (curPcmIndex < pcmList.Count)
             {
-                pcmLables = new List<(double, string)>() { (0, "48.52") };
+                pcmLables.Add((file.Points.Last().Footage, pcmList[curPcmIndex].ToString("F2")));
+                ++curPcmIndex;
             }
             var pcmData = pcmLables.Select(value => (value.Item1, double.Parse(value.Item2))).ToList();
             var pcm2 = new GraphSeries("PCM", pcmData)
@@ -815,15 +872,15 @@ namespace AFSTester
                 var minDepthString = minDepth == -1 ? "" : minDepth.ToString("F0");
                 output.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{region}\t{length.ToString("F0")}\t{minDepthString}\t");
                 var startGps = file.GetClosesetGps(startFoot);
-                output.Append($"{startGps.Latitude.ToString("F5")}\t{startGps.Longitude.ToString("F5")}\t");
+                output.Append($"{startGps.Latitude.ToString("F8")}\t{startGps.Longitude.ToString("F8")}\t");
                 var endGps = file.GetClosesetGps(endFoot);
-                output.Append($"{endGps.Latitude.ToString("F5")}\t{endGps.Longitude.ToString("F5")}\t");
+                output.Append($"{endGps.Latitude.ToString("F8")}\t{endGps.Longitude.ToString("F8")}\t");
                 if (reason == "SKIP.")
                 {
                     output.AppendLine($"NT\tNT\tNT\tSkipped");
                     skipReport.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1).ToString("F0")}\t");
-                    skipReport.Append($"{startGps.Latitude.ToString("F5")}\t{startGps.Longitude.ToString("F5")}\t");
-                    skipReport.AppendLine($"{endGps.Latitude.ToString("F5")}\t{endGps.Longitude.ToString("F5")}");
+                    skipReport.Append($"{startGps.Latitude.ToString("F8")}\t{startGps.Longitude.ToString("F8")}\t");
+                    skipReport.AppendLine($"{endGps.Latitude.ToString("F8")}\t{endGps.Longitude.ToString("F8")}");
                 }
                 else
                 {
@@ -868,9 +925,9 @@ namespace AFSTester
                     var (endFoot, _) = extrapolatedDepth[curIndex];
                     depthException.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1).ToString("F0")}\t{minDepth.ToString("F0")}\t");
                     var startGps = file.GetClosesetGps(startFoot);
-                    depthException.Append($"{startGps.Latitude.ToString("F5")}\t{startGps.Longitude.ToString("F5")}\t");
+                    depthException.Append($"{startGps.Latitude.ToString("F8")}\t{startGps.Longitude.ToString("F8")}\t");
                     var endGps = file.GetClosesetGps(endFoot);
-                    depthException.AppendLine($"{endGps.Latitude.ToString("F5")}\t{endGps.Longitude.ToString("F5")}");
+                    depthException.AppendLine($"{endGps.Latitude.ToString("F8")}\t{endGps.Longitude.ToString("F8")}");
 
                     i = curIndex + 1;
                 }
@@ -891,9 +948,9 @@ namespace AFSTester
                     var (endFoot, _) = extrapolatedDepth[curIndex];
                     depthException.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1).ToString("F0")}\t{max.ToString("F0")}\t");
                     var startGps = file.GetClosesetGps(startFoot);
-                    depthException.Append($"{startGps.Latitude.ToString("F5")}\t{startGps.Longitude.ToString("F5")}\t");
+                    depthException.Append($"{startGps.Latitude.ToString("F8")}\t{startGps.Longitude.ToString("F8")}\t");
                     var endGps = file.GetClosesetGps(endFoot);
-                    depthException.AppendLine($"{endGps.Latitude.ToString("F5")}\t{endGps.Longitude.ToString("F5")}");
+                    depthException.AppendLine($"{endGps.Latitude.ToString("F8")}\t{endGps.Longitude.ToString("F8")}");
 
                     i = curIndex + 1;
                 }
@@ -1872,12 +1929,15 @@ namespace AFSTester
             var masterFiles = await folder.GetFilesAsync();
             StorageFile regionFile = null;
             StorageFile surveysFile = null;
+            StorageFile kml = null;
             foreach (var masterFile in masterFiles)
             {
                 if (masterFile.FileType.ToLower() == ".regions")
                     regionFile = masterFile;
                 if (masterFile.FileType.ToLower() == ".surveys")
                     surveysFile = masterFile;
+                if (masterFile.FileType.ToLower() == ".kml")
+                    kml = masterFile;
             }
 
             var surveyInfo = new Dictionary<string, (string HcaId, string Route, string StartMilepost, string EndMilepost)>();
@@ -2138,9 +2198,16 @@ namespace AFSTester
                         Regions = regions
                     };
                     PgeEcdaReportInformation reportInfo;
+                    GpsInfo? gpsInfo = null;
+                    if (kml != null)
+                    {
+                        var scopeKml = await ScopeKml.GetScopeKmlAsync(kml);
+                        if (scopeKml.GpsInfos.ContainsKey(hcaInfo.Route))
+                            gpsInfo = scopeKml.GpsInfos[hcaInfo.Route];
+                    }
                     if (isDcvg)
                     {
-                        reportInfo = new PgeEcdaReportInformation(combinedFile, dcvgFiles, hcaInfo, 10);
+                        reportInfo = new PgeEcdaReportInformation(combinedFile, dcvgFiles, hcaInfo, 10, false, gpsInfo);
                     }
                     else
                     {
@@ -2168,7 +2235,7 @@ namespace AFSTester
                     wbPart.Workbook = new Workbook();
                     wbPart.Workbook.AppendChild(new Sheets());
                     AddData(wbPart, ReportQ, 1, "Report Q", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
-                    AddData(wbPart, reportQ, 2, "Report Q2", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
+                    //AddData(wbPart, reportQ, 2, "Report Q2", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
                     wbPart.Workbook.Save();
                 }
             }
@@ -2194,6 +2261,52 @@ namespace AFSTester
         {
             IsAerial = !IsAerial;
             MapControl.StyleSheet = IsAerial ? MapStyleSheet.Aerial() : MapStyleSheet.RoadDark();
+        }
+
+        private async void Button_Click_4(object sender, RoutedEventArgs e)
+        {
+            if (!double.TryParse(CombineMaxGap.Text, out var maxGap))
+                return;
+            foreach (var rootNode in FileTreeView.RootNodes)
+            {
+                if (rootNode.Equals(HiddenNode)) continue;
+                if (!FileTreeView.SelectedNodes.Contains(rootNode))
+                    continue;
+                var fileNodes = rootNode.Children.Where(node => node.Content is AllegroCISFile).ToList();
+                var files = new List<AllegroCISFile>();
+                var fileNames = new HashSet<string>();
+                foreach (var node in fileNodes)
+                {
+                    var file = node.Content as AllegroCISFile;
+                    if (!fileNames.Contains(file.Name))
+                    {
+                        files.Add(file);
+                        fileNames.Add(file.Name);
+                    }
+                    else
+                    {
+                        if (file.Extension == ".csv")
+                        {
+                            for (int i = 0; i < files.Count; ++i)
+                            {
+                                if (files[i].Name == file.Name)
+                                {
+                                    files.RemoveAt(i);
+                                    files.Add(file);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (files.Count == 0)
+                    continue;
+                var test = CombinedAllegroCISFile.CombineFiles(files.First().Header["segment"].Trim().ToUpper(), files, maxGap);
+                if (test == null)
+                    continue;
+                test.FixContactSpikes();
+                await MakeGraphs(test);
+            }
         }
     }
 }

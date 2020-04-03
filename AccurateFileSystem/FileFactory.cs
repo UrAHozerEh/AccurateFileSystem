@@ -51,9 +51,12 @@ namespace AccurateFileSystem
                 case ".acvg":
                 case ".png":
                 case ".regions":
+                case ".kmz":
+                case ".cor":
+                case ".inf":
                     return null;
                 default:
-                    throw new Exception($"File is an unknown file format '{extension}'");
+                    return null;
             }
         }
 
