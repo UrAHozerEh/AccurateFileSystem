@@ -108,12 +108,12 @@ namespace AccurateReportSystem
                         format.FontFamily = "Arial";
                         format.FontWeight = FontWeights.Thin;
                         format.FontStyle = FontStyle.Normal;
-                        var textHeight = TailYShift * 2;
-                        Rect textRect = new Rect(x - Width, y - TailYShift, Width, textHeight);
+                        var textBoxHeight = TailYShift * 2;
+                        Rect textRect = new Rect(x - Width, y - TailYShift, Width, textBoxHeight);
                         Matrix3x2 textRotation = rotationMatrix;
                         if (rotation > 90 && rotation <= 270)
                         {
-                            textRect = new Rect(x, y - TailYShift, Width, textHeight);
+                            textRect = new Rect(x, y - TailYShift, Width, textBoxHeight);
                             var tempRadians = (float)((rotation - 180) * Math.PI / 180);
                             textRotation = Matrix3x2.CreateRotation(tempRadians, new Vector2(x, y)); ;
                         }

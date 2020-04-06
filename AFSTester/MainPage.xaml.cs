@@ -409,7 +409,8 @@ namespace AFSTester
             //{
             //    RequestedPercent = 0.5
             //};
-            var chart1 = new Chart(report, "Survey Direction");
+            var chart1 = new Chart(report, "Survey Direction and Survey Date");
+            chart1.LegendInfo.NameFontSize = 14f;
             var chart2 = new Chart(report, "850 Data");
             chart2.LegendInfo.SeriesNameFontSize = 8f;
             chart2.LegendInfo.NameFontSize = 16f;
@@ -420,7 +421,7 @@ namespace AFSTester
             chart2.Series.Add(exceptions);
             //chart1.LegendInfo.NameFontSize = 18f;
 
-            var chart1Series = new SurveyDirectionSeries(allegroFile.GetDirectionData());
+            var chart1Series = new SurveyDirectionWithDateSeries(allegroFile.GetDirectionWithDateData());
             chart1.Series.Add(chart1Series);
 
             splitContainer.AddSelfSizedContainer(topGlobalXAxis);
@@ -2270,7 +2271,7 @@ namespace AFSTester
             foreach (var rootNode in FileTreeView.RootNodes)
             {
                 if (rootNode.Equals(HiddenNode)) continue;
-                if (!FileTreeView.SelectedNodes.Contains(rootNode))
+                if (!FileTreeView.SelectedNodes.Contains(rootNode) && FileTreeView.SelectedNodes.Count > 0)
                     continue;
                 var fileNodes = rootNode.Children.Where(node => node.Content is AllegroCISFile).ToList();
                 var files = new List<AllegroCISFile>();
