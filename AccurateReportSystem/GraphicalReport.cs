@@ -22,6 +22,7 @@ namespace AccurateReportSystem
         public XAxisInfo XAxisInfo { get; set; } = new XAxisInfo();
         public YAxesInfo YAxesInfo { get; set; } = new YAxesInfo();
         public LegendInfo LegendInfo { get; set; } = new LegendInfo();
+        public CanvasBitmap Logo { get; set; } = null;
 
         public static int DEFAULT_DIP = 96;
         public static int DIGITS_TO_ROUND = 2;
@@ -47,6 +48,7 @@ namespace AccurateReportSystem
                     session.Clear(Colors.White);
                     session.TextRenderingParameters = new CanvasTextRenderingParameters(CanvasTextRenderingMode.NaturalSymmetric, CanvasTextGridFit.Default);
                     Container.Draw(page, session, drawArea);
+
                 }
                 list.Add(offscreen);
             }
@@ -66,6 +68,11 @@ namespace AccurateReportSystem
             using (CanvasDrawingSession session = offscreen.CreateDrawingSession())
             {
                 session.Clear(Colors.White);
+                if (Logo != null)
+                {
+                    var scale = Logo.Size.Width / Logo.Size.Height;
+                    session.DrawImage(Logo, new Rect((float)MarginInfo.LeftDip * 0.1, (float)MarginInfo.TopDip * 0.1, MarginInfo.TopDip * scale, MarginInfo.TopDip));
+                }
                 session.TextRenderingParameters = new CanvasTextRenderingParameters(CanvasTextRenderingMode.NaturalSymmetric, CanvasTextGridFit.Default);
                 Container.Draw(page, session, drawArea);
             }

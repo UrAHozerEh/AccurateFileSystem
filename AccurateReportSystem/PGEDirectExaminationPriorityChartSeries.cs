@@ -176,7 +176,7 @@ namespace AccurateReportSystem
                 if (dcvgSeverities.ContainsKey(0) && DcvgSeries.IsDcvg)
                 {
                     firstShapeValues = new string[34];
-                    firstShapeValues[LABEL] = $"DCVG: {lastDcvgValue.ToString("F1")}%";
+                    firstShapeValues[LABEL] = $"DCVG: {lastDcvgValue:F1}%";
                     firstShapeValues[STATION] = "0";
                     firstShapeValues[DATE] = lastDate.ToShortDateString();
                     firstShapeValues[DCVGREMOTE] = lastDcvgValue.ToString("F1");
@@ -207,7 +207,7 @@ namespace AccurateReportSystem
                 if (dcvgSeverities.ContainsKey(0) && !DcvgSeries.IsDcvg)
                 {
                     firstShapeValues = new string[34];
-                    firstShapeValues[LABEL] = $"ACVG: {lastDcvgValue.ToString("F2")}";
+                    firstShapeValues[LABEL] = $"ACVG: {lastDcvgValue:F2}";
                     firstShapeValues[STATION] = "0";
                     firstShapeValues[DATE] = lastDate.ToShortDateString();
                     firstShapeValues[ECDAREGION] = lastRegion;
@@ -295,7 +295,7 @@ namespace AccurateReportSystem
                 if (dcvgSeverities.ContainsKey(curFoot))
                 {
                     var shapeValues = new string[34];
-                    shapeValues[LABEL] = DcvgSeries.IsDcvg ? $"DCVG: {curDcvgValue.ToString("F1")}%" : $"ACVG: {curDcvgValue.ToString("F2")}";
+                    shapeValues[LABEL] = DcvgSeries.IsDcvg ? $"DCVG: {curDcvgValue:F1}%" : $"ACVG: {curDcvgValue:F2}";
                     shapeValues[STATION] = curFoot.ToString("F0");
                     shapeValues[DATE] = curDate.ToShortDateString();                        
                     shapeValues[ECDAREGION] = curRegion;

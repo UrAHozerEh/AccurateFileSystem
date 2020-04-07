@@ -57,21 +57,21 @@ namespace AccurateReportSystem
                 {
                     //DCVG
                     var severity = PGESeverity.NRI;
-                    var reason = "DCVG % IR is greater than 0 and less than or equal to 15";
+                    var reason = "DCVG % IR is greater than 0% and less than or equal to 15%";
                     if (percent > 60)
                     {
                         severity = PGESeverity.Severe;
-                        reason = "DCVG % IR is greater than 60";
+                        reason = "DCVG % IR is greater than 60%";
                     }
                     else if (percent > 35)
                     {
                         severity = PGESeverity.Moderate;
-                        reason = "DCVG % IR is greater than 35 and less than or equal to 60";
+                        reason = "DCVG % IR is greater than 35% and less than or equal to 60%";
                     }
                     else if (percent > 15)
                     {
                         severity = PGESeverity.Minor;
-                        reason = "DCVG % IR is greater than 15 and less than or equal to 35";
+                        reason = "DCVG % IR is greater than 15% and less than or equal to 35%";
                     }
                     for (double curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
                     {

@@ -54,6 +54,7 @@ namespace AccurateFileSystem
                 case ".kmz":
                 case ".cor":
                 case ".inf":
+                case ".jpg":
                     return null;
                 default:
                     return null;
