@@ -39,6 +39,7 @@ using PageSetup = AccurateReportSystem.PageSetup;
 using DocumentFormat.OpenXml.Spreadsheet;
 using ClosedXML.Excel;
 using Windows.UI.Popups;
+using Microsoft.Graphics.Canvas;
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
 namespace AFSTester
@@ -48,6 +49,7 @@ namespace AFSTester
     /// </summary>
     public sealed partial class MainPage : Page
     {
+        private CanvasBitmap Logo = null;
         List<File> NewFiles;
         Dictionary<AllegroCISFile, MapLayer> Layers = new Dictionary<AllegroCISFile, MapLayer>();
         private Random Random = new Random(1984);
@@ -159,6 +161,14 @@ namespace AFSTester
                 var newFile = await factory.GetFile();
                 if (newFile != null)
                     NewFiles.Add(newFile);
+                if(file.FileType.ToLower() == ".jpg")
+                {
+                    CanvasDevice device = CanvasDevice.GetSharedDevice();
+                    using (var stream = await file.OpenAsync(FileAccessMode.Read))
+                    {
+                        Logo = await CanvasBitmap.LoadAsync(device, stream);
+                    }
+                }
             }
             NewFiles.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
             for (int i = 0; i < NewFiles.Count; ++i)
@@ -220,7 +230,7 @@ namespace AFSTester
                     {
                         if (point.TestStationReads.Count > 0)
                             testStationComments.Add((point, point.GPS));
-                        else if(!string.IsNullOrWhiteSpace(point.OriginalComment))
+                        else if (!string.IsNullOrWhiteSpace(point.OriginalComment))
                             allOtherComments.Add((point, point.GPS));
                     }
                     for (int j = 0; j < ShortList.Count; ++j)
@@ -257,10 +267,10 @@ namespace AFSTester
             var longCloseStringList = longListDistance.Select(info => $"{info.Dist}\t{RoundDist(info.Dist)}\t{info.Point.On}\t{info.Point.Off}\t{info.Point.GPS.Latitude}\t{info.Point.GPS.Longitude}\t{info.Point.OriginalComment}");
             var longCloseString = string.Join('\n', longCloseStringList);
 
-            var commentsStringList = testStationComments.Select(value => $"{value.Item1.MirOn.ToString("F3")}\t{value.Item1.MirOff.ToString("F3")}\t{value.Item1.OriginalComment}\t{value.Item2.Latitude.ToString("F8")}\t{value.Item2.Longitude.ToString("F8")}");
+            var commentsStringList = testStationComments.Select(value => $"{value.Item1.MirOn.ToString("F3")}\t{value.Item1.MirOff.ToString("F3")}\t{value.Item1.OriginalComment}\t{value.Item2.Latitude:F8}\t{value.Item2.Longitude:F8}");
             var commentsOutput = string.Join("\n", commentsStringList);
 
-            var allCommentsStringList = allOtherComments.Select(value => $"{value.Item1.MirOn.ToString("F3")}\t{value.Item1.MirOff.ToString("F3")}\t{value.Item1.OriginalComment}\t{value.Item2.Latitude.ToString("F8")}\t{value.Item2.Longitude.ToString("F8")}");
+            var allCommentsStringList = allOtherComments.Select(value => $"{value.Item1.MirOn.ToString("F3")}\t{value.Item1.MirOff.ToString("F3")}\t{value.Item1.OriginalComment}\t{value.Item2.Latitude:F8}\t{value.Item2.Longitude:F8}");
             var allCommentsOutput = string.Join("\n", allCommentsStringList);
         }
 
@@ -286,7 +296,10 @@ namespace AFSTester
             {
                 allegroFile.Reverse();
             }
-            var report = new GraphicalReport();
+            var report = new GraphicalReport()
+            {
+                Logo = Logo
+            };
             var commentGraph = new Graph(report);
             var graph1 = new Graph(report);
             var graph2 = new Graph(report);
@@ -574,7 +587,7 @@ namespace AFSTester
             var onData = new List<(double, double)>();
             var offData = new List<(double, double)>();
             var commentData = new List<(double, string)>();
-            var directionData = new List<(double, bool)>();
+            var directionData = new List<(double, bool, string)>();
             foreach (var point in file.Points)
             {
                 if ((point.Point.Depth ?? 0) > maxDepth)
@@ -589,7 +602,7 @@ namespace AFSTester
                 offData = file.GetDoubleData("Off");
                 onData = file.GetDoubleData("On");
                 commentData = file.GetCommentData("Comment");
-                directionData = file.GetDirectionData();
+                directionData = file.GetDirectionWithDateData();
                 if (onData.Count == 1)
                 {
                     onData.Add((5, onData[0].Item2));
@@ -606,7 +619,7 @@ namespace AFSTester
                         direction = true;
                     if (footage >= 1800)
                         direction = false;
-                    directionData.Add((footage, false));
+                    directionData.Add((footage, false,""));
                     curDepth = RandomShift(curDepth, 5, 10, 100);
                     if (footage % 50 == 0)
                         depthData.Add((footage, curDepth));
@@ -727,7 +740,7 @@ namespace AFSTester
             onOffGraph.Series.Add(dcvgIndication);
             var pcmList = new List<double>()
             {
-                59.12,58.02,60.57,57.10,59.6,59.65,59.31,58.89,59.79,57.52
+                903.17,796.32,1068.39,715.9,954.9,960.61,923.74,880.5,976.27,751.3
             };
             var pcmLables = new List<(double, string)>();
             var curPcmIndex = 0;
@@ -735,21 +748,21 @@ namespace AFSTester
             {
                 if (point.Point.Depth.HasValue && curPcmIndex < pcmList.Count)
                 {
-                    pcmLables.Add((point.Footage, pcmList[curPcmIndex].ToString("F2")));
+                    pcmLables.Add((point.Footage, pcmList[curPcmIndex].ToString("F0")));
                     ++curPcmIndex;
                 }
             }
             if (curPcmIndex < pcmList.Count)
             {
-                pcmLables.Add((file.Points.Last().Footage, pcmList[curPcmIndex].ToString("F2")));
+                pcmLables.Add((file.Points.Last().Footage, pcmList[curPcmIndex].ToString("F0")));
                 ++curPcmIndex;
             }
-            var pcmData = pcmLables.Select(value => (value.Item1, double.Parse(value.Item2))).ToList();
-            var pcm2 = new GraphSeries("PCM", pcmData)
+            var pcmData = pcmLables.Select(value => (value.Item1, -0.4, value.Item2)).ToList();
+            var pcm2 = new PointWithLabelGraphSeries("PCM (mA)", pcmData)
             {
                 LineColor = Colors.Black,
                 PointColor = Colors.Navy,
-                IsY1Axis = false,
+                IsY1Axis = true,
                 PointShape = GraphSeries.Shape.Square,
                 GraphType = GraphSeries.Type.Point
             };
@@ -777,7 +790,8 @@ namespace AFSTester
             //{
             //    RequestedPercent = 0.5
             //};
-            var surveyDirectionChart = new Chart(report, "Survey Direction");
+            var surveyDirectionChart = new Chart(report, "Survey Direction With Survey Date");
+            surveyDirectionChart.LegendInfo.NameFontSize = 14f;
             var cisClass = new Chart(report, "CIS Severity");
             var tempRegions = regions.Select(region => (region.Start, region.End, region.Name)).ToList();
             var cisIndication = new PGECISIndicationChartSeries(file.GetPoints(), cisClass, tempRegions);
@@ -792,7 +806,7 @@ namespace AFSTester
             var ecdaClassSeries = new PGEDirectExaminationPriorityChartSeries(ecdaClassChart, cisIndication, dcvgIndicationSeries);
             ecdaClassChart.Series.Add(ecdaClassSeries);
 
-            var surveyDirectionSeries = new SurveyDirectionSeries(directionData);
+            var surveyDirectionSeries = new SurveyDirectionWithDateSeries(directionData);
             surveyDirectionChart.Series.Add(surveyDirectionSeries);
 
             splitContainer.AddSelfSizedContainer(topGlobalXAxis);
@@ -871,17 +885,17 @@ namespace AFSTester
                 }
                 var length = Math.Max(endFoot - startFoot, 1);
                 var minDepthString = minDepth == -1 ? "" : minDepth.ToString("F0");
-                output.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{region}\t{length.ToString("F0")}\t{minDepthString}\t");
+                output.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{region}\t{length:F0}\t{minDepthString}\t");
                 var startGps = file.GetClosesetGps(startFoot);
-                output.Append($"{startGps.Latitude.ToString("F8")}\t{startGps.Longitude.ToString("F8")}\t");
+                output.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
                 var endGps = file.GetClosesetGps(endFoot);
-                output.Append($"{endGps.Latitude.ToString("F8")}\t{endGps.Longitude.ToString("F8")}\t");
+                output.Append($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t");
                 if (reason == "SKIP.")
                 {
                     output.AppendLine($"NT\tNT\tNT\tSkipped");
-                    skipReport.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1).ToString("F0")}\t");
-                    skipReport.Append($"{startGps.Latitude.ToString("F8")}\t{startGps.Longitude.ToString("F8")}\t");
-                    skipReport.AppendLine($"{endGps.Latitude.ToString("F8")}\t{endGps.Longitude.ToString("F8")}");
+                    skipReport.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1):F0}\t");
+                    skipReport.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
+                    skipReport.AppendLine($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}");
                 }
                 else
                 {
@@ -896,6 +910,15 @@ namespace AFSTester
             {
                 var lineString = string.Join('\t', line);
                 cisShapeFileStringBuilder.AppendLine(lineString);
+            }
+            var depthShapeFileStringBuilder = new StringBuilder();
+            foreach (var line in ecdaClassSeries.CISShapeFileOutput)
+            {
+                if (string.IsNullOrWhiteSpace(line[7]))
+                    continue;
+                line[0] = $"Depth: {line[7]}";
+                var lineString = string.Join('\t', line);
+                depthShapeFileStringBuilder.AppendLine(lineString);
             }
             var dcvgShapeFileStringBuilder = new StringBuilder();
             foreach (var line in ecdaClassSeries.IndicationShapeFileOutput)
@@ -924,20 +947,19 @@ namespace AFSTester
                     --curIndex;
                     var (startFoot, _) = extrapolatedDepth[start];
                     var (endFoot, _) = extrapolatedDepth[curIndex];
-                    depthException.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1).ToString("F0")}\t{minDepth.ToString("F0")}\t");
+                    depthException.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1):F0}\t{minDepth:F0}\t");
                     var startGps = file.GetClosesetGps(startFoot);
-                    depthException.Append($"{startGps.Latitude.ToString("F8")}\t{startGps.Longitude.ToString("F8")}\t");
+                    depthException.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
                     var endGps = file.GetClosesetGps(endFoot);
-                    depthException.AppendLine($"{endGps.Latitude.ToString("F8")}\t{endGps.Longitude.ToString("F8")}");
-
+                    depthException.AppendLine($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}");
                     i = curIndex + 1;
                 }
-                if (curDepth > maxDepth)
+                if (curDepth > 72)
                 {
                     var start = i;
                     var curIndex = i;
                     var max = curDepth;
-                    while (curDepth > maxDepth && curIndex != extrapolatedDepth.Count)
+                    while (curDepth > 72 && curIndex != extrapolatedDepth.Count)
                     {
                         (curFoot, curDepth) = extrapolatedDepth[curIndex];
                         if (curDepth > max)
@@ -947,11 +969,11 @@ namespace AFSTester
                     --curIndex;
                     var (startFoot, _) = extrapolatedDepth[start];
                     var (endFoot, _) = extrapolatedDepth[curIndex];
-                    depthException.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1).ToString("F0")}\t{max.ToString("F0")}\t");
+                    depthException.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1):F0}\t{max:F0}\t");
                     var startGps = file.GetClosesetGps(startFoot);
-                    depthException.Append($"{startGps.Latitude.ToString("F8")}\t{startGps.Longitude.ToString("F8")}\t");
+                    depthException.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
                     var endGps = file.GetClosesetGps(endFoot);
-                    depthException.AppendLine($"{endGps.Latitude.ToString("F8")}\t{endGps.Longitude.ToString("F8")}");
+                    depthException.AppendLine($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}");
 
                     i = curIndex + 1;
                 }
@@ -973,8 +995,7 @@ namespace AFSTester
             {
                 foreach (var tsRead in point.TestStationReads)
                 {
-                    var ac = tsRead as ACTestStationRead;
-                    if (ac == null)
+                    if (!(tsRead is ACTestStationRead ac))
                         continue;
                     if (ac.Value >= 10)
                         return;
@@ -1014,6 +1035,16 @@ namespace AFSTester
                 wbPart.Workbook = new Workbook();
                 wbPart.Workbook.AppendChild(new Sheets());
                 AddData(wbPart, cisShapeFileStringBuilder.ToString(), 1, "Shapefile", new List<string>());
+                wbPart.Workbook.Save();
+            }
+            outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{folderName} Depth Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
+            using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            {
+                var wbPart = spreadDoc.AddWorkbookPart();
+                wbPart.Workbook = new Workbook();
+                wbPart.Workbook.AppendChild(new Sheets());
+                AddData(wbPart, depthShapeFileStringBuilder.ToString(), 1, "Shapefile", new List<string>());
                 wbPart.Workbook.Save();
             }
             if (dcvgData.Count > 0)

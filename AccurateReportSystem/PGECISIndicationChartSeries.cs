@@ -169,17 +169,17 @@ namespace AccurateReportSystem
         {
             var changeInBaseline = Math.Abs(off - baseline);
             if (off > -0.5)
-                return (PGESeverity.Severe, "Off is less than -0.500");
+                return (PGESeverity.Severe, "Off is less than -0.500V");
             if (off > -0.7 && changeInBaseline >= 0.2)
-                return (PGESeverity.Severe, "Off is between -0.700 and -0.501 and difference in baseline is greater than 0.200");
+                return (PGESeverity.Severe, "Off is between -0.700V and -0.501V and difference in baseline is greater than 0.200V");
             if (off > -0.7)
-                return (PGESeverity.Moderate, "Off is between -0.700 and -0.501");
+                return (PGESeverity.Moderate, "Off is between -0.700V and -0.501V");
             if (off > -0.85 && changeInBaseline >= 0.2)
-                return (PGESeverity.Moderate, "Off is between -0.850 and -0.701 and difference in baseline is greater than 0.200");
+                return (PGESeverity.Moderate, "Off is between -0.850V and -0.701V and difference in baseline is greater than 0.200V");
             if (off > -0.85)
-                return (PGESeverity.Minor, "Off is between -0.850 and -0.701");
+                return (PGESeverity.Minor, "Off is between -0.850V and -0.701V");
             if (changeInBaseline >= 0.2)
-                return (PGESeverity.Minor, "difference in baseline is greater than 0.200");
+                return (PGESeverity.Minor, "difference in baseline is greater than 0.200V");
             return (PGESeverity.NRI, "");
         }
 
