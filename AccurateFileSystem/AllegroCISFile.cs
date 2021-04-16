@@ -18,6 +18,7 @@ namespace AccurateFileSystem
         public double TotalFootage => EndFootage - StartFootage;
         public List<(int start, int end)> Reconnects { get; private set; }
         public bool IsReverseRun { get; set; }
+        public bool IsOnOff => !Header.ContainsKey("onoff") || Header["onoff"] == "T";
 
         public AllegroCISFile(string name, string extension, Dictionary<string, string> header, Dictionary<int, AllegroDataPoint> points, FileType type) : base(name, type)
         {
@@ -30,6 +31,36 @@ namespace AccurateFileSystem
             EndFootage = points[points.Count - 1].Footage;
             IsReverseRun = Name.ToLower().Contains("rev");
             ProcessPoints();
+        }
+
+        public List<int> GetAnchorPoints(int distance = 50)
+        {
+            var testStations = new List<int> { 0 };
+            var lastFoot = Points[0].Footage;
+            for (int i = 1; i < Points.Count - 1; ++i)
+            {
+                var curPoint = Points[i];
+                AllegroDataPoint nextPoint = Points[i + 1];
+                if (curPoint.TestStationReads.Count != 0 && !Name.ToLower().Contains("redo"))
+                {
+                    if (i == 1 && curPoint.Footage - lastFoot <= 10)
+                        continue;
+
+                    if (nextPoint.TestStationReads.Count != 0)
+                    {
+                        if (nextPoint.Footage - curPoint.Footage <= 10)
+                            continue;
+                    }
+                    testStations.Add(i);
+                }
+                else if (nextPoint.Footage - curPoint.Footage > distance)
+                {
+                    testStations.Add(i);
+                }
+                lastFoot = curPoint.Footage;
+            }
+            testStations.Add(Points.Count - 1);
+            return testStations;
         }
 
         public override string ToString()
@@ -83,7 +114,7 @@ namespace AccurateFileSystem
         public BasicGeoposition GetLastGps()
         {
             var lastGps = new BasicGeoposition();
-            for(int i = 0; i < Points.Count; ++i)
+            for (int i = 0; i < Points.Count; ++i)
             {
                 if (Points[i].HasGPS)
                     lastGps = Points[i].GPS;
@@ -110,7 +141,6 @@ namespace AccurateFileSystem
             Reconnects = new List<(int, int)>();
             if (Points == null || Points.Count == 0)
                 return;
-            int incVal = int.Parse(Header["autoincval"]);
             double startIrDrop = 0;
             double irDropFactor = 0;
             if (Type == FileType.DCVG)
@@ -133,10 +163,13 @@ namespace AccurateFileSystem
                 recon.StartPoint = Points[0];
                 recon.EndPoint = Points[0];
             }
+            int lastUniqueGps = 0;
+            int duplicateGpsCount = 0;
+            var prevGps = Points[0].GPS;
             for (int i = 1; i < Points.Count; ++i)
             {
                 var cur = Points[i];
-                if (cur.On == 0 || cur.Off == 0)
+                if (cur.On == 0 || (cur.Off == 0 && IsOnOff))
                 {
                     if (string.IsNullOrWhiteSpace(cur.OriginalComment))
                     {
@@ -163,6 +196,22 @@ namespace AccurateFileSystem
                         cur.Off = Points[i + 1].Off;
                     }
                 }
+
+                var curGps = cur.GPS;
+                if (curGps.Equals(prevGps))
+                {
+                    ++duplicateGpsCount;
+                }
+                else
+                {
+                    if (duplicateGpsCount > 3)
+                    {
+                        ExtrapolateGps(lastUniqueGps, i);
+                    }
+                    duplicateGpsCount = 0;
+                    lastUniqueGps = i;
+                }
+
                 if (cur.HasIndication)
                 {
                     var curIrDrop = startIrDrop + irDropFactor * cur.Footage;
@@ -170,6 +219,7 @@ namespace AccurateFileSystem
                 }
                 prevOn = cur.On;
                 prevOff = cur.Off;
+                prevGps = cur.GPS;
                 if (cur.HasReconnect)
                 {
                     Reconnects.Add((startIndex, i));
@@ -204,6 +254,38 @@ namespace AccurateFileSystem
             }
         }
 
+        private void ExtrapolateGps(int from, int to)
+        {
+            var startPoint = Points[from];
+            var startGps = startPoint.GPS;
+            var startLat = startGps.Latitude;
+            var startLon = startGps.Longitude;
+            var startFootage = startPoint.Footage;
+
+            var endPoint = Points[to];
+            var endGps = endPoint.GPS;
+            var endLat = endGps.Latitude;
+            var endLon = endGps.Longitude;
+            var endFootage = endPoint.Footage;
+
+            var distance = endFootage - startFootage;
+            var diffLat = endLat - startLat;
+            var diffLon = endLon - startLon;
+
+            var slopeLat = diffLat / distance;
+            var slopeLon = diffLon / distance;
+
+            for (int i = from + 1; i < to; ++i)
+            {
+                var curPoint = Points[i];
+                var curFootage = curPoint.Footage;
+                var curDistance = curFootage - startFootage;
+                var curLat = Math.Round(curDistance * slopeLat + startLat, 8);
+                var curLon = Math.Round(curDistance * slopeLon + startLon, 8);
+                curPoint.GPS = new BasicGeoposition() { Latitude = curLat, Longitude = curLon };
+            }
+        }
+
         /*var cur = Points[i];
                 var next = Points[i + 1];
 
@@ -225,8 +307,7 @@ namespace AccurateFileSystem
         // TODO: Add a return for what the differences are.
         public override bool IsEquivalent(File otherFile)
         {
-            var other = otherFile as AllegroCISFile;
-            if (other == null)
+            if (!(otherFile is AllegroCISFile other))
                 return false;
             // If Guid is equal then we know they are equal. Probably an uncommon check.
             if (other.Guid.Equals(Guid))
@@ -299,6 +380,26 @@ namespace AccurateFileSystem
             }
 
             return (distance, point);
+        }
+
+        public string ToStringCsv()
+        {
+            var output = new StringBuilder();
+
+            output.AppendLine("Start survey:");
+
+            foreach (var (key, value) in Header)
+            {
+                output.AppendLine($"{key},{value}");
+            }
+            for (int i = 0; i < Points.Count; ++i)
+            {
+                output.AppendLine(Points[i].ToStringCsv());
+            }
+
+            output.AppendLine("End survey");
+
+            return output.ToString();
         }
 
         public List<(double Footage, double Value1, double Value2)> GetCombinedDoubleData(string name1, string name2)
@@ -486,7 +587,7 @@ namespace AccurateFileSystem
                 var leftCheck = myIndex - myOffset;
                 var leftPoint = leftCheck >= 0 ? Points[leftCheck] : null;
                 var leftDist = myPoint.Footage - (leftPoint?.Footage ?? double.MinValue);
-                var rightCheck = myIndex - myOffset;
+                var rightCheck = myIndex + myOffset;
                 var rightPoint = rightCheck < Points.Count ? Points[rightCheck] : null;
                 var rightDist = (rightPoint?.Footage ?? double.MaxValue) - myPoint.Footage;
                 if (leftPoint != null || rightPoint != null)

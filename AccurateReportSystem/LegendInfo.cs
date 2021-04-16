@@ -166,6 +166,20 @@ namespace AccurateReportSystem
         public void Draw(CanvasDrawingSession session, IEnumerable<Series> series, Rect drawArea)
         {
             var height = 0f;
+            var labelPercentWidth = float.NaN;
+            foreach (var s in series)
+            {
+                if (s is ExceptionsChartSeries chartSeries)
+                {
+                    if (float.IsNaN(labelPercentWidth))
+                        labelPercentWidth = chartSeries.LegendLabelSplit;
+                    else
+                        labelPercentWidth = Math.Min(chartSeries.LegendLabelSplit, labelPercentWidth);
+                }
+            }
+            if (float.IsNaN(labelPercentWidth))
+                labelPercentWidth = 1f;
+            var width = (float)(drawArea.Width * labelPercentWidth);
             var filteredSeries = series.Where(s => s.IsDrawnInLegend).ToList();
 
             using (var format = new CanvasTextFormat())
@@ -175,7 +189,7 @@ namespace AccurateReportSystem
                 format.FontFamily = "Arial";
                 format.FontWeight = FontWeights.Bold;
                 format.FontStyle = FontStyle.Normal;
-                using (var layout = new CanvasTextLayout(session, Name, format, (float)drawArea.Width, 0))
+                using (var layout = new CanvasTextLayout(session, Name, format, width, 0))
                 {
                     var curHeight = (float)layout.LayoutBounds.Height;
                     height += curHeight;
@@ -190,7 +204,7 @@ namespace AccurateReportSystem
                 format.FontStyle = FontStyle.Normal;
                 foreach (var curSeries in filteredSeries)
                 {
-                    using (var layout = new CanvasTextLayout(session, curSeries.Name, format, (float)drawArea.Width, 0))
+                    using (var layout = new CanvasTextLayout(session, curSeries.Name, format, width, 0))
                     {
                         var curHeight = (float)layout.LayoutBounds.Height;
                         height += curHeight;
@@ -198,7 +212,7 @@ namespace AccurateReportSystem
                 }
             }
 
-            //session.DrawRectangle(legendDrawArea, Colors.Orange);
+            //session.DrawRectangle(drawArea, Colors.Orange);
             using (var layer = session.CreateLayer(1f, drawArea))
             {
                 var offset = 0f;
@@ -213,7 +227,7 @@ namespace AccurateReportSystem
                     format.FontFamily = "Arial";
                     format.FontWeight = FontWeights.Bold;
                     format.FontStyle = FontStyle.Normal;
-                    using (var layout = new CanvasTextLayout(session, Name, format, (float)drawArea.Width, 0))
+                    using (var layout = new CanvasTextLayout(session, Name, format, width, 0))
                     {
                         using (var geo = CanvasGeometry.CreateText(layout))
                         {
@@ -232,7 +246,7 @@ namespace AccurateReportSystem
                     format.FontStyle = FontStyle.Normal;
                     foreach (var curSeries in filteredSeries)
                     {
-                        using (var layout = new CanvasTextLayout(session, curSeries.Name, format, (float)drawArea.Width, 0))
+                        using (var layout = new CanvasTextLayout(session, curSeries.Name, format, width, 0))
                         {
                             using (var geo = CanvasGeometry.CreateText(layout))
                             {

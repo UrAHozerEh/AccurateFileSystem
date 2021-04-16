@@ -98,8 +98,6 @@ namespace AccurateReportSystem
 
                 //DrawGridLines(page, graphBodyDrawArea, session, translateMatrix, scaleMatrix);
 
-
-
                 foreach (var series in Series)
                 {
                     var curTransform = series.IsY1Axis ? y1Transform : y2Transform;

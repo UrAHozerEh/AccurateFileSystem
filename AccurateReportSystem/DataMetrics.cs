@@ -41,6 +41,7 @@ namespace AccurateReportSystem
                             Readings = 1,
                             Worst = point.MirOn
                         };
+                        On850.Add(on850);
                     }
                     else
                     {
@@ -53,7 +54,7 @@ namespace AccurateReportSystem
                 }
                 else if (on850 != null)
                 {
-                    On850.Add(on850);
+                    //On850.Add(on850);
                     on850 = null;
                 }
 
@@ -70,6 +71,7 @@ namespace AccurateReportSystem
                             Readings = 1,
                             Worst = point.MirOff
                         };
+                        Off850.Add(off850);
                     }
                     else
                     {
@@ -82,7 +84,7 @@ namespace AccurateReportSystem
                 }
                 else if (off850 != null)
                 {
-                    Off850.Add(off850);
+                    //Off850.Add(off850);
                     off850 = null;
                 }
 
@@ -99,6 +101,7 @@ namespace AccurateReportSystem
                             Readings = 1,
                             Worst = point.MirOff
                         };
+                        Off1250.Add(off1250);
                     }
                     else
                     {
@@ -111,7 +114,7 @@ namespace AccurateReportSystem
                 }
                 else if (off1250 != null)
                 {
-                    Off1250.Add(off1250);
+                    //Off1250.Add(off1250);
                     off1250 = null;
                 }
 
@@ -128,6 +131,7 @@ namespace AccurateReportSystem
                             Readings = 1,
                             Worst = point.MirOff
                         };
+                        OffBetween.Add(offBetween);
                     }
                     else
                     {
@@ -140,7 +144,7 @@ namespace AccurateReportSystem
                 }
                 else if (offBetween != null)
                 {
-                    OffBetween.Add(offBetween);
+                    //OffBetween.Add(offBetween);
                     offBetween = null;
                 }
 
@@ -180,7 +184,7 @@ namespace AccurateReportSystem
 
             public override string ToString()
             {
-                return $"{Readings}\t{StartFootage}\t{StartPoint.GPS.Latitude}\t{StartPoint.GPS.Longitude}\t{EndFootage}\t{EndPoint.GPS.Latitude}\t{EndPoint.GPS.Longitude}\t{EndFootage - StartFootage}\t{Worst.ToString("F4")}";
+                return $"{Readings}\t{StartFootage}\t{StartPoint.GPS.Latitude:F8}\t{StartPoint.GPS.Longitude:F8}\t{EndFootage}\t{EndPoint.GPS.Latitude:F8}\t{EndPoint.GPS.Longitude:F8}\t{EndFootage - StartFootage}\t{Worst:F4}";
             }
         }
 
@@ -198,7 +202,7 @@ namespace AccurateReportSystem
                 curLength += row.Length;
                 on850 += row.ToString() + "\n";
             }
-            summary += $"On < -0.850V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads).ToString("P")}\t{curLength}\n";
+            summary += $"On < -0.850V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads):P}\t{curLength}\n";
 
             var off850 = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
@@ -209,7 +213,7 @@ namespace AccurateReportSystem
                 curLength += row.Length;
                 off850 += row.ToString() + "\n";
             }
-            summary += $"Off < -0.850V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads).ToString("P")}\t{curLength}\n";
+            summary += $"Off < -0.850V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads):P}\t{curLength}\n";
 
             var off1250 = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
@@ -220,7 +224,7 @@ namespace AccurateReportSystem
                 curLength += row.Length;
                 off1250 += row.ToString() + "\n";
             }
-            summary += $"Off > -1.250V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads).ToString("P")}\t{curLength}\n";
+            summary += $"Off > -1.250V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads):P}\t{curLength}\n";
 
             var offBetween = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
@@ -231,7 +235,7 @@ namespace AccurateReportSystem
                 curLength += row.Length;
                 offBetween += row.ToString() + "\n";
             }
-            summary += $"Off Between -0.600V and -0.750V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads).ToString("P")}\t{curLength}\n";
+            summary += $"Off Between -0.600V and -0.750V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads):P}\t{curLength}\n";
 
             var ac = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
@@ -242,7 +246,7 @@ namespace AccurateReportSystem
                 curLength += row.Length;
                 ac += row.ToString() + "\n";
             }
-            summary += $"AC > 2V\t{TotalAcReads}\t{curCount}\t{(curCount / (double)TotalAcReads).ToString("P")}\t{curLength}\n";
+            summary += $"AC > 2V\t{TotalAcReads}\t{curCount}\t{(curCount / (double)TotalAcReads):P}\t{curLength}\n";
 
             sheets.Add(("Summary", summary));
             sheets.Add(("On < -0.850V", on850));
