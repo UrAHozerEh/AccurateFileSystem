@@ -92,6 +92,10 @@ namespace AccurateFileSystem
             else if (onMatch.Success)
             {
                 IsOnOff = false;
+                int count = onMatch.Groups.Count;
+                if (count == 3)
+                    Tag = onMatch.Groups[1].Value;
+                On = double.Parse(onMatch.Groups[count - 1].Value);
             }
             else
                 throw new Exception();
@@ -131,6 +135,12 @@ namespace AccurateFileSystem
             else if (onMatch.Success)
             {
                 IsOnOff = false;
+                int count = onMatch.Groups.Count;
+                if (count == 4)
+                    Tag = onMatch.Groups[1].Value;
+                LeftOn = double.Parse(onMatch.Groups[count - 2].Value);
+
+                RightOn = double.Parse(onMatch.Groups[count - 1].Value);
             }
             else
                 throw new Exception();
@@ -181,6 +191,15 @@ namespace AccurateFileSystem
             else if (onMatch.Success)
             {
                 IsOnOff = false;
+                int count = onMatch.Groups.Count;
+                if (count == 5)
+                    Tag = onMatch.Groups[1].Value;
+                FGOn = double.Parse(onMatch.Groups[count - 3].Value);
+
+                MirOn = double.Parse(onMatch.Groups[count - 2].Value);
+
+                NGOn = double.Parse(onMatch.Groups[count - 1].Value);
+
             }
             else
                 throw new Exception();
@@ -234,8 +253,8 @@ namespace AccurateFileSystem
 
     public class CrossingTestStationRead : TestStationRead
     {
-        public static string OnOffRegexPattern => @"\(Crossing without bond([^:]+)?: Struct P/S ([^V]+)V IRF ([^V]+)V, Forgn P/S ([^V]+)V IRF ([^V]+)V\)";
-        public static string OnRegexPattern => @"\(Crossing without bond([^:]+)?: Struct P/S ([^V]+)V, Forgn P/S ([^V]+)V\)";
+        public static string OnOffRegexPattern => @"\(Crossing with(?:out)? bond([^:]+)?: Struct P/S ([^V]+)V IRF ([^V]+)V,(?:[^\)]+)P/S ([^V]+)V IRF ([^V]+)V\)";
+        public static string OnRegexPattern => @"\(Crossing with(?:out)? bond([^:]+)?: Struct P/S ([^V]+)V,(?:[^\)]+)P/S ([^V]+)V\)";
         public bool IsOnOff { get; }
         public double StructOn { get; }
         public double StructOff { get; }

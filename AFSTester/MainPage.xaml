@@ -28,14 +28,21 @@
                 <RowDefinition Height="1*"/>
                 <RowDefinition Height="1*"/>
                 <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
             </Grid.RowDefinitions>
-            <Button Content="Import" Click="Button_Click" Grid.Row="0" HorizontalAlignment="Center"/>
-            <Button Content="Do Map" Click="Button_Click_1" Grid.Row="1" HorizontalAlignment="Center"/>
+            <Button Content="Import" Click="ImportButtonClick" Grid.Row="0" HorizontalAlignment="Center"/>
+            <Button Content="Do Map" Click="DoMapButtonClick" Grid.Row="1" HorizontalAlignment="Center"/>
             <Button Content="Hide Map" Click="Button_Click_2" Grid.Row="2" HorizontalAlignment="Center"/>
             <Button Content="Zoom Map" Click="Button_Click_3" Grid.Row="3" HorizontalAlignment="Center"/>
             <Grid Grid.Row="4">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="1*"/>
                     <RowDefinition Height="1*"/>
                     <RowDefinition Height="1*"/>
                 </Grid.RowDefinitions>
@@ -44,14 +51,21 @@
                 </Grid.ColumnDefinitions>
                 <Button Content="Combine" Click="CombineButtonClick" Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center"/>
                 <TextBox x:Name="CombineMaxGap" Text="1500" VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Row="1" InputScope="Number"/>
-                <CheckBox x:Name="IsReversed" Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Left" Content="Rev?"/>
             </Grid>
             <Button Content="Hide" Click="HideButtonClick" Grid.Row="5" HorizontalAlignment="Center"/>
             <Button Content="IIT" Click="IITClick"  Grid.Row="6" HorizontalAlignment="Center"/>
             <Button Content="Batch IIT" Click="BatchIITClick"  Grid.Row="7" HorizontalAlignment="Center"/>
             <Button Content="NuStar" Click="MakeNustarGraphs"  Grid.Row="8" HorizontalAlignment="Center"/>
             <Button Content="Combine All" Grid.Row="9" HorizontalAlignment="Center" Click="Button_Click_4"/>
-            <Button Content="Aerial" Click="ToggleAerial"  Grid.Row="10" HorizontalAlignment="Center"/>
+            <Button Content="Import Order" Grid.Row="10" HorizontalAlignment="Center" Click="ImportFilesOrder"/>
+            <Button Content="Aerial" Click="ToggleAerial"  Grid.Row="11" HorizontalAlignment="Center"/>
+            <CheckBox Content="MIR Filter" Grid.Row="12" x:Name="MirFilter"/>
+            <CheckBox Content="Sempra" Grid.Row="13" x:Name="IsSempra"/>
+            <CheckBox Content="Combine" Grid.Row="14" x:Name="CombineFilter"/>
+            <TextBox Text="" x:Name="OutputFolderTextBox" Grid.Row="15"/>
+            <Button Content="Quick Graph" Grid.Row="16" HorizontalAlignment="Center" Click="Button_Click_5"/>
+            <Button Content="CIS and Depol" Grid.Row="17" HorizontalAlignment="Center" Click="OnOffDepolButtonClick"/>
+            <Button Content="Converter" Grid.Row="18" HorizontalAlignment="Center" Click="ConvertSvyToCsv"/>
         </Grid>
 
         <Maps:MapControl x:Name="MapControl" Grid.Column="0"/>

@@ -98,11 +98,11 @@ namespace AccurateReportSystem
 
             if (CisSeries != null)
             {
-                foreach (var (foot, on, off, comment, date, depth, isExtrapolated, _, gps, region, severity, reason) in CisSeries.Data)
+                foreach (var dataPoint in CisSeries.Data)
                 {
-                    if (foot > lastFoot)
-                        lastFoot = foot;
-                    cisSeverities.Add((int)foot, (on, off, comment, date, depth, isExtrapolated, severity, reason, gps, region));
+                    if (dataPoint.Footage > lastFoot)
+                        lastFoot = dataPoint.Footage;
+                    cisSeverities.Add((int)dataPoint.Footage, (dataPoint.On, dataPoint.Off, dataPoint.Comment, dataPoint.Date, dataPoint.Depth, dataPoint.IsExtrapolated, dataPoint.Severity, dataPoint.Reason, dataPoint.Gps, dataPoint.Region));
                 }
             }
             var dcvgSeverities = new Dictionary<int, (double, PGESeverity, string, BasicGeoposition)>();
@@ -384,13 +384,13 @@ namespace AccurateReportSystem
             var cisSeverities = new Dictionary<int, PGESeverity>();
             if (CisSeries != null)
             {
-                foreach (var (foot, _, _, _, _, _, _, _, _, _, severity, _) in CisSeries.Data)
+                foreach (var dataPoint in CisSeries.Data)
                 {
-                    if (foot < page.StartFootage)
+                    if (dataPoint.Footage < page.StartFootage)
                         continue;
-                    if (foot > page.EndFootage)
+                    if (dataPoint.Footage > page.EndFootage)
                         break;
-                    cisSeverities.Add((int)foot, severity);
+                    cisSeverities.Add((int)dataPoint.Footage, dataPoint.Severity);
                 }
             }
             var dcvgSeverities = new Dictionary<int, PGESeverity>();

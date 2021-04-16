@@ -20,7 +20,7 @@ namespace AccurateFileSystem
         public double MirOffOffset { get; set; }
         public double MirOff => Off - MirOffOffset;
         public double? MirOffPerFoot { get; set; } = null;
-        public double? Depth { get; private set; }
+        public double? Depth { get; set; }
         public string OriginalComment { get; set; }
         public string CommentTemplate { get; private set; }
         public string StrippedComment { get; set; }
@@ -64,7 +64,7 @@ namespace AccurateFileSystem
             MirOnOffset = 0;
             Off = off;
             MirOffOffset = 0;
-            OriginalComment = comment;
+            OriginalComment = comment.Replace("(250V Range)", "").Replace("250V Range","");
             GPS = gps;
             Times = times;
             IndicationValue = indicationValue;
@@ -76,9 +76,16 @@ namespace AccurateFileSystem
         {
             if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
-            string docPattern = @"(?i)DOC:?\s?(\d+)\s?(in)?";
+            string docPattern = "(?i)DOC:?\\s?(\\d+)\\s?(in)?(\")?";
             string docFootPattern = @"(?i)DOC:?\s?(\d+)\s?ft";
-            string docFootInchPattern = @"(?i)DOC:?\s?(\d+)'(\d*)\s?(in)?";
+            string docFootInchPattern = "(?i)DOC:?\\s?(\\d+)'(\\d*)\\s?(in)?(\")?";
+            //string offsetPattern = "(?i)(begin)?(start)?(end)? ?offset";
+            //var offset = Regex.Match(OriginalComment, offsetPattern);
+            //if (offset.Success)
+            //{
+            //    if (offset.Groups.Count(g => g.Length > 0) == 1)
+            //        OriginalComment = OriginalComment.Replace(offset.Value, "");
+            //}
             var doc = Regex.Match(OriginalComment, docPattern);
             var docFoot = Regex.Match(OriginalComment, docFootPattern);
             var docFootInch = Regex.Match(OriginalComment, docFootInchPattern);
@@ -203,6 +210,33 @@ namespace AccurateFileSystem
                 if (read is ReconnectTestStationRead)
                     return read as ReconnectTestStationRead;
             return null;
+        }
+
+        public string ToStringCsv()
+        {
+            var output = new StringBuilder();
+
+            output.Append($"{Footage:F3},  ,");
+            var onString = $"{On:F4}".PadLeft(8, ' ');
+            var offString = $"{Off:F4}".PadLeft(8, ' ');
+            output.Append(onString + ',' + offString + ',');
+            if (OnTime != null)
+            {
+                var onTimeString = " " + OnTime?.ToString("MM/dd/yyyy, HH:mm:ss.fff") + ",g,";
+                output.Append(onTimeString);
+            }
+            if (OffTime != null)
+            {
+                var offTimeString = " " + OffTime?.ToString("MM/dd/yyyy, HH:mm:ss.fff") + ",g,";
+                output.Append(offTimeString);
+            }
+            var latString = $"{GPS.Latitude:F8}".PadLeft(14, ' ');
+            var lonString = $"{GPS.Longitude:F8}".PadLeft(14, ' ');
+            var altString = $"{GPS.Longitude:F1}".PadLeft(6, ' ');
+            output.Append($"{latString},{lonString},{altString}, 1.200, D,");
+            output.Append($"\"{OriginalComment}\"");
+
+            return output.ToString();
         }
     }
 }

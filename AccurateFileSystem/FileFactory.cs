@@ -92,6 +92,7 @@ namespace AccurateFileSystem
                     switch (label)
                     {
                         case "Time":
+                            value = value.Replace(", No GPS", "");
                             time = DateTime.Parse(value);
                             break;
                         case "Range":
@@ -145,7 +146,7 @@ namespace AccurateFileSystem
             string extension = File.FileType.ToLower();
             string headerDelimiter;
             int pointId = 0;
-            bool noGaps = true;
+            bool noGaps = false;
             switch (extension)
             {
                 case ".svy":
@@ -173,7 +174,7 @@ namespace AccurateFileSystem
                 string extraCommasShort = extraCommasMatch.Success ? extraCommasMatch.Value.Substring(1) : "";
                 double? startFoot = null;
                 AllegroDataPoint lastPoint = null;
-                
+
                 while (!reader.EndOfStream)
                 {
                     line = reader.ReadLine().Trim();
@@ -225,7 +226,7 @@ namespace AccurateFileSystem
                             point = ParseAllegroLineFromCSV(pointId, line);
                         if (startFoot == null)
                             startFoot = point.Footage;
-                        
+
                         if (extension != ".dvg")
                             point.Footage -= startFoot ?? 0;
                         if (noGaps && lastPoint != null && point.Footage - lastPoint.Footage > 20)
@@ -239,7 +240,7 @@ namespace AccurateFileSystem
                             var extrapolatedOff = (lastPoint.Off + point.Off) / 2;
                             var curGps = point.HasGPS ? point.GPS : lastPoint.GPS;
                             var extrapolatedPoint = new AllegroDataPoint(point.Id, lastPoint.Footage + 10, extrapolatedOn, extrapolatedOff, curGps, point.Times, point.IndicationValue, "", false);
-                            point.Id = point.Id + 1;
+                            point.Id += 1;
                             points.Add(extrapolatedPoint.Id, extrapolatedPoint);
                             ++pointId;
                         }
@@ -275,7 +276,7 @@ namespace AccurateFileSystem
 
         private AllegroDataPoint ParseAllegroLineFromCSV(int id, string line)
         {
-            var indicationMatch = Regex.Match(line, ",\"[^\"]*\",\"UN\",0,(\\d+\\.?\\d*),0");
+            var indicationMatch = Regex.Match(line, ",\"?[^\",]*\"?,\"?UN\"?,0,(\\d+\\.?\\d*),0");
             double indicationValue = double.NaN;
             if (indicationMatch.Success)
             {
@@ -287,15 +288,41 @@ namespace AccurateFileSystem
             if (split.Length < 16)
                 return null;
             var comment = split[15];
+            double realDoC = double.NaN;
             if (split.Length > 16)
             {
+                // Weird 111A stuff
+                //if (split.Last().Contains("\""))
+                //{
+                //    for (int i = 15; i < split.Length; i++)
+                //    {
+                //        if (split[i].Contains("\""))
+                //        {
+                //            var sublistt = split.Skip(i);
+                //            comment = string.Join(",", sublistt);
+                //            if (!string.IsNullOrEmpty(split[i - 1]))
+                //                realDoC = double.Parse(split[i - 1]);
+                //            break;
+                //        }
+                //    }
+                //}
+                //else
+                //{
+                //    comment = split.Last();
+                //    if (!string.IsNullOrEmpty(split[split.Length - 2]))
+                //        realDoC = double.Parse(split[split.Length - 2]);
+                //}
+                // End Weird Stuff
+                // Start Normal Stuff
                 var sublist = split.Skip(15);
                 comment = string.Join(",", sublist);
+                // End Normal Stuff
             }
             if (comment == "\"\"")
                 comment = "";
             if (comment.Contains('"'))
                 comment = Regex.Replace(comment, "^\"(.*)\"$", "$1");
+            comment = Regex.Replace(comment, "\"\"", "\"");
 
             double footage = double.Parse(split[0]);
             double on = double.Parse(split[2]);
@@ -306,10 +333,17 @@ namespace AccurateFileSystem
                 times.Add(JoinAndParseDateTime(split, 4));
             if (IsValidTime(split, 7))
                 times.Add(JoinAndParseDateTime(split, 7));
+            double lat = 0, lon = 0, alt = 0;
+            try
+            {
+                lat = double.Parse(split[10]);
+                lon = double.Parse(split[11]);
+                alt = double.Parse(split[12]);
+            }
+            catch
+            {
 
-            double lat = double.Parse(split[10]);
-            double lon = double.Parse(split[11]);
-            double alt = double.Parse(split[12]);
+            }
             var dColumn = split[14].Trim();
             BasicGeoposition gps = new BasicGeoposition();
             if (lat != 0 && lon != 0)
@@ -323,6 +357,10 @@ namespace AccurateFileSystem
             }
 
             var output = new AllegroDataPoint(id, footage, on, off, gps, times, indicationValue, comment.Trim(), dColumn.ToLower().Contains("d"));
+            // Weird 111A Stuff
+            //if (!double.IsNaN(realDoC))
+            //    output.Depth = realDoC;
+            // End Weird 111A Stuff
             return output;
         }
 
@@ -371,19 +409,23 @@ namespace AccurateFileSystem
             {
                 var gpsLabel = match.Groups[1].Value.ToLower();
                 isCorrected = gpsLabel.Contains("d");
-                var split = match.Groups[2].Value.Split(',');
-                if (split.Length != 4)
-                    throw new Exception();
-                double lat = double.Parse(split[0]);
-                double lon = double.Parse(split[1]);
-                double alt = double.Parse(split[2]);
-                gps = new BasicGeoposition
+                if (!line.Contains("{g no gps}", StringComparison.OrdinalIgnoreCase))
                 {
-                    Altitude = alt,
-                    Longitude = lon,
-                    Latitude = lat
-                };
+                    var split = match.Groups[2].Value.Split(',');
+                    if (split.Length != 4)
+                        throw new Exception();
+                    double lat = double.Parse(split[0]);
+                    double lon = double.Parse(split[1]);
+                    double alt = double.Parse(split[2]);
+                    gps = new BasicGeoposition
+                    {
+                        Altitude = alt,
+                        Longitude = lon,
+                        Latitude = lat
+                    };
+                }
                 line = line = Regex.Replace(line, match.Value, "").Trim();
+
             }
             var timeMatches = Regex.Matches(line, timePattern);
             List<DateTime> times = new List<DateTime>();
