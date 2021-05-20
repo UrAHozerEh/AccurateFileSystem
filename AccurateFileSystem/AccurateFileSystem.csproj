@@ -123,10 +123,17 @@
     <Compile Include="AllegroCISFile.cs" />
     <Compile Include="AllegroDataPoint.cs" />
     <Compile Include="AllegroWaveformFile.cs" />
+    <Compile Include="CsvPcm.cs" />
+    <Compile Include="Hca.cs" />
+    <Compile Include="HcaRegion.cs" />
+    <Compile Include="IitRegionFile.cs" />
+    <Compile Include="OtherPcm.cs" />
+    <Compile Include="VivaxPcm.cs" />
     <Compile Include="CombinedAllegroCISFile.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="File.cs" />
     <Compile Include="FileFactory.cs" />
+    <Compile Include="GeneralCsv.cs" />
     <Compile Include="Object.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SurveyFile.cs" />

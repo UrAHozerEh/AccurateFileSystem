@@ -148,8 +148,8 @@ namespace AccurateReportSystem
 
         private void DrawOverlapShadow(PageInformation page, CanvasDrawingSession session, Rect graphBodyDrawArea)
         {
-            var color = Colors.Black;
-            var opacity = 0.25f;
+            var color = XAxisInfo.OverlapColor;
+            var opacity = XAxisInfo.OverlapOpacity;
             var pixelToFootRatio = graphBodyDrawArea.Width / page.Width;
             var shadowWidth = (float)Math.Round(pixelToFootRatio * page.Overlap, GraphicalReport.DIGITS_TO_ROUND);
             var startRect = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Y, shadowWidth, graphBodyDrawArea.Height);

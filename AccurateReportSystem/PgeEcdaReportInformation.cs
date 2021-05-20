@@ -16,11 +16,24 @@ namespace AccurateReportSystem
         public CombinedAllegroCISFile CisFile { get; set; }
         public List<PgeEcdaDataPoint> EcdaData { get; set; }
         public HcaInfo HcaInfo { get; set; }
+        public Hca? Hca { get; set; }
         public bool IsDcvg { get; private set; }
         public bool IsAcvg => !IsDcvg;
         public bool UseMir { get; set; }
         public double MaxSpacing { get; set; }
         public GpsInfo? GpsInfo { get; set; }
+
+        public List<int> GetActualReadFootage()
+        {
+            var output = Enumerable.Repeat(0, 5).ToList();
+            foreach(var point in EcdaData)
+            {
+                if (point.IsCisSkipped || point.Footage == 0) continue;
+                output[0] += 1;
+                output[point.Severity] += 1;
+            }
+            return output;
+        }
 
         public class PgeEcdaDataPoint
         {
@@ -36,8 +49,9 @@ namespace AccurateReportSystem
             public double Baseline { get; set; } = double.NaN;
             public double IndicationValue { get; set; } = double.NaN;
             public string Region { get; set; }
+            public HcaRegion? RegionUpdated { get; set; }
 
-            public PgeEcdaDataPoint(double footage, double on, double off, double? depth, bool isSkipped, bool isExtrapolated, BasicGeoposition gps, bool isDcvg, string region)
+            public PgeEcdaDataPoint(double footage, double on, double off, double? depth, bool isSkipped, bool isExtrapolated, BasicGeoposition gps, bool isDcvg, string region, HcaRegion? regionUpdated = null)
             {
                 Footage = footage;
                 On = on;
@@ -48,6 +62,7 @@ namespace AccurateReportSystem
                 CisGps = gps;
                 IsDcvg = isDcvg;
                 Region = region;
+                RegionUpdated = regionUpdated;
             }
 
             public int Severity
@@ -130,6 +145,8 @@ namespace AccurateReportSystem
             {
                 if (IsCisSkipped && Region.Contains("3"))
                     return (PGESeverity.NRI, "Casing");
+                if (IsCisSkipped && Region.Contains("7"))
+                    return (PGESeverity.NRI, "Atmospheric");
                 if (IsCisSkipped)
                     return (PGESeverity.NRI, "Skip");
 
@@ -218,6 +235,11 @@ namespace AccurateReportSystem
 
                 return true;
             }
+
+            public override string ToString()
+            {
+                return $"{Footage} {Region}{(IsCisSkipped ? "Skipped" : "")}";
+            }
         }
 
         public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<AllegroCISFile> dcvgFiles, HcaInfo hcaInfo, double maxSpacing, bool useMir = false, GpsInfo? gpsInfo = null)
@@ -229,6 +251,53 @@ namespace AccurateReportSystem
             CisFile = cisFile;
             HcaInfo = hcaInfo;
             ExtrapolateCisData();
+
+            foreach (var file in dcvgFiles)
+            {
+                AllegroDataPoint lastGpsPoint = null;
+                foreach (var (_, point) in file.Points)
+                {
+                    if (point.HasIndication)
+                    {
+                        var gps = point.GPS;
+                        if (!point.HasGPS)
+                        {
+                            gps = lastGpsPoint.GPS;
+                        }
+                        var closestDistance = double.MaxValue;
+                        PgeEcdaDataPoint closestPoint = null;
+                        foreach (var surveyPoint in EcdaData)
+                        {
+                            if (surveyPoint.IsCisSkipped)
+                                continue;
+                            var curDistance = surveyPoint.CisGps.Distance(gps);
+                            if (curDistance < closestDistance)
+                            {
+                                closestDistance = curDistance;
+                                closestPoint = surveyPoint;
+                            }
+                        }
+                        if (closestPoint == null)
+                            throw new Exception();
+                        closestPoint.IndicationValue = point.IndicationPercent;
+                        var middleGps = closestPoint.CisGps.MiddleTowards(gps);
+                        closestPoint.IndicationGps = middleGps;
+                    }
+                    if (point.HasGPS)
+                        lastGpsPoint = point;
+                }
+            }
+        }
+
+        public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<AllegroCISFile> dcvgFiles, Hca hca, double maxSpacing, bool useMir = false, GpsInfo? gpsInfo = null)
+        {
+            GpsInfo = gpsInfo;
+            MaxSpacing = maxSpacing;
+            IsDcvg = true;
+            UseMir = useMir;
+            CisFile = cisFile;
+            Hca = hca;
+            ExtrapolateCisDataUpdated();//
 
             foreach (var file in dcvgFiles)
             {
@@ -298,6 +367,36 @@ namespace AccurateReportSystem
             }
         }
 
+        public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<(BasicGeoposition, double)> acvgIndications, Hca hca, double maxSpacing, bool useMir = false)
+        {
+            MaxSpacing = maxSpacing;
+            IsDcvg = false;
+            UseMir = useMir;
+            CisFile = cisFile;
+            Hca = hca;
+            ExtrapolateCisDataUpdated();
+
+            foreach (var (gps, value) in acvgIndications)
+            {
+                var closestDistance = double.MaxValue;
+                PgeEcdaDataPoint closestPoint = null;
+                foreach (var surveyPoint in EcdaData)
+                {
+                    if (surveyPoint.IsCisSkipped)
+                        continue;
+                    var curDistance = surveyPoint.CisGps.Distance(gps);
+                    if (curDistance < closestDistance)
+                    {
+                        closestDistance = curDistance;
+                        closestPoint = surveyPoint;
+                    }
+                }
+                if (closestPoint == null)
+                    throw new Exception();
+                closestPoint.IndicationValue = value;
+                closestPoint.IndicationGps = gps;
+            }
+        }
         public List<(double, double, BasicGeoposition)> GetIndicationData()
         {
             var output = new List<(double, double, BasicGeoposition)>();
@@ -322,6 +421,25 @@ namespace AccurateReportSystem
                 if ((!string.IsNullOrWhiteSpace(curPoint.OriginalComment) || curPoint.Depth.HasValue) && curPoint.HasGPS)
                 {
                     var (newPoint, distance) = info.GetClosestGps(curPoint.GPS);
+                    var lat = (curPoint.GPS.Latitude + (newPoint.Latitude * 9)) / 10;
+                    var lon = (curPoint.GPS.Longitude + (newPoint.Longitude * 9)) / 10;
+                    curPoint.GPS = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+                }
+            }
+            file.StraightenGps();
+        }
+
+        public void StraightenGpsUpdated(CombinedAllegroCISFile file, GpsInfo info)
+        {
+            foreach (var point in file.Points)
+            {
+                var curPoint = point.Point;
+                var region = Hca.Value.GetClosestRegion(curPoint.GPS);
+                if (region.Name == "0")
+                    continue;
+                if ((!string.IsNullOrWhiteSpace(curPoint.OriginalComment) || curPoint.Depth.HasValue) && curPoint.HasGPS)
+                {
+                    var (newPoint, _) = info.GetClosestGps(curPoint.GPS);
                     var lat = (curPoint.GPS.Latitude + (newPoint.Latitude * 9)) / 10;
                     var lon = (curPoint.GPS.Longitude + (newPoint.Longitude * 9)) / 10;
                     curPoint.GPS = new BasicGeoposition() { Latitude = lat, Longitude = lon };
@@ -432,6 +550,120 @@ namespace AccurateReportSystem
             CalcualteBaselines();
         }
 
+        public List<(double Footage, double Value)> GetOnData()
+        {
+            var output = new List<(double Footage, double Value)>();
+            foreach (var point in EcdaData)
+            {
+                if (!point.IsCisExtrapolated && !point.IsCisSkipped)
+                    output.Add((point.Footage, point.On));
+            }
+            return output;
+        }
+
+        public List<(double Footage, double Value)> GetOffData()
+        {
+            var output = new List<(double Footage, double Value)>();
+            foreach (var point in EcdaData)
+            {
+                if (!point.IsCisExtrapolated && !point.IsCisSkipped)
+                    output.Add((point.Footage, point.Off));
+            }
+            return output;
+        }
+
+        public List<(double Footage, double On, double Off)> GetOnOffData()
+        {
+            var output = new List<(double Footage, double On, double Off)>();
+            foreach (var point in EcdaData)
+            {
+                if (!point.IsCisExtrapolated && !point.IsCisSkipped)
+                    output.Add((point.Footage, point.On, point.Off));
+            }
+            return output;
+        }
+
+        private void ExtrapolateCisDataUpdated()
+        {
+            int start = CisFile.HasStartSkip ? 1 : 0;
+            int end = CisFile.Points.Count - (CisFile.HasEndSkip ? 2 : 1);
+            var startFootage = CisFile.Points[start].Footage;
+            var endFootage = CisFile.Points[end].Footage;
+            double lastFootage = double.NaN;
+            AllegroDataPoint lastPoint = null;
+            EcdaData = new List<PgeEcdaDataPoint>();
+            double? lastDepth = null;
+            foreach (var (curFootage, _, curPoint, _, _) in CisFile.Points)
+            {
+                if (curFootage < startFootage || curFootage > endFootage)
+                    continue;
+                if (curPoint.Depth.HasValue)
+                {
+                    lastDepth = curPoint.Depth.Value;
+                    break;
+                }
+            }
+            foreach (var (curFootage, _, curPoint, _, _) in CisFile.Points)
+            {
+                if (curFootage < startFootage || curFootage > endFootage)
+                    continue;
+                if (!curPoint.HasGPS)
+                    throw new Exception();
+                var curOn = UseMir ? curPoint.MirOn : curPoint.On;
+                var curOff = UseMir ? curPoint.MirOff : curPoint.Off;
+                var curGps = curPoint.GPS;
+                var curDepth = curPoint.Depth;
+                if (!curDepth.HasValue)
+                    curDepth = lastDepth;
+                var closeRegion = Hca.Value.GetClosestRegion(curGps);
+                var newPoint = new PgeEcdaDataPoint(curFootage, curOn, curOff, curDepth, closeRegion.ShouldSkip, false, curGps, IsDcvg, closeRegion.ReportQName, closeRegion);
+                EcdaData.Add(newPoint);
+
+                if (lastPoint == null)
+                {
+                    lastFootage = curFootage;
+                    lastPoint = curPoint;
+                    continue;
+                }
+
+                var lastOn = UseMir ? curPoint.MirOn : curPoint.On;
+                var lastOff = UseMir ? curPoint.MirOff : curPoint.Off;
+                var lastGps = lastPoint.GPS;
+
+                var footDist = curFootage - lastFootage;
+
+                var latFactor = (curGps.Latitude - lastGps.Latitude) / footDist;
+                var lonFactor = (curGps.Longitude - lastGps.Longitude) / footDist;
+                var onFactor = (curOn - lastOn) / footDist;
+                double? depthFactor = curDepth.HasValue ? ((curDepth.Value - lastDepth.Value) / footDist) : (double?)null;
+                var offFactor = (curOff - lastOff) / footDist;
+                var isSkipped = footDist > MaxSpacing || closeRegion.ShouldSkip;
+
+                for (int j = 1; j < footDist; ++j)
+                {
+                    var fakeGps = new BasicGeoposition()
+                    {
+                        Latitude = lastGps.Latitude + latFactor * j,
+                        Longitude = lastGps.Longitude + lonFactor * j
+                    };
+                    var fakeFoot = lastFootage + j;
+                    var fakeOn = lastOn + onFactor * j;
+                    var fakeOff = lastOff + offFactor * j;
+                    var fakeDepth = depthFactor.HasValue ? lastDepth.Value + depthFactor.Value * j : (double?)null;
+                    closeRegion = Hca.Value.GetClosestRegion(curGps);
+                    newPoint = new PgeEcdaDataPoint(fakeFoot, fakeOn, fakeOff, fakeDepth, isSkipped, true, fakeGps, IsDcvg, closeRegion.ReportQName, closeRegion);
+                    EcdaData.Add(newPoint);
+                }
+
+                lastFootage = curFootage;
+                lastPoint = curPoint;
+            }
+
+            EcdaData.Sort((first, second) => first.Footage.CompareTo(second.Footage));
+
+            CalcualteBaselines();
+        }
+
         private bool Within100(double footage, double checkFootage)
         {
             return Math.Abs(footage - checkFootage) <= 100;
@@ -501,18 +733,21 @@ namespace AccurateReportSystem
                 output.Append(hcaInfo);
                 output.Append($"{ToStationing(area.Start.Footage)}\t");
                 output.Append($"{ToStationing(area.End.Footage)}\t");
-                output.Append($"{area.Start.Region}\t");
+                if (area.Start.RegionUpdated.HasValue)
+                    output.Append($"{area.Start.RegionUpdated.Value.Name}\t");
+                else
+                    output.Append($"{area.Start.Region}\t");
                 var dist = area.End.Footage - area.Start.Footage;
                 output.Append($"{dist.ToString("F0")}\t");
                 var depthString = area.MinDepth.HasValue ? area.MinDepth.Value.ToString("F0") : "N/A";
                 output.Append($"{depthString}\t");
-                output.Append($"{area.Start.CisGps.Latitude.ToString("F8")}\t");
-                output.Append($"{area.Start.CisGps.Longitude.ToString("F8")}\t");
-                output.Append($"{area.End.CisGps.Latitude.ToString("F8")}\t");
-                output.Append($"{area.End.CisGps.Longitude.ToString("F8")}\t");
+                output.Append($"{area.Start.CisGps.Latitude:F8)}\t");
+                output.Append($"{area.Start.CisGps.Longitude:F8)}\t");
+                output.Append($"{area.End.CisGps.Latitude:F8)}\t");
+                output.Append($"{area.End.CisGps.Longitude:F8)}\t");
 
-                output.Append($"{area.Start.CisSeverity.ToString()}\t");
-                output.Append($"{area.Start.IndicationSeverity.ToString()}\t");
+                output.Append($"{area.Start.CisSeverity}\t");
+                output.Append($"{area.Start.IndicationSeverity}\t");
                 output.Append($"{area.Start.Priority}\t");
                 var reason = area.Start.CisReason + " " + area.Start.IndicationReason;
                 output.AppendLine($"{reason.Trim()}\t");

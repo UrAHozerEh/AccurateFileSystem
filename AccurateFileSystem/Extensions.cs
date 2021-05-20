@@ -1,15 +1,77 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
 using Windows.Foundation;
+using Windows.Storage;
 
 namespace AccurateFileSystem
 {
     public static class Extensions
     {
+        public static double ParseDegree(this string text)
+        {
+            var degreeIndex = text.IndexOf('�');
+            var minuteIndex = text.IndexOf('\'');
+            var secondIndex = text.IndexOf('"');
+            var degreeString = text.Substring(0, degreeIndex);
+            var degree = double.Parse(degreeString);
+            var minuteString = text.Substring(degreeIndex + 1, minuteIndex - degreeIndex - 1);
+            var minute = double.Parse(minuteString);
+            var secondString = text.Substring(minuteIndex + 1, secondIndex - minuteIndex - 1);
+            var second = double.Parse(secondString);
+            var suffix = text.Substring(secondIndex + 1);
+
+            var output = degree;
+            output += minute / 60.0;
+            output += second / 3600.0;
+            output *= GetMultiplier(suffix);
+
+            return output;
+        }
+
+        private static int GetMultiplier(string suffix)
+        {
+            switch (suffix)
+            {
+                case "N":
+                case "E":
+                    return 1;
+            }
+            return -1;
+        }
+
+        public static async Task<List<string>> GetLines(this StorageFile file)
+        {
+            var output = new List<string>();
+            using (var stream = await file.OpenStreamForReadAsync())
+            using (var reader = new StreamReader(stream))
+            {
+                while (!reader.EndOfStream)
+                {
+                    output.Add(reader.ReadLine());
+                }
+            }
+            return output;
+        }
+
+        public static double TotalDistance(this List<BasicGeoposition> points)
+        {
+            if (points.Count < 2)
+                return 0;
+            var total = 0.0;
+            for(int i = 1; i < points.Count; ++i)
+            {
+                var last = points[i - 1];
+                var cur = points[i];
+                total += cur.Distance(last);
+            }
+            return total;
+        }
+
         public static double Distance(this BasicGeoposition pos1, BasicGeoposition pos2)
         {
             double earthRadius = 3960 * 5280;
@@ -35,11 +97,12 @@ namespace AccurateFileSystem
             return Math.PI * value / 180.0; ;
         }
 
-        public static (double Footage, double Distance, double ExtrapolatedFootage, double ExtrapolatedDistance) AlignPoint(this List<(double, BasicGeoposition)> points, BasicGeoposition otherGps)
+        public static (double Footage, double Distance, double ExtrapolatedFootage, double ExtrapolatedDistance, BasicGeoposition Gps) AlignPoint(this List<(double, BasicGeoposition)> points, BasicGeoposition otherGps)
         {
             int closestIndex = 0;
             double closestDistance = double.MaxValue;
             double footage = 0;
+            var closestGps = new BasicGeoposition();
             for (int i = 0; i < points.Count; ++i)
             {
                 var (foot, gps) = points[i];
@@ -49,11 +112,11 @@ namespace AccurateFileSystem
                     closestDistance = curDistance;
                     closestIndex = i;
                     footage = foot;
+                    closestGps = gps;
                 }
             }
             var startIndex = Math.Max(0, closestIndex - 1);
             var endIndex = Math.Min(points.Count - 1, closestIndex + 1);
-            var extrapolatedPoints = new List<(double, BasicGeoposition)>();
             var extrapolatedDist = closestDistance;
             double extrapolatedFoot = footage;
             for (int i = startIndex; i < endIndex; ++i)
@@ -79,7 +142,7 @@ namespace AccurateFileSystem
                     }
                 }
             }
-            return (footage, closestDistance, extrapolatedFoot, extrapolatedDist);
+            return (footage, closestDistance, extrapolatedFoot, extrapolatedDist, closestGps);
         }
 
         public static GeoboundingBox CombineAreas(this GeoboundingBox rect1, GeoboundingBox rect2)

@@ -62,6 +62,19 @@ namespace AccurateReportSystem
             }
         }
         private string y1LabelFormat = null;
+
+        public string Y1LabelSuffix
+        {
+            get
+            {
+                return y1LabelSuffix ?? Master.Y1LabelSuffix;
+            }
+            set
+            {
+                y1LabelSuffix = value;
+            }
+        }
+        private string y1LabelSuffix = null;
         public float Y1LabelHeightInches
         {
             get
@@ -416,6 +429,7 @@ namespace AccurateReportSystem
             Y1LabelFontSize = 8f;
             Y1LabelHeightInches = 0.25f;
             Y1LabelFormat = "F2";
+            Y1LabelSuffix = "";
 
             Y1ExtraTitleHeight = 2f;
             Y1TitleFontSize = 16f;
@@ -572,7 +586,7 @@ namespace AccurateReportSystem
                 foreach (var (location, value) in values)
                 {
                     var endLocation = location;
-                    var label = value.ToString(Y1LabelFormat);
+                    var label = value.ToString(Y1LabelFormat) + (Y1LabelSuffix ?? "");
                     using (var layout = new CanvasTextLayout(session, label, format, 0, 0))
                     {
                         var halfLayoutHeight = (float)Math.Round(layout.LayoutBounds.Height / 2, GraphicalReport.DIGITS_TO_ROUND);

@@ -10,6 +10,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Windows;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Data.Pdf;
 using Windows.Data.Xml.Dom;
@@ -161,6 +162,8 @@ namespace AFSTester
             {
                 var factory = new FileFactory(file);
                 if (file.DisplayType == "TXT File")
+                    continue;
+                if (file.DisplayType == "Text Document")
                     continue;
                 var newFile = await factory.GetFile();
                 if (newFile != null)
@@ -505,7 +508,7 @@ namespace AFSTester
             var testStation = allegroFile.GetTestStationData();
             await CreateExcelFile($"{fileName} Test Station Data", new List<(string Name, string Data)>() { ("Test Station Data", testStation) });
             var cisSkips = allegroFile.GetSkipData();
-            await CreateExcelFile($"{fileName} CIS Skip Data", new List<(string Name, string Data)>() { ("CIS Skip Data", cisSkips) });
+            await CreateExcelFile($"{fileName} Skip Data", new List<(string Name, string Data)>() { ("Skip Data", cisSkips) });
             var shapefile = allegroFile.GetShapeFile();
             await CreateExcelFile($"{fileName} Shapefile", new List<(string Name, string Data)>() { ("Shapefile", shapefile) });
             await CreateExcelFile($"{fileName} Files Order", new List<(string Name, string Data)>() { ("Order", allegroFile.FileInfos.GetExcelData()) });
@@ -620,8 +623,25 @@ namespace AFSTester
             return curValue + change;
         }
 
-        private async Task MakeIITGraphs(CombinedAllegroCISFile file, List<(double, double, BasicGeoposition)> dcvgData, bool isDcvg, string folderName, List<RegionInfo> regions = null, (string, string, string, string)? surveyInfos = null)
+        private async Task MakeIITGraphs(CombinedAllegroCISFile file, List<(double, double, BasicGeoposition)> dcvgData, bool isDcvg, string folderName, List<RegionInfo> regions = null, (string, string, string, string)? surveyInfos = null, StorageFolder outputFolder = null)
         {
+            if (outputFolder == null)
+                outputFolder = ApplicationData.Current.LocalFolder;
+            if (surveyInfos.HasValue && surveyInfos.Value.Item1 == "2389")
+            {
+                foreach (var point in file.Points)
+                {
+                    point.Footage += 4;
+                    if (Math.Round(point.Footage) == 57)
+                        point.Footage = 58;
+                }
+            }
+            if (surveyInfos.HasValue && surveyInfos.Value.Item1 == "497")
+                foreach (var point in file.Points)
+                {
+                    if (point.Footage == 2429)
+                        point.Footage = 2421;
+                }
             bool inRegion = false;
             BasicGeoposition hcaStartGps = new BasicGeoposition();
             BasicGeoposition hcaEndGps = new BasicGeoposition();
@@ -634,37 +654,56 @@ namespace AFSTester
             {
                 bufferEnd = regions.Last().End;
             }
-            for (int i = 0; i < regions.Count; ++i)
+            if (regions.Count != 1)
             {
-                var region = regions[i];
-                if (region.Name != "Buffer" && !inRegion)
+                for (int i = 0; i < regions.Count; ++i)
                 {
-                    hcaStartGps = region.Start;
-                    inRegion = true;
+                    var region = regions[i];
+                    if (region.Name != "Buffer" && !inRegion)
+                    {
+                        hcaStartGps = region.Start;
+                        inRegion = true;
+                    }
+                    hcaEndGps = region.End;
+                    if (region.Name == "Buffer" && inRegion)
+                    {
+                        hcaEndGps = region.Start;
+                        inRegion = false;
+                    }
                 }
-                hcaEndGps = region.End;
-                if (region.Name == "Buffer" && inRegion)
+                if (bufferStart.HasValue)
                 {
-                    hcaEndGps = region.Start;
-                    inRegion = false;
+                    file.Points[0].Point.OriginalComment += " START OF BUFFER";
                 }
+                if (bufferEnd.HasValue)
+                {
+                    file.Points.Last().Point.OriginalComment += " END OF BUFFER";
+                }
+                var (hcaStartPoint, hcaStartDistance) = file.GetClosestPoint(hcaStartGps);
+                hcaStartPoint.Point.GPS = hcaStartGps;
+                if (!surveyInfos.HasValue || surveyInfos.Value.Item1 != "2389")
+                    hcaStartPoint.Point.OriginalComment += (bufferStart.HasValue ? " END OF BUFFER" : "") + " START OF HCA";
+                else if (surveyInfos.HasValue)
+                    hcaStartPoint.Point.OriginalComment += " END VAULT SKIP";
+
+                var (hcaEndPoint, hcaEndDistance) = file.GetClosestPoint(hcaEndGps);
+                hcaEndPoint.Point.GPS = hcaEndGps;
+                hcaEndPoint.Point.OriginalComment += " END OF HCA" + (bufferEnd.HasValue ? " START OF BUFFER" : "");
+            }
+            else
+            {
+                hcaStartGps = regions.First().Start;
+                var hcaStartPoint = file.Points.First().Point;
+                var hcaStartDistance = hcaStartPoint.GPS.Distance(hcaStartGps);
+                //hcaStartPoint.GPS = hcaStartGps;
+
+                hcaEndGps = regions.First().End;
+                var hcaEndPoint = file.Points.Last().Point;
+                var hcaEndDistance = hcaEndPoint.GPS.Distance(hcaEndGps);
+                //hcaEndPoint.GPS = hcaEndGps;
             }
 
-            if (bufferStart.HasValue)
-            {
-                file.Points[0].Point.OriginalComment += " START OF BUFFER";
-            }
-            if (bufferEnd.HasValue)
-            {
-                file.Points.Last().Point.OriginalComment += " END OF BUFFER";
-            }
-            var (hcaStartPoint, hcaStartDistance) = file.GetClosestPoint(hcaStartGps);
-            hcaStartPoint.Point.GPS = hcaStartGps;
-            hcaStartPoint.Point.OriginalComment += (bufferStart.HasValue ? " END OF BUFFER" : "") + " START OF HCA";
 
-            var (hcaEndPoint, hcaEndDistance) = file.GetClosestPoint(hcaEndGps);
-            hcaEndPoint.Point.GPS = hcaEndGps;
-            hcaEndPoint.Point.OriginalComment += " END OF HCA" + (bufferEnd.HasValue ? " START OF BUFFER" : "");
 
             var maxDepth = 200;
             var curDepth = 50.0;
@@ -700,7 +739,8 @@ namespace AFSTester
                 offData = file.GetDoubleData("Off");
                 onData = file.GetDoubleData("On");
                 commentData = file.GetCommentData();
-                directionData = file.GetDirectionWithDateData();
+                if (surveyInfos.HasValue && surveyInfos.Value.Item1 == "2389")
+                    commentData.Insert(0, (0, "START HCA START VAULT SKIP"));
                 if (onData.Count == 1)
                 {
                     onData.Add((5, onData[0].Item2));
@@ -847,7 +887,7 @@ namespace AFSTester
                 var imageFileName = $"{folderName} Page {pageString}.png";
                 if (pages.Count == 1)
                     imageFileName = $"{folderName} Graph.png";
-                var imageFile = await ApplicationData.Current.LocalFolder.CreateFileAsync(imageFileName, CreationCollisionOption.ReplaceExisting);
+                var imageFile = await outputFolder.CreateFileAsync(imageFileName, CreationCollisionOption.ReplaceExisting);
                 using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
                 {
                     await image.SaveAsync(stream, Microsoft.Graphics.Canvas.CanvasBitmapFileFormat.Png);
@@ -1034,7 +1074,7 @@ namespace AFSTester
             //}
 
             //await FileIO.WriteTextAsync(outputFile, outputString);
-            var outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{folderName} Reports.xlsx", CreationCollisionOption.ReplaceExisting);
+            var outputFile = await outputFolder.CreateFileAsync($"{folderName} Reports.xlsx", CreationCollisionOption.ReplaceExisting);
             using (var outStream = await outputFile.OpenStreamForWriteAsync())
             using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
             {
@@ -1050,7 +1090,25 @@ namespace AFSTester
                 wbPart.Workbook.Save();
             }
 
-            outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{folderName} CIS Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
+            var exceptionsFullData = PGECISIndicationChartSeries.DataPoint.Headers;
+            foreach (var exception in cisIndication.Data)
+            {
+                if (!exception.IsExtrapolated)
+                    exceptionsFullData += "\n" + exception.ToString();
+            }
+            outputFile = await outputFolder.CreateFileAsync($"{folderName} CIS Exceptions Data.xlsx", CreationCollisionOption.ReplaceExisting);
+            using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            {
+                var wbPart = spreadDoc.AddWorkbookPart();
+                wbPart.Workbook = new Workbook();
+                wbPart.Workbook.AppendChild(new Sheets());
+                var wbData = exceptionsFullData.TrimEnd('\n').TrimEnd('\r');
+                AddData(wbPart, wbData, 1, "Exception Data", new List<string>());
+                wbPart.Workbook.Save();
+            }
+
+            outputFile = await outputFolder.CreateFileAsync($"{folderName} CIS Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
             using (var outStream = await outputFile.OpenStreamForWriteAsync())
             using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
             {
@@ -1061,7 +1119,7 @@ namespace AFSTester
                 AddData(wbPart, wbData, 1, "Shapefile", new List<string>());
                 wbPart.Workbook.Save();
             }
-            outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{folderName} Depth Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
+            outputFile = await outputFolder.CreateFileAsync($"{folderName} Depth Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
             using (var outStream = await outputFile.OpenStreamForWriteAsync())
             using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
             {
@@ -1073,7 +1131,7 @@ namespace AFSTester
             }
             if (dcvgData.Count > 0)
             {
-                outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{folderName} {(isDcvg ? "DCVG" : "ACVG")} Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
+                outputFile = await outputFolder.CreateFileAsync($"{folderName} {(isDcvg ? "DCVG" : "ACVG")} Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
                 using (var outStream = await outputFile.OpenStreamForWriteAsync())
                 using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
                 {
@@ -1084,6 +1142,469 @@ namespace AFSTester
                     wbPart.Workbook.Save();
                 }
             }
+        }
+
+        private void AddHcaComments(CombinedAllegroCISFile file, Hca hca)
+        {
+            BasicGeoposition hcaStartGps = hca.GetFirstNonSkipGps();
+            BasicGeoposition hcaEndGps = hca.GetLastNonSkipGps();
+            bool hasStartBuffer = hca.StartBuffer.HasValue;
+            bool hasEndBuffer = hca.EndBuffer.HasValue;
+            var (hcaStartPoint, hcaStartDistance) = file.GetClosestPoint(hcaStartGps);
+            if (hasStartBuffer)
+            {
+                file.Points[file.HasStartSkip ? 1 : 0].Point.OriginalComment += " START OF BUFFER";
+            }
+            else
+            {
+                hcaStartPoint = file.Points[file.HasStartSkip ? 1 : 0];
+            }
+            hcaStartPoint.Point.GPS = hcaStartGps;
+            hcaStartPoint.Point.OriginalComment += (hasStartBuffer ? " END OF BUFFER" : "") + " START OF HCA";
+
+            var (hcaEndPoint, hcaEndDistance) = file.GetClosestPoint(hcaEndGps);
+            if (hasEndBuffer)
+            {
+                file.Points[file.Points.Count - (file.HasEndSkip ? 2 : 1)].Point.OriginalComment += " END OF BUFFER";
+            }
+            else
+            {
+                hcaEndPoint = file.Points[file.Points.Count - (file.HasEndSkip ? 2 : 1)];
+            }
+            hcaEndPoint.Point.GPS = hcaEndGps;
+            hcaEndPoint.Point.OriginalComment += " END OF HCA" + (hasEndBuffer ? " START OF BUFFER" : "");
+        }
+
+        private void AddMaxDepthComment(CombinedAllegroCISFile file, double maxDepth)
+        {
+            foreach (var point in file.Points)
+            {
+                if ((point.Point.Depth ?? 0) > maxDepth)
+                {
+                    var tempDepthString = $" Depth: {point.Point.Depth.Value} Inches";
+                    point.Point.OriginalComment += tempDepthString;
+                }
+            }
+        }
+
+        private bool CheckDepthGaps(List<(double Footage, double Depth)> depthData, double startFootage, double endFootage, double maxGap)
+        {
+            var firstDepth = depthData.First();
+            if (firstDepth.Footage - startFootage > maxGap)
+                return true;
+            for (int i = 1; i < depthData.Count; ++i)
+            {
+                var curDepth = depthData[i - 1];
+                var nextDepth = depthData[i];
+                if (nextDepth.Footage - curDepth.Footage > maxGap)
+                    return true;
+            }
+            var lastDepth = depthData.Last();
+            if (endFootage - lastDepth.Footage > maxGap)
+                return true;
+
+            return false;
+        }
+
+        private async Task MakeIITGraphsUpdated(CombinedAllegroCISFile file, PgeEcdaReportInformation ecdaReport, bool isDcvg, string folderName, Hca hca, StorageFolder outputFolder = null)
+        {
+            if (outputFolder == null)
+                outputFolder = ApplicationData.Current.LocalFolder;
+            var dcvgData = ecdaReport.GetIndicationData();
+
+            var maxDepth = 200;
+            var curDepth = 50.0;
+            var directionData = new List<(double, bool, string)>();
+            var pcmLables = new List<(double, string)>();
+            AddMaxDepthComment(file, maxDepth);
+
+            var depthData = file.GetDoubleData("Depth");
+            var offData = ecdaReport.GetOffData();
+            var onData = ecdaReport.GetOnData();
+            //if (CheckDepthGaps(depthData, onData.First().footage, onData.Last().footage, 75))
+            //    onData = onData;
+            var commentData = file.GetCommentData();
+            if (onData.Count == 1)
+            {
+                onData.Add((5, onData[0].Value));
+                offData.Add((5, offData[0].Value));
+            }
+            var report = new GraphicalReport();
+            report.LegendInfo.NameFontSize = 16f;
+            if (file.Points.Last().Footage < 100)
+            {
+                report.PageSetup = new PageSetup(100, 10);
+                report.XAxisInfo.MajorGridline.Offset = 10;
+            }
+            var onOffGraph = new Graph(report);
+            var on = new GraphSeries("On", onData)
+            {
+                LineColor = Colors.Blue,
+                PointShape = GraphSeries.Shape.Circle,
+                PointColor = Colors.Blue,
+                ShapeRadius = 2,
+                MaxDrawDistance = 19
+            };
+            var off = new GraphSeries("Off", offData)
+            {
+                LineColor = Colors.Green,
+                PointShape = GraphSeries.Shape.Circle,
+                PointColor = Colors.Green,
+                ShapeRadius = 2,
+                MaxDrawDistance = 19
+            };
+            var depth = new GraphSeries("Depth", depthData)
+            {
+                LineColor = Colors.Black,
+                PointColor = Colors.Orange,
+                IsY1Axis = false,
+                PointShape = GraphSeries.Shape.Circle,
+                GraphType = GraphSeries.Type.Point,
+                ShapeRadius = 4
+            };
+            var redLine = new SingleValueGraphSeries("850 Line", -0.85)
+            {
+                IsDrawnInLegend = false,
+                Opcaity = 0.75f
+            };
+            var commentSeries = new CommentSeries { Values = commentData, PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs, BackdropOpacity = 0.75f };
+
+
+            onOffGraph.Series.Add(depth);
+            onOffGraph.YAxesInfo.Y2IsDrawn = true;
+            onOffGraph.YAxesInfo.Y2MaximumValue = maxDepth;
+            onOffGraph.CommentSeries = commentSeries;
+            onOffGraph.Series.Add(on);
+            onOffGraph.Series.Add(off);
+            onOffGraph.Series.Add(redLine);
+            onOffGraph.DrawTopBorder = false;
+
+            if (file != null && file.Points.Last().Footage < 100)
+            {
+                onOffGraph.CommentSeries.PercentOfGraph = 0.25f;
+            }
+
+            var dcvgLabels = dcvgData.Select((value) => (value.Item1, value.Item2.ToString("F1") + (isDcvg ? "%" : ""))).ToList();
+
+            var indicationLabel = isDcvg ? "DCVG" : "ACVG";
+            var dcvgIndication = new PointWithLabelGraphSeries($"{indicationLabel} Indication", -0.2, dcvgLabels)
+            {
+                ShapeRadius = 3,
+                PointColor = Colors.Red,
+                BackdropOpacity = 1f
+            };
+            onOffGraph.Series.Add(dcvgIndication);
+
+            report.XAxisInfo.IsEnabled = false;
+            report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
+            report.LegendInfo.SeriesNameFontSize = report.YAxesInfo.Y1LabelFontSize;
+
+            var bottomGlobalXAxis = new GlobalXAxis(report)
+            {
+                DrawPageInfo = true
+            };
+
+            var topGlobalXAxis = new GlobalXAxis(report, true)
+            {
+                Title = $"PGE IIT Survey {folderName}"
+            };
+
+            var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
+
+            var surveyDirectionChart = new Chart(report, "Survey Direction With Survey Date");
+            surveyDirectionChart.LegendInfo.NameFontSize = 14f;
+            var cisClass = new Chart(report, "CIS Severity");
+            var cisIndication = new PGECISIndicationChartSeries(file.GetPoints(), cisClass, hca);
+            cisClass.Series.Add(cisIndication);
+
+            var dcvgClass = new Chart(report, "DCVG Severity");
+            var dcvgIndicationSeries = new PgeDcvgIndicationChartSeries(dcvgData, dcvgClass, isDcvg);
+            dcvgClass.Series.Add(dcvgIndicationSeries);
+            dcvgClass.LegendInfo.NameFontSize = 13f;
+
+            var ecdaClassChart = new Chart(report, "ECDA Clas.");
+            var ecdaClassSeries = new PGEDirectExaminationPriorityChartSeries(ecdaClassChart, cisIndication, dcvgIndicationSeries);
+            ecdaClassChart.Series.Add(ecdaClassSeries);
+
+            var surveyDirectionSeries = new SurveyDirectionWithDateSeries(file.GetDirectionWithDateData());
+            surveyDirectionChart.Series.Add(surveyDirectionSeries);
+
+            splitContainer.AddSelfSizedContainer(topGlobalXAxis);
+            splitContainer.AddContainer(onOffGraph);
+            splitContainer.AddSelfSizedContainer(ecdaClassChart);
+            splitContainer.AddSelfSizedContainer(surveyDirectionChart);
+            splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
+            report.Container = splitContainer;
+            var surveyLength = onData.Last().Footage;
+            var pages = report.PageSetup.GetAllPages(0, surveyLength);
+
+            for (int i = 0; i < pages.Count; ++i)
+            {
+                var page = pages[i];
+                var pageString = $"{i + 1}".PadLeft(3, '0');
+                var image = report.GetImage(page, 300);
+                var imageFileName = $"{folderName} Page {pageString}.png";
+                if (pages.Count == 1)
+                    imageFileName = $"{folderName} Graph.png";
+                var imageFile = await outputFolder.CreateFileAsync(imageFileName, CreationCollisionOption.ReplaceExisting);
+                using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
+                {
+                    await image.SaveAsync(stream, CanvasBitmapFileFormat.Png);
+                }
+            }
+
+            var areas = ecdaClassSeries.GetUpdatedReportQ();
+            var uniqueRegions = hca.GetUniqueRegions();
+            uniqueRegions.Sort();
+            var output = new StringBuilder();
+            var extrapolatedDepth = new List<(double, double)>();
+            double curFoot;
+            double curExtrapolatedFoot = 0;
+            for (int i = 0; i < depthData.Count; ++i)
+            {
+                (curFoot, curDepth) = depthData[i];
+                while (curExtrapolatedFoot <= curFoot)
+                {
+                    extrapolatedDepth.Add((curExtrapolatedFoot, curDepth));
+                    ++curExtrapolatedFoot;
+                }
+                if (i == depthData.Count - 1)
+                {
+                    while (curExtrapolatedFoot <= surveyLength)
+                    {
+                        extrapolatedDepth.Add((curExtrapolatedFoot, curDepth));
+                        ++curExtrapolatedFoot;
+                    }
+                }
+                else
+                {
+                    var (nextFoot, nextDepth) = depthData[i + 1];
+                    var factor = (nextDepth - curDepth) / (nextFoot - curFoot);
+                    while (curExtrapolatedFoot < nextFoot)
+                    {
+                        var curExtrapolatedDepth = factor * (curExtrapolatedFoot - curFoot) + curDepth;
+                        extrapolatedDepth.Add((curExtrapolatedFoot, curExtrapolatedDepth));
+                        ++curExtrapolatedFoot;
+                    }
+                }
+            }
+            var skipReport = new StringBuilder();
+            foreach (var (startFoot, endFoot, cisSeverity, dcvgSeverity, region, priority, reason) in areas)
+            {
+                var depthInArea = extrapolatedDepth.Where(value => value.Item1 >= startFoot && value.Item1 <= endFoot);
+                var minDepth = depthInArea.Count() != 0 ? depthInArea.Min(value => value.Item2) : -1;
+                var (startMp, endMp) = hca.GetMpForRegion(region);
+                output.Append($"{hca.Name}\t{hca.LineName}\t{startMp}\t{endMp}\t");
+                var length = endFoot - startFoot;
+                var minDepthString = minDepth == -1 ? "" : minDepth.ToString("F0");
+                output.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{region.ReportQName}\t{length:F0}\t{minDepthString}\t");
+                var startGps = file.GetClosesetGps(startFoot);
+                output.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
+                var endGps = file.GetClosesetGps(endFoot);
+                output.Append($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t");
+                if (reason.Contains("SKIP."))
+                {
+                    output.AppendLine($"NT\tNT\tNT\t{region.LongSkipReason}");
+                    skipReport.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1):F0}\t");
+                    skipReport.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
+                    skipReport.AppendLine($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{region.ShortSkipReason}");
+                }
+                else
+                {
+                    output.AppendLine($"{cisSeverity.GetDisplayName()}\t{dcvgSeverity.GetDisplayName()}\t{PriorityDisplayName(priority)}\t{reason}");
+                }
+            }
+            ReportQ += output.ToString();
+            var cisShapeFileStringBuilder = new StringBuilder();
+            foreach (var line in ecdaClassSeries.CISShapeFileOutput)
+            {
+                var lineString = string.Join('\t', line);
+                cisShapeFileStringBuilder.AppendLine(lineString);
+            }
+            var depthShapeFileStringBuilder = new StringBuilder();
+            foreach (var line in ecdaClassSeries.CISShapeFileOutput)
+            {
+                if (string.IsNullOrWhiteSpace(line[7]))
+                    continue;
+                line[0] = $"Depth: {line[7]}";
+                var lineString = string.Join('\t', line);
+                depthShapeFileStringBuilder.AppendLine(lineString);
+            }
+            var dcvgShapeFileStringBuilder = new StringBuilder();
+            foreach (var line in ecdaClassSeries.IndicationShapeFileOutput)
+            {
+                var lineString = string.Join('\t', line);
+                dcvgShapeFileStringBuilder.AppendLine(lineString);
+            }
+            var skipReportString = skipReport.ToString();
+            var testStation = file.GetTestStationData();
+            var depthException = new StringBuilder();
+            for (int i = 0; i < extrapolatedDepth.Count; ++i)
+            {
+                (curFoot, curDepth) = extrapolatedDepth[i];
+                if (curDepth < 36)
+                {
+                    var start = i;
+                    var curIndex = i;
+                    var minDepth = curDepth;
+                    while (curDepth < 36 && curIndex != extrapolatedDepth.Count)
+                    {
+                        (curFoot, curDepth) = extrapolatedDepth[curIndex];
+                        if (curDepth < minDepth)
+                            minDepth = curDepth;
+                        ++curIndex;
+                    }
+                    --curIndex;
+                    var (startFoot, _) = extrapolatedDepth[start];
+                    var (endFoot, _) = extrapolatedDepth[curIndex];
+                    depthException.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1):F0}\t{minDepth:F0}\t");
+                    var startGps = file.GetClosesetGps(startFoot);
+                    depthException.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
+                    var endGps = file.GetClosesetGps(endFoot);
+                    depthException.AppendLine($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}");
+                    i = curIndex + 1;
+                }
+                if (curDepth > 72)
+                {
+                    var start = i;
+                    var curIndex = i;
+                    var max = curDepth;
+                    while (curDepth > 72 && curIndex != extrapolatedDepth.Count)
+                    {
+                        (curFoot, curDepth) = extrapolatedDepth[curIndex];
+                        if (curDepth > max)
+                            max = curDepth;
+                        ++curIndex;
+                    }
+                    --curIndex;
+                    var (startFoot, _) = extrapolatedDepth[start];
+                    var (endFoot, _) = extrapolatedDepth[curIndex];
+                    depthException.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1):F0}\t{max:F0}\t");
+                    var startGps = file.GetClosesetGps(startFoot);
+                    depthException.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
+                    var endGps = file.GetClosesetGps(endFoot);
+                    depthException.AppendLine($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}");
+
+                    i = curIndex + 1;
+                }
+            }
+            var depthString = depthException.ToString();
+            var uniqueRegionsString = string.Join(", ", uniqueRegions);
+            var (hcaStartMp, hcaEndMp) = hca.GetMpForHca();
+            //var reportLLengths = ecdaReport.GetActualReadFootage();
+            var reportLLengths2 = GetActualReadFootage(areas);
+            var reportLString = $"Indirect Inspection:\tCIS\t{indicationLabel}\t{uniqueRegionsString}\t{hcaStartMp}\t{hcaEndMp}\t{hca.LineName}\t{"HCA " + hca.Name}\nLength (feet)\t{reportLLengths2[0]}\t{reportLLengths2[0]}\n\t";
+            var reportLNext = "Length (feet)\t";
+            for (int i = 1; i <= 4; ++i)
+            {
+                reportLString += $"{PriorityDisplayName(i)}\t";
+                reportLNext += $"{reportLLengths2[i]}\t";
+            }
+            reportLString += "\n" + reportLNext;
+
+            skipReportString = "\n\n" + skipReportString;
+            depthString = "\n\n" + depthString;
+
+            foreach (var (foot, _, point, _, _) in file.Points)
+            {
+                foreach (var tsRead in point.TestStationReads)
+                {
+                    if (!(tsRead is ACTestStationRead ac))
+                        continue;
+                    if (ac.Value >= 10)
+                        return;
+                }
+            }
+
+            //var testFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{folderName} Reports V2.xlsx", CreationCollisionOption.ReplaceExisting);
+            //using (var outStream = await testFile.OpenStreamForWriteAsync())
+            //using (var workbook = new XLWorkbook())
+            //{
+            //    workbook.SaveAs(outStream);
+            //}
+
+            //await FileIO.WriteTextAsync(outputFile, outputString);
+            var outputFile = await outputFolder.CreateFileAsync($"{folderName} Reports.xlsx", CreationCollisionOption.ReplaceExisting);
+            using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            {
+                var wbPart = spreadDoc.AddWorkbookPart();
+                wbPart.Workbook = new Workbook();
+                wbPart.Workbook.AppendChild(new Sheets());
+                AddData(wbPart, reportLString, 1, "Report L", new List<string>());
+                AddData(wbPart, skipReportString, 2, "CIS Skip Report", new List<string>() { "A1:B1", "C1:C2", "D1:G1" });
+                AddData(wbPart, skipReportString, 3, $"Other Skip Report", new List<string>() { "A1:B1", "C1:C2", "D1:G1" });
+                AddData(wbPart, testStation, 4, "Test Station and Coupon Data", new List<string>());
+                AddData(wbPart, depthString, 5, "Depth Exception", new List<string>() { "A1:B1", "C1:C2", "D1:D2", "E1:H1" });
+                AddData(wbPart, "Survey Stationing\tAC Read\tComments\tLatitude\tLongitude", 7, "AC Touch Voltage", new List<string>());
+                wbPart.Workbook.Save();
+            }
+
+            var exceptionsFullData = PGECISIndicationChartSeries.DataPoint.Headers;
+            foreach (var exception in cisIndication.DataUpdated)
+            {
+                if (!exception.IsExtrapolated)
+                    exceptionsFullData += "\n" + exception.ToString();
+            }
+            outputFile = await outputFolder.CreateFileAsync($"{folderName} CIS Exceptions Data.xlsx", CreationCollisionOption.ReplaceExisting);
+            using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            {
+                var wbPart = spreadDoc.AddWorkbookPart();
+                wbPart.Workbook = new Workbook();
+                wbPart.Workbook.AppendChild(new Sheets());
+                var wbData = exceptionsFullData.TrimEnd('\n').TrimEnd('\r');
+                AddData(wbPart, wbData, 1, "Exception Data", new List<string>());
+                wbPart.Workbook.Save();
+            }
+
+            outputFile = await outputFolder.CreateFileAsync($"{folderName} CIS Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
+            using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            {
+                var wbPart = spreadDoc.AddWorkbookPart();
+                wbPart.Workbook = new Workbook();
+                wbPart.Workbook.AppendChild(new Sheets());
+                var wbData = cisShapeFileStringBuilder.ToString().TrimEnd('\n').TrimEnd('\r');
+                AddData(wbPart, wbData, 1, "Shapefile", new List<string>());
+                wbPart.Workbook.Save();
+            }
+            outputFile = await outputFolder.CreateFileAsync($"{folderName} Depth Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
+            using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            {
+                var wbPart = spreadDoc.AddWorkbookPart();
+                wbPart.Workbook = new Workbook();
+                wbPart.Workbook.AppendChild(new Sheets());
+                AddData(wbPart, depthShapeFileStringBuilder.ToString().TrimEnd('\n').TrimEnd('\r'), 1, "Shapefile", new List<string>());
+                wbPart.Workbook.Save();
+            }
+            if (dcvgData.Count > 0)
+            {
+                outputFile = await outputFolder.CreateFileAsync($"{folderName} {(isDcvg ? "DCVG" : "ACVG")} Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
+                using (var outStream = await outputFile.OpenStreamForWriteAsync())
+                using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+                {
+                    var wbPart = spreadDoc.AddWorkbookPart();
+                    wbPart.Workbook = new Workbook();
+                    wbPart.Workbook.AppendChild(new Sheets());
+                    AddData(wbPart, dcvgShapeFileStringBuilder.ToString().TrimEnd('\n').TrimEnd('\r'), 1, "Shapefile", new List<string>());
+                    wbPart.Workbook.Save();
+                }
+            }
+        }
+
+        private List<int> GetActualReadFootage(List<(double Start, double End, PGESeverity CisSeverity, PGESeverity DcvgSeverity, HcaRegion Region, int Overall, string Comments)> areas)
+        {
+            var output = Enumerable.Repeat(0, 5).ToList();
+            foreach (var area in areas)
+            {
+                if (area.Comments.Contains("SKIP")) continue;
+                var distance = (int)(area.End - area.Start);
+                output[0] += distance;
+                output[area.Overall] += distance;
+            }
+            return output;
         }
 
 
@@ -2132,13 +2653,13 @@ namespace AFSTester
                                 var dist = foot - lastFoot;
                                 if (dist <= 10)
                                 {
-                                    (regFoot, regDist, extrapFoot, extrapDist) = combinedFootages.AlignPoint(lastGps);
+                                    (regFoot, regDist, extrapFoot, extrapDist, _) = combinedFootages.AlignPoint(lastGps);
                                     dcvgData.Add((regFoot, point.IndicationPercent, lastGps));
                                 }
                                 else
                                     throw new ArgumentException();
                             }
-                            (regFoot, regDist, extrapFoot, extrapDist) = combinedFootages.AlignPoint(point.GPS);
+                            (regFoot, regDist, extrapFoot, extrapDist, _) = combinedFootages.AlignPoint(point.GPS);
                             dcvgData.Add((regFoot, point.IndicationPercent, point.GPS));
                         }
                         if (point.HasGPS)
@@ -2162,7 +2683,255 @@ namespace AFSTester
             }
 
         }
+
         private async void BatchIITClick(object sender, RoutedEventArgs e)
+        {
+            var folderPicker = new FolderPicker();
+            folderPicker.FileTypeFilter.Add(".");
+            var folder = await folderPicker.PickSingleFolderAsync();
+            if (folder == null)
+                return;
+            var outputFolder = await folder.CreateFolderAsync("Processed Data", CreationCollisionOption.OpenIfExists);
+            var curFolders = await folder.GetFoldersAsync();
+            var masterFolders = new List<StorageFolder>();
+
+            if (curFolders.Count(f => f.DisplayName == "DCVG" || f.DisplayName == "ACVG") == 0)
+            {
+                masterFolders.Add(folder);
+            }
+            else
+            {
+                masterFolders = curFolders.ToList();
+            }
+            var masterFiles = await folder.GetFilesAsync();
+            StorageFile regionFile = null;
+            StorageFile kml = null;
+            foreach (var masterFile in masterFiles)
+            {
+                if (masterFile.DisplayName.Contains("regions", StringComparison.OrdinalIgnoreCase))
+                    regionFile = masterFile;
+                if (masterFile.FileType.ToLower() == ".kml")
+                    kml = masterFile;
+            }
+
+            var regions = await IitRegionFile.GetIitRegion(regionFile);
+            var globalAlignData = new List<(double, double, double, double)>();
+            foreach (var masterFolder in masterFolders)
+            {
+                await ParseIitMasterFolder(masterFolder, regions, outputFolder);
+            }
+            var dialog = new MessageDialog($"Finished making IIT Stuff");
+            await dialog.ShowAsync();
+        }
+
+        private async Task ParseIitFolder(StorageFolder folder, IitRegionFile regions, bool isDcvg, StorageFolder outputFolder)
+        {
+            var displayName = folder.DisplayName;
+            var plusIndex = displayName.IndexOf('+');
+            if (plusIndex != -1)
+            {
+                displayName = displayName.Substring(plusIndex + 1).Trim();
+            }
+
+            var storageFiles = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
+            var cisFiles = new List<AllegroCISFile>();
+            var dcvgFiles = new List<AllegroCISFile>();
+            var pcmFiles = new List<CsvPcm>();
+            var acvgReads = new List<(BasicGeoposition, double)>();
+
+            foreach (var file in storageFiles)
+            {
+                var factory = new FileFactory(file);
+                var newFile = await factory.GetFile();
+                if (newFile is CsvPcm)
+                {
+                    pcmFiles.Add(newFile as CsvPcm);
+                    continue;
+                }
+                if (newFile is AllegroCISFile)
+                {
+                    var allegroFile = newFile as AllegroCISFile;
+                    if (allegroFile.Type == FileType.OnOff)
+                        cisFiles.Add(allegroFile);
+                    if (allegroFile.Type == FileType.DCVG)
+                        dcvgFiles.Add(allegroFile);
+                    continue;
+                }
+                if (newFile == null && file.FileType.ToLower() == ".acvg")
+                {
+                    acvgReads = ParseAcvgReads(await file.GetLines());
+                }
+            }
+            if (cisFiles.Count == 0)
+            {
+                //TODO: Add empty data to report Q.
+                return;
+            }
+            cisFiles = GetUniqueFiles(cisFiles);
+            dcvgFiles = GetUniqueFiles(dcvgFiles);
+            var combinedCisFile = CombinedAllegroCISFile.CombineFiles("Combined", cisFiles);
+
+            var hca = regions.GetHca(displayName).Value;
+            combinedCisFile.ReverseBasedOnHca(hca);
+            AddHcaComments(combinedCisFile, hca);
+            combinedCisFile.StraightenGps();
+            combinedCisFile.SetFootageFromGps();
+            combinedCisFile.AddPcmDepthData(pcmFiles);
+
+            var dcvgData = new List<(double, double, BasicGeoposition)>();
+            if (combinedCisFile.HasStartSkip)
+            {
+                combinedCisFile.ShiftPoints(-combinedCisFile.Points[1].Footage);
+            }
+            var combinedFootages = new List<(double, BasicGeoposition)>();
+
+            foreach (var (foot, _, point, _, _) in combinedCisFile.Points)
+            {
+                if (point.HasGPS)
+                {
+                    combinedFootages.Add((foot, point.GPS));
+                }
+            }
+
+            if (combinedCisFile.HasStartSkip)
+                combinedFootages.RemoveAt(0);
+            if (combinedCisFile.HasEndSkip)
+                combinedFootages.RemoveAt(combinedFootages.Count - 1);
+
+            if (isDcvg)
+            {
+                foreach (var file in dcvgFiles)
+                {
+                    dcvgData.AddRange(GetAlignedDcvgData(file, combinedFootages, hca));
+                }
+            }
+            else
+            {
+                dcvgData.AddRange(GetAlignedAcvgData(acvgReads, combinedFootages, hca));
+            }
+            dcvgData.Sort((first, second) => first.Item1.CompareTo(second.Item1));
+
+
+            PgeEcdaReportInformation reportInfo;
+            if (isDcvg)
+            {
+                reportInfo = new PgeEcdaReportInformation(combinedCisFile, dcvgFiles, hca, 10, false);
+            }
+            else
+            {
+                reportInfo = new PgeEcdaReportInformation(combinedCisFile, acvgReads, hca, 10, false);
+            }
+
+
+            var reportQ = "";
+            reportQ += reportInfo.GetReportQ();
+            await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, isDcvg, displayName, hca, outputFolder);
+        }
+
+        private List<(double, double, BasicGeoposition)> GetAlignedAcvgData(List<(BasicGeoposition, double)> acvgReads, List<(double, BasicGeoposition)> cisCombinedData, Hca hca)
+        {
+            var output = new List<(double, double, BasicGeoposition)>();
+            foreach (var (readGps, read) in acvgReads)
+            {
+                var (_, _, acvgExtrapFoot, _, gps) = cisCombinedData.AlignPoint(readGps);
+                var region = hca.GetClosestRegion(gps);
+                if (region.ShouldSkip)
+                    continue;
+                output.Add((acvgExtrapFoot, read, readGps));
+            }
+            return output;
+        }
+
+        private List<(double, double, BasicGeoposition)> GetAlignedDcvgData(AllegroCISFile dcvgFile, List<(double, BasicGeoposition)> cisCombinedData, Hca hca)
+        {
+            BasicGeoposition lastGps = new BasicGeoposition();
+            var output = new List<(double, double, BasicGeoposition)>();
+            foreach (var (foot, point) in dcvgFile.Points)
+            {
+                if (point.HasGPS)
+                {
+                    lastGps = point.GPS;
+                }
+                if (point.HasIndication)
+                {
+                    var (_, _, extrapFoot, _, gps) = cisCombinedData.AlignPoint(lastGps);
+                    var region = hca.GetClosestRegion(gps);
+                    if (region.ShouldSkip)
+                        continue;
+                    if (lastGps.Equals(new BasicGeoposition()))
+                        throw new ArgumentException();
+                    output.Add((extrapFoot, point.IndicationPercent, point.GPS));
+                }
+            }
+
+            return output;
+        }
+
+        private List<AllegroCISFile> GetUniqueFiles(List<AllegroCISFile> files)
+        {
+            files.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
+            for (int i = 0; i < files.Count; ++i)
+            {
+                var curFile = files[i];
+                for (int j = i + 1; j < files.Count; ++j)
+                {
+                    var nextFile = files[j];
+                    if (curFile.Name != nextFile.Name)
+                        break;
+                    if (true)//curFile.IsEquivalent(nextFile))
+                    {
+                        files.RemoveAt(j);
+                        --j;
+                    }
+                }
+            }
+            return files;
+        }
+
+        private List<(BasicGeoposition Gps, double Read)> ParseAcvgReads(List<string> lines)
+        {
+            var correction = 15.563025007672872650175335959592166719366374913056088;
+            var output = new List<(BasicGeoposition Gps, double Read)>();
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+                var splitLine = line.Split(',');
+                var lat = double.Parse(splitLine[0]);
+                var lon = double.Parse(splitLine[1]);
+                var read = double.Parse(splitLine[2]) - correction;
+                var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+                output.Add((gps, read));
+            }
+            return output;
+        }
+
+        private async Task ParseIitMasterFolder(StorageFolder masterFolder, IitRegionFile regions, StorageFolder outputFolder)
+        {
+            if (masterFolder.DisplayName == "Processed Data")
+                return;
+            var isDcvg = masterFolder.DisplayName == "DCVG";
+            var folders = await masterFolder.GetFoldersAsync();
+            ReportQ = "";
+
+            foreach (var curFolder in folders)
+            {
+                await ParseIitFolder(curFolder, regions, isDcvg, outputFolder);
+            }
+            var outputFile = await outputFolder.CreateFileAsync($"{masterFolder.DisplayName} Report Q.xlsx", CreationCollisionOption.ReplaceExisting);
+            using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            {
+                var wbPart = spreadDoc.AddWorkbookPart();
+                wbPart.Workbook = new Workbook();
+                wbPart.Workbook.AppendChild(new Sheets());
+                AddData(wbPart, ReportQ, 1, "Report Q", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
+                //AddData(wbPart, reportQ, 2, "Report Q2", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
+                wbPart.Workbook.Save();
+            }
+        }
+
+        private async void BatchIITClick_OLD(object sender, RoutedEventArgs e)
         {
             var folderPicker = new FolderPicker();
             folderPicker.FileTypeFilter.Add(".");
@@ -2170,7 +2939,7 @@ namespace AFSTester
             var dcvgfjdsak = "HCA\tFootage\tPercent\tValue\tStart Footage\tStart On\tStart Off\tStart IR Drop\tEnd Footage\tEnd On\tEnd Off\tEnd IR Drop\tLatitude\tLongitude";
             if (folder == null)
                 return;
-
+            var outputFolder = await folder.CreateFolderAsync("Processed Data", CreationCollisionOption.OpenIfExists);
             var curFolders = await folder.GetFoldersAsync();
             var masterFolders = new List<StorageFolder>();
             var totalCisPoints = 0;
@@ -2225,9 +2994,15 @@ namespace AFSTester
                 var reportQ = "";
                 foreach (var curFolder in folders)
                 {
+                    var displayName = curFolder.DisplayName;
+                    if (displayName.Length > 3 && displayName[2] == '+')
+                    {
+                        displayName = displayName.Substring(3);
+                    }
                     var files = await curFolder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
                     var cisFiles = new List<AllegroCISFile>();
                     var dcvgFiles = new List<AllegroCISFile>();
+                    VivaxPcm pcmFile = null;
                     var acvgReads = new List<(BasicGeoposition, double)>();
                     var regions = new List<RegionInfo>();
                     var alignData = new List<(double, double, double, double)>();
@@ -2237,6 +3012,11 @@ namespace AFSTester
                         var newFile = await factory.GetFile();
                         if (newFile != null)
                         {
+                            if (newFile is VivaxPcm)
+                            {
+                                pcmFile = newFile as VivaxPcm;
+                                continue;
+                            }
                             if (!(newFile is AllegroCISFile))
                                 continue;
                             var allegroFile = newFile as AllegroCISFile;
@@ -2293,7 +3073,7 @@ namespace AFSTester
                                     continue;
                                 }
                                 var surveyName = splitLine[0].Trim();
-                                if (surveyName.ToLower() != curFolder.DisplayName.Trim().ToLower())
+                                if (surveyName.ToLower() != displayName.Trim().ToLower())
                                     continue;
                                 var startLat = double.Parse(splitLine[1]);
                                 var startLon = double.Parse(splitLine[2]);
@@ -2349,10 +3129,13 @@ namespace AFSTester
                         }
                     }
                     var combinedFile = CombinedAllegroCISFile.CombineFiles("Combined", cisFiles);
-                    if (curFolder.DisplayName.Contains("628"))
+                    if (pcmFile != null)
                     {
-                        combinedFile.FileInfos.SetOffset(10);
-                        combinedFile.UpdatePoints();
+                        foreach (var (gps, depth) in pcmFile.DepthData)
+                        {
+                            var pointDist = combinedFile.GetClosestPoint(gps);
+                            pointDist.Point.Point.Depth = depth;
+                        }
                     }
 
                     //var combinedFile = CombinedAllegroCISFile.CombineOrderedFiles("Combined", cisFiles, 10);
@@ -2386,7 +3169,7 @@ namespace AFSTester
                                 //var irDropFactor = (endIrDrop - startIrDrop) / TotalFootage;
 
                                 var dcvgFileInfo = $"0\t{startOn:F4}\t{startOff:F4}\t{startIrDrop:F4}\t{file.TotalFootage}\t{endOn:F4}\t{endOff:F4}\t{endIrDrop:F4}";
-                                dcvgfjdsak += $"\n{curFolder.DisplayName}\t{point.Footage}\t{point.IndicationPercent:F2}%\t{point.IndicationValue}\t{dcvgFileInfo}";
+                                dcvgfjdsak += $"\n{displayName}\t{point.Footage}\t{point.IndicationPercent:F2}%\t{point.IndicationValue}\t{dcvgFileInfo}";
                                 if (point.HasGPS)
                                     dcvgfjdsak += $"\t{ point.GPS.Latitude}\t{ point.GPS.Longitude}";
                                 else
@@ -2398,7 +3181,7 @@ namespace AFSTester
                                     {
                                         dist = dist;
                                     }
-                                    (regFoot, regDist, extrapFoot, extrapDist) = combinedFootages.AlignPoint(lastGps);
+                                    (regFoot, regDist, extrapFoot, extrapDist, _) = combinedFootages.AlignPoint(lastGps);
                                     alignData.Add((regFoot, regDist, extrapFoot, extrapDist));
                                     dcvgData.Add((extrapFoot, point.IndicationPercent, lastGps)); // Extgrap Foot
                                     ++totalDcvgPoints;
@@ -2407,7 +3190,7 @@ namespace AFSTester
                                     continue;
                                     throw new ArgumentException();
                                 }
-                                (regFoot, regDist, extrapFoot, extrapDist) = combinedFootages.AlignPoint(point.GPS);
+                                (regFoot, regDist, extrapFoot, extrapDist, _) = combinedFootages.AlignPoint(point.GPS);
                                 alignData.Add((regFoot, regDist, extrapFoot, extrapDist));
                                 dcvgData.Add((extrapFoot, point.IndicationPercent, point.GPS));// Extgrap Foot
                                 ++totalDcvgPoints;
@@ -2427,7 +3210,7 @@ namespace AFSTester
                     {
                         foreach (var (gps, read) in acvgReads)
                         {
-                            var (acvgRegFoot, acvgRegDist, acvgExtrapFoot, acvgExtrapDist) = combinedFootages.AlignPoint(gps);
+                            var (acvgRegFoot, acvgRegDist, acvgExtrapFoot, acvgExtrapDist, _) = combinedFootages.AlignPoint(gps);
                             alignData.Add((acvgRegFoot, acvgRegDist, acvgExtrapFoot, acvgExtrapDist));
                             dcvgData.Add((acvgExtrapFoot, read, gps));
                         }
@@ -2437,7 +3220,7 @@ namespace AFSTester
 
                     if (regions == null || regions.Count == 0)
                         regions = null;
-                    if (!surveyInfo.ContainsKey(curFolder.DisplayName.ToLower()))
+                    if (!surveyInfo.ContainsKey(displayName.ToLower()))
                         regions = null;
                     //if (alignData.Count == 0)
                     //    continue;
@@ -2449,7 +3232,7 @@ namespace AFSTester
                     //}
                     //if (!hasNew)
                     //    continue;
-                    var fromHcaFile = surveyInfo[curFolder.DisplayName.ToLower()];
+                    var fromHcaFile = surveyInfo[displayName.ToLower()];
                     var hcaInfo = new HcaInfo()
                     {
                         HcaId = fromHcaFile.HcaId,
@@ -2476,7 +3259,7 @@ namespace AFSTester
                     }
                     reportQ += reportInfo.GetReportQ();
                     if (regions != null)
-                        await MakeIITGraphs(reportInfo.CisFile, reportInfo.GetIndicationData(), isDcvg, curFolder.DisplayName, regions, surveyInfo[curFolder.DisplayName.ToLower()]);
+                        await MakeIITGraphs(reportInfo.CisFile, reportInfo.GetIndicationData(), isDcvg, displayName, regions, surveyInfo[displayName.ToLower()], outputFolder);
                     if (alignData.Count > 0)
                     {
                         globalAlignData.AddRange(alignData);
@@ -2488,7 +3271,7 @@ namespace AFSTester
                         var minDiff1 = diffList1.Min();
                     }
                 }
-                var outputFile = await ApplicationData.Current.LocalFolder.CreateFileAsync($"{masterFolder.DisplayName} Report Q.xlsx", CreationCollisionOption.ReplaceExisting);
+                var outputFile = await outputFolder.CreateFileAsync($"{masterFolder.DisplayName} Report Q.xlsx", CreationCollisionOption.ReplaceExisting);
                 using (var outStream = await outputFile.OpenStreamForWriteAsync())
                 using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
                 {
@@ -2947,46 +3730,166 @@ namespace AFSTester
         private async void Button_Click_5(object sender, RoutedEventArgs e)
         {
             //MakeQuickIITGraphs(CombinedAllegroCISFile file, List < (double, double, BasicGeoposition) > dcvgData, List < (double Footage, double Current, double Depth, string Comment, BasicGeoposition Gps) > pcmInput, string folderName)
+            //var folderPicker = new FolderPicker();
+            //folderPicker.FileTypeFilter.Add(".");
+            //var folder = await folderPicker.PickSingleFolderAsync();
+            //if (folder == null)
+            //    return;
+            //var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
+            //var pcm = files.Where(file => file.Name.Contains("PCM")).First();
+
+            //var pcmInfo = new List<(double Footage, double Current, double Depth, string Comment)>();
+            //using (var stream = await pcm.OpenStreamForReadAsync())
+            //using (var reader = new StreamReader(stream))
+            //{
+            //    while (!reader.EndOfStream)
+            //    {
+            //        var line = reader.ReadLine();
+            //        var split = line.Split('\t');
+            //        var footage = double.Parse(split[2]);
+            //        var current = double.Parse(split[0] == "" ? "0" : split[0]);
+            //        var depth = double.Parse(split[1] == "" ? "0" : split[1]);
+            //        var comment = split[3].Replace("\"", "");
+            //        pcmInfo.Add((footage, current, depth, comment));
+            //    }
+            //}
+            //var onOffFiles = files.Where(file => file.Name.Contains("CIS"));
+            //var dcvgFile = files.Where(file => file.Name.Contains("DCVG")).First();
+            //var onOffs = new List<AllegroCISFile>();
+            //foreach (var file in onOffFiles)
+            //{
+            //    var onOffFactory = new FileFactory(file);
+            //    var onOff = await onOffFactory.GetFile() as AllegroCISFile;
+            //    onOffs.Add(onOff);
+            //}
+
+            //var dcvgFactory = new FileFactory(dcvgFile);
+
+            //var onOffCombined = CombinedAllegroCISFile.CombineFiles("Test", onOffs);
+            ////onOffCombined.Reverse();
+            //var dcvg = await dcvgFactory.GetFile() as AllegroCISFile;
+            //var dcvgData = dcvg.Points.Select(point => (point.Value.Footage, point.Value.IndicationValue, point.Value.GPS)).Where(val => !double.IsNaN(val.IndicationValue)).ToList();
+            //await MakeQuickIITGraphs(onOffCombined, dcvgData, pcmInfo, "057A");
+
             var folderPicker = new FolderPicker();
             folderPicker.FileTypeFilter.Add(".");
             var folder = await folderPicker.PickSingleFolderAsync();
             if (folder == null)
                 return;
             var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
-            var pcm = files.Where(file => file.Name.Contains("PCM")).First();
+            var soilRes = files.First();
 
-            var pcmInfo = new List<(double Footage, double Current, double Depth, string Comment)>();
-            using (var stream = await pcm.OpenStreamForReadAsync())
+            var soilResData = new Dictionary<int, List<(BasicGeoposition Gps, double Read, double Footage, string Comment)>>
+            {
+                { 60, new List<(BasicGeoposition Gps, double Read, double Footage, string Comment)>() },
+                { 120, new List<(BasicGeoposition Gps, double Read, double Footage, string Comment)>() }
+            };
+            using (var stream = await soilRes.OpenStreamForReadAsync())
             using (var reader = new StreamReader(stream))
             {
                 while (!reader.EndOfStream)
                 {
                     var line = reader.ReadLine();
-                    var split = line.Split('\t');
-                    var footage = double.Parse(split[2]);
-                    var current = double.Parse(split[0] == "" ? "0" : split[0]);
-                    var depth = double.Parse(split[1] == "" ? "0" : split[1]);
-                    var comment = split[3].Replace("\"", "");
-                    pcmInfo.Add((footage, current, depth, comment));
+                    var split = line.Split(',');
+                    var lat = double.Parse(split[0]);
+                    var lon = double.Parse(split[1]);
+                    var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+                    var spacing = int.Parse(split[2]);
+                    var res = double.Parse(split[3]);
+                    var footage = double.Parse(split[4]);
+                    var comment = split[5].Replace("\"", "");
+                    soilResData[spacing].Add((gps, res, footage, comment));
                 }
             }
-            var onOffFiles = files.Where(file => file.Name.Contains("CIS"));
-            var dcvgFile = files.Where(file => file.Name.Contains("DCVG")).First();
-            var onOffs = new List<AllegroCISFile>();
-            foreach (var file in onOffFiles)
+            await MakeDoubleSoilResGraphs(soilResData, folder);
+        }
+
+        private async Task MakeDoubleSoilResGraphs(Dictionary<int, List<(BasicGeoposition Gps, double Read, double Footage, string Comment)>> soilResData, StorageFolder folder)
+        {
+            var report = new GraphicalReport()
             {
-                var onOffFactory = new FileFactory(file);
-                var onOff = await onOffFactory.GetFile() as AllegroCISFile;
-                onOffs.Add(onOff);
+                Logo = Logo
+            };
+            report.XAxisInfo.OverlapOpacity = 0f;
+            var mainGraph = new Graph(report);
+
+            var sixtyRes = new GraphSeries("60 in Spacing", soilResData[60].Select(res => (res.Footage, res.Read / 1000)).ToList())
+            {
+                LineColor = Colors.Black,
+                PointColor = Colors.Orange,
+                IsY1Axis = true,
+                PointShape = GraphSeries.Shape.Circle,
+                GraphType = GraphSeries.Type.Point
+            };
+            var oneTwentyRes = new GraphSeries("120 in Spacing", soilResData[120].Select(res => (res.Footage, res.Read / 1000)).ToList())
+            {
+                LineColor = Colors.Black,
+                PointColor = Colors.Green,
+                IsY1Axis = true,
+                PointShape = GraphSeries.Shape.Triangle,
+                GraphType = GraphSeries.Type.Point
+            };
+            var commentSeries = new CommentSeries { Values = soilResData[60].Select(res => (res.Footage, res.Comment)).ToList(), PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs };
+
+            mainGraph.Series.Add(sixtyRes);
+            mainGraph.Series.Add(oneTwentyRes);
+            mainGraph.DrawTopBorder = false;
+            mainGraph.CommentSeries = commentSeries;
+            mainGraph.YAxesInfo.Y2IsDrawn = false;
+            mainGraph.YAxesInfo.Y1IsInverted = false;
+            mainGraph.YAxesInfo.Y1MinimumValue = 0;
+            mainGraph.YAxesInfo.Y1MaximumValue = 50;
+            mainGraph.YAxesInfo.Y1LabelFormat = "F0";
+            mainGraph.YAxesInfo.Y1LabelSuffix = "K";
+            mainGraph.YAxesInfo.MinorGridlines.Offset = 5;
+            mainGraph.YAxesInfo.MajorGridlines.Offset = 10;
+            mainGraph.YAxesInfo.Y1Title = "Soil Resistivity (ohms-cm)";
+            mainGraph.LegendInfo.Name = "Soil Res Data";
+
+            report.XAxisInfo.IsEnabled = false;
+            report.XAxisInfo.MajorGridline.Offset = 1000;
+            report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
+            report.LegendInfo.SeriesNameFontSize = report.YAxesInfo.Y1LabelFontSize;
+
+            var bottomGlobalXAxis = new GlobalXAxis(report)
+            {
+                DrawPageInfo = true
+            };
+
+            var topGlobalXAxis = new GlobalXAxis(report, true)
+            {
+                Title = "Tucson Water 42in Silverbell Soil Resistivity"
+            };
+
+            var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
+            splitContainer.AddSelfSizedContainer(topGlobalXAxis);
+            splitContainer.AddContainer(mainGraph);
+            splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
+            report.Container = splitContainer;
+            report.PageSetup.FootagePerPage = 10000;
+            var pages = report.PageSetup.GetAllPages(0, soilResData[60].Last().Footage);
+            var curFileName = $"{topGlobalXAxis.Title}";
+            //var tabular = GetOnOffDepolPcmTabularData(allegroFile, depolFile, depolExceptions.PolarizationData, pcmReads);
+            //await CreateExcelFile($"{curFileName} Combined Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) });
+
+            var imageFiles = new List<StorageFile>();
+            for (int i = 0; i < pages.Count; ++i)
+            {
+                var page = pages[i];
+                var pageString = $"{i + 1}".PadLeft(3, '0');
+                var fileName = $"{topGlobalXAxis.Title} Page {pageString}.png";
+                if (pages.Count == 1)
+                    fileName = $"{topGlobalXAxis.Title} Graph.png";
+                var imageFile = await folder.CreateFileAsync($"{fileName}", CreationCollisionOption.ReplaceExisting);
+                using (var image = report.GetImage(page, 300))
+                using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
+                {
+                    await image.SaveAsync(stream, CanvasBitmapFileFormat.Png);
+                }
+                imageFiles.Add(imageFile);
             }
-
-            var dcvgFactory = new FileFactory(dcvgFile);
-
-            var onOffCombined = CombinedAllegroCISFile.CombineFiles("Test", onOffs);
-            //onOffCombined.Reverse();
-            var dcvg = await dcvgFactory.GetFile() as AllegroCISFile;
-            var dcvgData = dcvg.Points.Select(point => (point.Value.Footage, point.Value.IndicationValue, point.Value.GPS)).Where(val => !double.IsNaN(val.IndicationValue)).ToList();
-            await MakeQuickIITGraphs(onOffCombined, dcvgData, pcmInfo, "057A");
+            var dialog = new MessageDialog($"Finished making {topGlobalXAxis.Title}");
+            await dialog.ShowAsync();
         }
 
         private async void OnOffDepolButtonClick(object sender, RoutedEventArgs e)
@@ -3163,7 +4066,7 @@ namespace AFSTester
             pcmSignalGraph.YAxesInfo.MajorGridlines.Offset = 1;
             pcmSignalGraph.YAxesInfo.MinorGridlines.Offset = 0.5;
             pcmSignalGraph.YAxesInfo.Y2IsDrawn = false;
-            pcmSignalGraph.YAxesInfo.Y1Title = "dBµV";
+            pcmSignalGraph.YAxesInfo.Y1Title = "Amps";
             pcmSignalGraph.YAxesInfo.Y1MaximumValue = 3.5;
             pcmSignalGraph.YAxesInfo.Y1MinimumValue = 0;
             pcmSignalGraph.YAxesInfo.Y1IsInverted = false;
@@ -3239,7 +4142,8 @@ namespace AFSTester
             report.Container = splitContainer;
             var pages = report.PageSetup.GetAllPages(0, allegroFile.Points.Last().Footage);
             var curFileName = $"{response.Value.Item1}\\{topGlobalXAxis.Title}";
-            await CreateStandardExcel(curFileName, allegroFile);
+            await CreateStandardExcel(curFileName + " CIS", allegroFile);
+            await CreateStandardExcel(curFileName + " Depol", depolFile);
             var tabular = GetOnOffDepolPcmTabularData(allegroFile, depolFile, depolExceptions.PolarizationData, pcmReads);
             await CreateExcelFile($"{curFileName} Combined Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) });
 

@@ -14,6 +14,8 @@ namespace AccurateFileSystem
         public FileType Type { get; set; }
         public string Name { get; set; }
         public List<CombinedDataPoint> Points = null;
+        public bool HasStartSkip { get; private set; }
+        public bool HasEndSkip { get; private set; }
 
         private CombinedAllegroCISFile(string name, FileType type, FileInfoLinkedList fileInfos)
         {
@@ -21,6 +23,7 @@ namespace AccurateFileSystem
             Name = name;
             FileInfos = fileInfos;
             UpdatePoints();
+            CheckEndSkips();
             //var output = FilterMir(new List<string>() { "anode", "rectifier" });
         }
 
@@ -38,10 +41,55 @@ namespace AccurateFileSystem
             return list;
         }
 
+        private void CheckEndSkips(double maxDistance = 20)
+        {
+            var firstPoint = Points[0];
+            var nextPoint = Points[1];
+            var startDist = nextPoint.Footage - firstPoint.Footage;
+
+            var prevPoint = Points[Points.Count - 2];
+            var lastPoint = Points[Points.Count - 1];
+            var lastDist = lastPoint.Footage - prevPoint.Footage;
+
+            HasStartSkip = startDist > maxDistance;
+            HasEndSkip = lastDist > maxDistance;
+        }
+
         public void Reverse()
         {
             FileInfos = FileInfos.Reverse();
             UpdatePoints();
+        }
+
+        public void AddPcmDepthData(CsvPcm pcm)
+        {
+            if (pcm != null)
+            {
+                foreach (var (gps, depth) in pcm.DepthData)
+                {
+                    var (Point, _) = GetClosestPoint(gps);
+                    Point.Point.Depth = depth;
+                }
+            }
+        }
+
+        public void AddPcmDepthData(List<CsvPcm> pcms)
+        {
+            foreach (var pcm in pcms)
+                foreach (var (gps, depth) in pcm.DepthData)
+                {
+                    var (Point, distance) = GetClosestPoint(gps);
+                    if (distance < 20)
+                        Point.Point.Depth = depth;
+                }
+        }
+
+        public void ShiftPoints(double footage)
+        {
+            foreach (var point in Points)
+            {
+                point.Footage += footage;
+            }
         }
 
         public List<int> GetAnchorPoints(int distance = 50)
@@ -212,10 +260,20 @@ namespace AccurateFileSystem
             }
         }
 
-        public void SetFootageFromGps(int roundDecimals = 0)
+        public void SetFootageFromGps(int roundDecimals = 0, int startIndex = 0)
         {
             var distances = new List<double>();
-            for (int index = 1; index < Points.Count; ++index)
+            for (int index = startIndex - 1; index >= 0; --index)
+            {
+                var nextData = Points[index + 1];
+                var curData = Points[index];
+
+                var distance = Math.Max(Math.Round(nextData.Point.GPS.Distance(curData.Point.GPS), roundDecimals), 1);
+                distances.Add(distance);
+                curData.Footage = nextData.Footage - distance;
+                Points[index] = curData;
+            }
+            for (int index = startIndex + 1; index < Points.Count; ++index)
             {
                 var lastData = Points[index - 1];
                 var curData = Points[index];
@@ -224,6 +282,33 @@ namespace AccurateFileSystem
                 distances.Add(distance);
                 curData.Footage = lastData.Footage + distance;
                 Points[index] = curData;
+            }
+        }
+
+        public void ReverseBasedOnHca(Hca hca)
+        {
+            var startGps = hca.GetStartGps();
+            int start = HasStartSkip ? 1 : 0;
+            int end = Points.Count - (HasEndSkip ? 2 : 1);
+            int startGpsIndex = start;
+            int endGpsIndex = end;
+            var startPoint = Points[startGpsIndex];
+            while (!startPoint.Point.HasGPS)
+            {
+                ++startGpsIndex;
+                startPoint = Points[startGpsIndex];
+            }
+            var endPoint = Points[endGpsIndex];
+            while (!endPoint.Point.HasGPS)
+            {
+                --endGpsIndex;
+                endPoint = Points[endGpsIndex];
+            }
+            var startDist = startPoint.Point.GPS.Distance(startGps);
+            var endDist = endPoint.Point.GPS.Distance(startGps);
+            if (endDist < startDist)
+            {
+                Reverse();
             }
         }
 
@@ -856,17 +941,26 @@ namespace AccurateFileSystem
         private List<(double footage, double value)> GetOnData()
         {
             var list = new List<(double, double)>();
-            for (int i = 0; i < Points.Count; ++i)
+            var (start, end) = GetActualStartEnd();
+            for (int i = start; i <= end; ++i)
             {
                 list.Add((Points[i].Footage, Points[i].Point.On));
             }
             return list;
         }
 
+        private (int Start, int End) GetActualStartEnd()
+        {
+            var start = HasStartSkip ? 1 : 0;
+            var end = Points.Count - (HasEndSkip ? 2 : 1);
+            return (start, end);
+        }
+
         public List<(double Footage, AllegroDataPoint Point)> GetPoints()
         {
             var list = new List<(double, AllegroDataPoint)>();
-            for (int i = 0; i < Points.Count; ++i)
+            var (start, end) = GetActualStartEnd();
+            for (int i = start; i <= end; ++i)
             {
                 list.Add((Points[i].Footage, Points[i].Point));
             }
@@ -890,7 +984,8 @@ namespace AccurateFileSystem
         private List<(double footage, double value)> GetOffData()
         {
             var list = new List<(double, double)>();
-            for (int i = 0; i < Points.Count; ++i)
+            var (start, end) = GetActualStartEnd();
+            for (int i = start; i <= end; ++i)
             {
                 list.Add((Points[i].Footage, Points[i].Point.Off));
             }
@@ -914,7 +1009,8 @@ namespace AccurateFileSystem
         private List<(double footage, double value)> GetDepthData()
         {
             var list = new List<(double, double)>();
-            for (int i = 0; i < Points.Count; ++i)
+            var (start, end) = GetActualStartEnd();
+            for (int i = start; i <= end; ++i)
             {
                 if (Points[i].Point.Depth.HasValue)
                     list.Add((Points[i].Footage, Points[i].Point.Depth.Value));
@@ -937,7 +1033,8 @@ namespace AccurateFileSystem
         public List<(double footage, string value)> GetCommentData(List<string> filters = null)
         {
             var list = new List<(double, string)>();
-            for (int i = 0; i < Points.Count; ++i)
+            var (start, end) = GetActualStartEnd();
+            for (int i = start; i <= end; ++i)
             {
                 var comment = Points[i].Point.OriginalComment;
                 if (filters != null)
