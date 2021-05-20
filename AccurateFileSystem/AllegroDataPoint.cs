@@ -76,7 +76,7 @@ namespace AccurateFileSystem
         {
             if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
-            string docPattern = "(?i)DOC:?\\s?(\\d+)\\s?(in)?(\")?";
+            string docPattern = "(?i)DOC:?\\s?(\\d+)\\s?(in)?c?(\")?";
             string docFootPattern = @"(?i)DOC:?\s?(\d+)\s?ft";
             string docFootInchPattern = "(?i)DOC:?\\s?(\\d+)'(\\d*)\\s?(in)?(\")?";
             //string offsetPattern = "(?i)(begin)?(start)?(end)? ?offset";

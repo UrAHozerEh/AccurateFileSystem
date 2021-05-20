@@ -22,6 +22,7 @@ namespace AccurateReportSystem
         public abstract int NumberOfValues { get; }
         public float Opacity { get; set; } = 0.75f;
         public float LegendLabelSplit { get; set; } = 0.33f;
+        public Color? OutlineColor = Colors.Black;
 
         private readonly LegendInfo MasterLegendInfo;
         private readonly YAxesInfo MasterYAxesInfo;
@@ -50,7 +51,8 @@ namespace AccurateReportSystem
                     var width = x2 - x1;
                     var drawRect = new Rect(x1, drawArea.Top, width, drawArea.Height);
                     session.FillRectangle(drawRect, Color);
-                    session.DrawRectangle(drawRect, Colors.Black);
+                    if(OutlineColor.HasValue)
+                        session.DrawRectangle(drawRect, OutlineColor.Value);
                 }
             }
 

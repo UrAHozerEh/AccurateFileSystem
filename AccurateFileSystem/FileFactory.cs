@@ -41,9 +41,18 @@ namespace AccurateFileSystem
                     if (await IsAllegroFile())
                         return await GetAllegroFile();
                     else
-                        return null;
+                    {
+                        var lines = await File.GetLines();
+                        if (lines[1].Contains("Observations:"))
+                            return new VivaxPcm(File.DisplayName, lines);
+                        if (lines[0].IndexOf("ID") <= 1)
+                            return new OtherPcm(File.DisplayName, lines);
+                        return new GeneralCsv(File.DisplayName, lines);
+                    }
                 case ".txt":
                     return await GetAllegroWaveform();
+                case ".regions2":
+                    return await IitRegionFile.GetIitRegion(File);
                 case ".xlsx":
                 case ".xls":
                 case ".zip":

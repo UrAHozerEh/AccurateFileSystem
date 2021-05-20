@@ -44,9 +44,9 @@ namespace AccurateReportSystem
             DrawLabels(session, page, transform);
         }
 
-        protected void DrawLabels(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
+        private List<(float X, float Y, CanvasTextLayout TextLayout)> GetLayouts(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
         {
-            //TODO: Add so you can show above and below. Maybe an anti collision check.
+            var output = new List<(float X, float Y, CanvasTextLayout TextLayout)>();
             for (int i = 0; i < Labels.Count; ++i)
             {
                 var (foot, label) = Labels[i];
@@ -56,7 +56,7 @@ namespace AccurateReportSystem
                 if (foot > page.EndFootage)
                     break;
                 var (x, y) = transform.ToDrawArea(foot, value);
-                
+
                 var drawArea = transform.DrawArea;
                 using (var format = new CanvasTextFormat())
                 {
@@ -67,38 +67,66 @@ namespace AccurateReportSystem
                     format.FontWeight = FontWeights.Normal;
                     format.FontStyle = FontStyle.Normal;
                     var endLocation = x;
-                    using (var layout = new CanvasTextLayout(session, label, format, 0, 0))
+                    var layout = new CanvasTextLayout(session, label, format, 0, 0);
+                    var halfLayoutWidth = (float)Math.Round(layout.LayoutBounds.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
+                    var finalLocation = x - halfLayoutWidth;
+                    if (finalLocation < drawArea.Left)
                     {
-                        var halfLayoutWidth = (float)Math.Round(layout.LayoutBounds.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
-                        var finalLocation = x - halfLayoutWidth;
-                        if (finalLocation < drawArea.Left)
-                        {
-                            endLocation = (float)drawArea.Left + halfLayoutWidth;
-                            finalLocation = (float)drawArea.Left;
-                        }
-                        else if (finalLocation + (2 * halfLayoutWidth) > drawArea.Right)
-                        {
-                            endLocation = (float)drawArea.Right - halfLayoutWidth;
-                            finalLocation = (float)Math.Round(drawArea.Right - (2 * halfLayoutWidth), GraphicalReport.DIGITS_TO_ROUND);
-                        }
-                        y -= ((float)layout.LayoutBounds.Height) + 2f + ShapeRadius;
-                        var translate = Matrix3x2.CreateTranslation(finalLocation, y);
+                        endLocation = (float)drawArea.Left + halfLayoutWidth;
+                        finalLocation = (float)drawArea.Left;
+                    }
+                    else if (finalLocation + (2 * halfLayoutWidth) > drawArea.Right)
+                    {
+                        endLocation = (float)drawArea.Right - halfLayoutWidth;
+                        finalLocation = (float)Math.Round(drawArea.Right - (2 * halfLayoutWidth), GraphicalReport.DIGITS_TO_ROUND);
+                    }
+                    y -= ((float)layout.LayoutBounds.Height) + 2f + ShapeRadius;
+                    output.Add((finalLocation, y, layout));
+                }
+            }
+            return output;
+        }
 
-                        using (var geo = CanvasGeometry.CreateText(layout))
+        protected void DrawLabels(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
+        {
+            //TODO: Add so you can show above and below. Maybe an anti collision check.
+            var layouts = GetLayouts(session, page, transform);
+            for (int i = 0; i < layouts.Count; ++i)
+            {
+                var (x, y, layout) = layouts[i];
+                //var layoutHeight = (float)(layout.LayoutBounds.Height * 1.1);
+                bool hasMoved;
+                do
+                {
+                    hasMoved = false;
+                    for (int j = 0; j < i; ++j)
+                    {
+                        var (prevX, prevY, prevLayout) = layouts[j];
+                        var prevLayoutWidth = prevLayout.LayoutBounds.Width * 1.1;
+                        if (prevX + prevLayoutWidth > x && prevY == y)
                         {
-                            using (var translatedGeo = geo.Transform(translate))
-                            {
-                                using (var _ = session.CreateLayer(BackdropOpacity))
-                                {
-                                    var translatedBounds = translatedGeo.ComputeBounds();
-                                    var yShift = translatedBounds.Height * (BackdropIncrease / 2);
-                                    translatedBounds.Height *= 1 + BackdropIncrease;
-                                    translatedBounds.Y -= yShift;
-                                    session.FillRectangle(translatedBounds, BackdropColor);
-                                }
-                                session.FillGeometry(translatedGeo, Colors.Black);
-                            }
+                            y -= FontSize + 2;
+                            hasMoved = true;
+                            layouts[i] = (x, y, layout);
                         }
+                    }
+                }
+                while (hasMoved);
+                var translate = Matrix3x2.CreateTranslation(x, y);
+
+                using (var geo = CanvasGeometry.CreateText(layout))
+                {
+                    using (var translatedGeo = geo.Transform(translate))
+                    {
+                        using (var _ = session.CreateLayer(BackdropOpacity))
+                        {
+                            var translatedBounds = translatedGeo.ComputeBounds();
+                            var yShift = translatedBounds.Height * (BackdropIncrease / 2);
+                            translatedBounds.Height *= 1 + BackdropIncrease;
+                            translatedBounds.Y -= yShift;
+                            session.FillRectangle(translatedBounds, BackdropColor);
+                        }
+                        session.FillGeometry(translatedGeo, Colors.Black);
                     }
                 }
             }

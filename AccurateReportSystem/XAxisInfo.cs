@@ -165,6 +165,32 @@ namespace AccurateReportSystem
         }
         private bool? isFlippedVertical = null;
 
+        public Color OverlapColor
+        {
+            get
+            {
+                return overlapColor ?? MasterInfo.OverlapColor;
+            }
+            set
+            {
+                overlapColor = value;
+            }
+        }
+        private Color? overlapColor = null;
+
+        public float OverlapOpacity
+        {
+            get
+            {
+                return overlapOpacity ?? MasterInfo.OverlapOpacity;
+            }
+            set
+            {
+                overlapOpacity = value;
+            }
+        }
+        private float? overlapOpacity = null;
+
         public bool IsEnabled
         {
             get
@@ -197,6 +223,8 @@ namespace AccurateReportSystem
             };
             MajorGridline = new GridlineInfo(100, Colors.LightGray);
             IsFlippedVertical = false;
+            OverlapColor = Colors.Black;
+            OverlapOpacity = 0.25f;
         }
 
         public XAxisInfo(XAxisInfo master)
