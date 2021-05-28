@@ -469,8 +469,6 @@ namespace AccurateReportSystem
             var endDist = endPoint.Point.GPS.Distance(startGps);
             if (endDist < startDist)
             {
-                if (HcaInfo.HcaId.Contains("51"))
-                    CisFile = CisFile;
                 CisFile.Reverse();
             }
             if (CisFile.Points.Count > 10)

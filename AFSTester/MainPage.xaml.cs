@@ -1146,6 +1146,8 @@ namespace AFSTester
 
         private void AddHcaComments(CombinedAllegroCISFile file, Hca hca)
         {
+            var startGap = hca.GetStartFootageGap();
+            file.ShiftPoints(startGap);
             BasicGeoposition hcaStartGps = hca.GetFirstNonSkipGps();
             BasicGeoposition hcaEndGps = hca.GetLastNonSkipGps();
             bool hasStartBuffer = hca.StartBuffer.HasValue;
@@ -1426,7 +1428,8 @@ namespace AFSTester
             {
                 if (string.IsNullOrWhiteSpace(line[7]))
                     continue;
-                line[0] = $"Depth: {line[7]}";
+                if (line[0] != "LABEL")
+                    line[0] = $"Depth: {line[7]}";
                 var lineString = string.Join('\t', line);
                 depthShapeFileStringBuilder.AppendLine(lineString);
             }
