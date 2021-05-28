@@ -59,6 +59,10 @@ namespace AccurateFileSystem
         {
             FileInfos = FileInfos.Reverse();
             UpdatePoints();
+            var tempStartSkip = HasStartSkip;
+            var tempEndSkip = HasEndSkip;
+            HasStartSkip = tempEndSkip;
+            HasEndSkip = tempStartSkip;
         }
 
         public void AddPcmDepthData(CsvPcm pcm)

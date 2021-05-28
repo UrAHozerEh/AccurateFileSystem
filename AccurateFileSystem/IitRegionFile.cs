@@ -103,6 +103,7 @@ namespace AccurateFileSystem
                 var endGps = SplitGps(Data[i, EndGpsColumn]);
 
                 var region = Data[i, RegionColumn].Trim();
+                region = region.Replace('–', '-');
                 if (region.Contains('-'))
                     region = region.Substring(0, region.IndexOf('-')).Trim();
 

@@ -20,7 +20,6 @@ namespace AccurateFileSystem
         public double HcaGpsLength => Regions.Sum(region => region.GpsLength);
         public double TotalGpsLength => StartBufferGpsLength + HcaGpsLength + EndBufferGpsLength;
 
-
         public Hca(string name, string lineName, List<string[]> lines)
         {
             Regions = new List<HcaRegion>();
@@ -29,6 +28,21 @@ namespace AccurateFileSystem
             StartBuffer = null;
             EndBuffer = null;
             ParseLines(lines);
+        }
+
+        public int GetStartFootageGap()
+        {
+            if (StartBuffer != null)
+                return 0;
+            var output = 0.0;
+            foreach(var region in Regions)
+            {
+                if (region.ShouldSkip)
+                    output += region.GpsLength;
+                else
+                    break;
+            }
+            return (int)output;
         }
 
         public BasicGeoposition GetStartGps()
