@@ -8,25 +8,30 @@ using Windows.Devices.Geolocation;
 
 namespace AccurateFileSystem
 {
-    public struct Hca
+    public class Hca
     {
-        public List<HcaRegion> Regions { get; private set; }
-        public HcaRegion? StartBuffer { get; private set; }
-        public HcaRegion? EndBuffer { get; private set; }
+        public List<HcaRegion> Regions { get; set; }
+        public HcaRegion StartBuffer { get; private set; }
+        public HcaRegion EndBuffer { get; private set; }
         public string LineName { get; private set; }
         public string Name { get; private set; }
+        public bool? FirstTime { get; private set; }
+        public string FirstTimeString => !FirstTime.HasValue ? "N/A" : (FirstTime.Value ? "Y" : "N");
         public double StartBufferGpsLength => StartBuffer?.GpsLength ?? 0;
         public double EndBufferGpsLength => EndBuffer?.GpsLength ?? 0;
         public double HcaGpsLength => Regions.Sum(region => region.GpsLength);
         public double TotalGpsLength => StartBufferGpsLength + HcaGpsLength + EndBufferGpsLength;
 
-        public Hca(string name, string lineName, List<string[]> lines)
+
+        public Hca(string name, string lineName, List<string[]> lines, bool? firstTime = null)
         {
             Regions = new List<HcaRegion>();
             Name = name;
             LineName = lineName;
             StartBuffer = null;
             EndBuffer = null;
+            FirstTime = firstTime;
+            lines = SortLines(lines);
             ParseLines(lines);
         }
 
@@ -35,7 +40,7 @@ namespace AccurateFileSystem
             if (StartBuffer != null)
                 return 0;
             var output = 0.0;
-            foreach(var region in Regions)
+            foreach (var region in Regions)
             {
                 if (region.ShouldSkip)
                     output += region.GpsLength;
@@ -65,13 +70,13 @@ namespace AccurateFileSystem
                 closestRegion = GetCloserRegion(closestRegion, region, gps);
             }
 
-            if (StartBuffer.HasValue)
+            if (StartBuffer != null)
             {
-                closestRegion = GetCloserRegion(closestRegion, StartBuffer.Value, gps);
+                closestRegion = GetCloserRegion(closestRegion, StartBuffer, gps);
             }
-            if (EndBuffer.HasValue)
+            if (EndBuffer != null)
             {
-                closestRegion = GetCloserRegion(closestRegion, EndBuffer.Value, gps);
+                closestRegion = GetCloserRegion(closestRegion, EndBuffer, gps);
             }
             return closestRegion;
         }
@@ -79,9 +84,9 @@ namespace AccurateFileSystem
         public (string StartMp, string EndMp) GetMpForRegion(HcaRegion region)
         {
             if (region.Equals(StartBuffer))
-                return (StartBuffer.Value.StartMp, StartBuffer.Value.EndMp);
+                return (StartBuffer.StartMp, StartBuffer.EndMp);
             if (region.Equals(EndBuffer))
-                return (EndBuffer.Value.StartMp, EndBuffer.Value.EndMp);
+                return (EndBuffer.StartMp, EndBuffer.EndMp);
             return GetMpForHca();
         }
 
@@ -173,6 +178,74 @@ namespace AccurateFileSystem
             return new HcaRegion(allGps, name, startMp, endMp);
         }
 
+        private List<string[]> SortLines(List<string[]> lines)
+        {
+            var output = new List<(BasicGeoposition StartGps, BasicGeoposition EndGps, string[] Line)>();
+
+            foreach (var line in lines)
+            {
+                var lat = double.Parse(line[4]);
+                var lon = double.Parse(line[5]);
+                var startGps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+
+                lat = double.Parse(line[6]);
+                lon = double.Parse(line[7]);
+                var endGps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+                (BasicGeoposition StartGps, BasicGeoposition EndGps, string[] Line) cur = (startGps, endGps, line);
+
+                var hasAdded = false;
+                var isCloseBefore = false;
+                var closestDist = double.MaxValue;
+                var closestIndex = -1;
+                for (int i = 0; i < output.Count; ++i)
+                {
+                    var other = output[i];
+                    if (other.EndGps.Equals(cur.StartGps))
+                    {
+                        output.Insert(i + 1, cur);
+                        hasAdded = true;
+                        break;
+                    }
+                    if (other.StartGps.Equals(cur.EndGps))
+                    {
+                        output.Insert(i + 1, cur);
+                        hasAdded = true;
+                        break;
+                    }
+                    var beforeDist = other.StartGps.Distance(cur.EndGps);
+                    var afterDist = other.EndGps.Distance(cur.StartGps);
+                    if (beforeDist < closestDist)
+                    {
+                        closestIndex = i;
+                        isCloseBefore = true;
+                    }
+                    if (afterDist < closestDist)
+                    {
+                        closestIndex = i;
+                        isCloseBefore = false;
+                    }
+                }
+                if (!hasAdded)
+                {
+                    if (closestIndex == -1)
+                    {
+                        output.Add((startGps, endGps, line));
+                        continue;
+                    }
+                    if(isCloseBefore)
+                    {
+                        output.Insert(closestIndex, cur);
+                    }
+                    else
+                    {
+                        output.Insert(closestIndex + 1, cur);
+                    }
+                }
+            }
+
+            return output.Select(temp => temp.Line).ToList();
+        }
+
         private void ParseLines(List<string[]> lines)
         {
             var curRegion = GetNextRegion(0, lines, out int startIndex);
@@ -201,7 +274,7 @@ namespace AccurateFileSystem
         public List<string> GetUniqueRegions()
         {
             var output = new List<string>();
-            if (StartBuffer.HasValue || EndBuffer.HasValue)
+            if (StartBuffer != null || EndBuffer != null)
                 output.Add("Buffer");
             var uniqueRegions = Regions.GroupBy(region => region.Name)
                 .Select(group => group.First().Name);
@@ -211,8 +284,8 @@ namespace AccurateFileSystem
 
         public override string ToString()
         {
-            var startBufferString = (StartBuffer.HasValue ? $" with {StartBuffer.Value.GpsLength:F0} feet of starting buffer" : "");
-            var endBufferString = (EndBuffer.HasValue ? $" with {EndBuffer.Value.GpsLength:F0} feet of ending buffer" : "");
+            var startBufferString = (StartBuffer != null ? $" with {StartBuffer.GpsLength:F0} feet of starting buffer" : "");
+            var endBufferString = (EndBuffer != null ? $" with {EndBuffer.GpsLength:F0} feet of ending buffer" : "");
             return $"HCA {Name}{startBufferString} {Regions.Count} regions with {HcaGpsLength:F0} feet of HCA{endBufferString}.";
         }
     }

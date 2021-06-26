@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,6 +13,138 @@ namespace AccurateFileSystem
 {
     public static class Extensions
     {
+        public static Dbf.DbfFile.Record GetRecord(this List<Dbf.DbfFile.FieldDescriptor> fieldDescriptors, byte[] data)
+        {
+            var values = new Dictionary<string, string>();
+            var deletionChar = PopChar(ref data);
+            bool isDeleted = deletionChar == '*';
+            foreach (var field in fieldDescriptors)
+            {
+                var curValue = PopAsciiString(ref data, field.Length);
+                curValue = curValue.Trim().Trim('\0');
+                values.Add(field.Name, curValue);
+            }
+            return new Dbf.DbfFile.Record(fieldDescriptors, values, isDeleted);
+        }
+
+        public static string PopAsciiString(this BitArray data, int length)
+        {
+            var byteCount = (int)Math.Ceiling((double)length / 8);
+            var bytes = new byte[byteCount];
+            var curBits = new BitArray(length, false);
+            for (int i = 0; i < length; ++i)
+            {
+                curBits[i] = data[i];
+            }
+            curBits.CopyTo(bytes, 0);
+            return bytes.GetAsciiString();
+        }
+
+        public static byte[] ToAsciiBytes(this string value)
+        {
+            return Encoding.ASCII.GetBytes(value);
+        }
+
+        public static string GetUtf8String(this byte[] data, int startIndex, int length)
+        {
+            return Encoding.UTF8.GetString(data, startIndex, length);
+        }
+
+        public static string GetAsciiString(this byte[] data, int startIndex, int length)
+        {
+            return Encoding.ASCII.GetString(data, startIndex, length);
+        }
+
+        public static string GetAsciiString(this byte[] data)
+        {
+            return Encoding.ASCII.GetString(data);
+        }
+
+        public static char PopChar(ref byte[] data)
+        {
+            var output = (char)data[0];
+            data = data.Skip(1).ToArray();
+            return output;
+        }
+
+        public static string PopAsciiString(ref byte[] data, int length)
+        {
+            var output = data.GetAsciiString(0, length);
+            data = data.Skip(length).ToArray();
+            return output;
+        }
+
+        public static bool GetBit(this byte b, int bitNumber)
+        {
+            return ((b >> bitNumber) & 1) != 0;
+        }
+
+        public static double GetDouble(this byte[] data, bool isLittle, int startIndex)
+        {
+            var curData = new byte[8];
+            for (int i = 0; i < 8; ++i)
+            {
+                curData[i] = data[i + startIndex];
+            }
+            if (BitConverter.IsLittleEndian != isLittle)
+                Array.Reverse(curData);
+            return BitConverter.ToDouble(curData, 0);
+        }
+
+        public static byte[] ToBytes(this double data, bool isLittle)
+        {
+            var output = BitConverter.GetBytes(data);
+            if (BitConverter.IsLittleEndian != isLittle)
+                Array.Reverse(output);
+            return output;
+        }
+
+        public static byte[] ToBytes(this int data, bool isLittle)
+        {
+            var output = BitConverter.GetBytes(data);
+            if (BitConverter.IsLittleEndian != isLittle)
+                Array.Reverse(output);
+            return output;
+        }
+
+        public static double PopDouble(ref byte[] data, bool isLittle)
+        {
+            var output = data.GetDouble(isLittle, 0);
+            data = data.Skip(8).ToArray();
+            return output;
+        }
+
+        public static int GetInt32(this byte[] data, bool isLittle, int startIndex)
+        {
+            var curData = new byte[4];
+            for (int i = 0; i < 4; ++i)
+            {
+                curData[i] = data[i + startIndex];
+            }
+            if (BitConverter.IsLittleEndian != isLittle)
+                Array.Reverse(curData);
+            return BitConverter.ToInt32(curData, 0);
+        }
+
+        public static int GetInt16(this byte[] data, bool isLittle, int startIndex)
+        {
+            var curData = new byte[2];
+            for (int i = 0; i < 2; ++i)
+            {
+                curData[i] = data[i + startIndex];
+            }
+            if (BitConverter.IsLittleEndian != isLittle)
+                Array.Reverse(curData);
+            return BitConverter.ToInt16(curData, 0);
+        }
+
+        public static int PopInt32(ref byte[] data, bool isLittle)
+        {
+            var output = data.GetInt32(isLittle, 0);
+            data = data.Skip(4).ToArray();
+            return output;
+        }
+
         public static double ParseDegree(this string text)
         {
             var degreeIndex = text.IndexOf('�');
@@ -63,7 +196,7 @@ namespace AccurateFileSystem
             if (points.Count < 2)
                 return 0;
             var total = 0.0;
-            for(int i = 1; i < points.Count; ++i)
+            for (int i = 1; i < points.Count; ++i)
             {
                 var last = points[i - 1];
                 var cur = points[i];
@@ -196,7 +329,46 @@ namespace AccurateFileSystem
 
             var dx = point.Latitude - xx;
             var dy = point.Longitude - yy;
-            return (Math.Sqrt(dx * dx + dy * dy), new BasicGeoposition() { Latitude = xx, Longitude = yy });
+            var pointOnLine = new BasicGeoposition() { Latitude = xx, Longitude = yy };
+            return (point.Distance(pointOnLine), pointOnLine);
+        }
+
+        public static (double Distance, BasicGeoposition PointOnSegment) DistanceToLine(this BasicGeoposition point, List<BasicGeoposition> points)
+        {
+            var closeDist = double.MaxValue;
+            var closePoint = point;
+
+            for(int i = 1; i < points.Count; ++i)
+            {
+                var start = points[i - 1];
+                var end = points[i];
+                var (curDist, curPoint) = point.DistanceToSegment(start, end);
+                if(curDist < closeDist)
+                {
+                    closeDist = curDist;
+                    closePoint = curPoint;
+                }
+            }
+
+            return (closeDist, closePoint);
+        }
+
+        public static (double Distance, BasicGeoposition PointOnSegment) DistanceToLines(this BasicGeoposition point, List<List<BasicGeoposition>> lines)
+        {
+            var closeDist = double.MaxValue;
+            var closePoint = point;
+
+            foreach(var line in lines)
+            {
+                var (curDist, curPoint) = point.DistanceToLine(line);
+                if (curDist < closeDist)
+                {
+                    closeDist = curDist;
+                    closePoint = curPoint;
+                }
+            }
+
+            return (closeDist, closePoint);
         }
     }
 }

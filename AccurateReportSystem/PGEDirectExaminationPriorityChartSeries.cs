@@ -684,7 +684,7 @@ namespace AccurateReportSystem
             var cisSeverities = new Dictionary<int, PGESeverity>();
             if (CisSeries != null)
             {
-                if (CisSeries.Hca.HasValue)
+                if (CisSeries.Hca != null)
                 {
                     foreach (var dataPoint in CisSeries.DataUpdated)
                     {

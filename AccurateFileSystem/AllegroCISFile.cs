@@ -165,6 +165,7 @@ namespace AccurateFileSystem
             }
             int lastUniqueGps = 0;
             int duplicateGpsCount = 0;
+            int emptyGpsCount = 0;
             var prevGps = Points[0].GPS;
             for (int i = 1; i < Points.Count; ++i)
             {
@@ -198,17 +199,22 @@ namespace AccurateFileSystem
                 }
 
                 var curGps = cur.GPS;
-                if (curGps.Equals(prevGps))
+                if (curGps.Equals(new BasicGeoposition()))
+                {
+                    ++emptyGpsCount;
+                }
+                else if (curGps.Equals(prevGps))
                 {
                     ++duplicateGpsCount;
                 }
                 else
                 {
-                    if (duplicateGpsCount > 3)
+                    if (duplicateGpsCount > 3 || emptyGpsCount != 0)
                     {
                         ExtrapolateGps(lastUniqueGps, i);
                     }
                     duplicateGpsCount = 0;
+                    emptyGpsCount = 0;
                     lastUniqueGps = i;
                 }
 

@@ -19,6 +19,7 @@ namespace AccurateFileSystem
         private int BeginGpsColumn = -1;
         private int EndGpsColumn = -1;
         private int RegionColumn = -1;
+        private int FirstTimeColumn = -1;
 
         public IitRegionFile(string name, List<string> lines) : base(name, lines)
         {
@@ -27,7 +28,7 @@ namespace AccurateFileSystem
             ParseData();
         }
 
-        public Hca? GetHca(string name)
+        public Hca GetHca(string name)
         {
             foreach (var hca in Hcas)
             {
@@ -50,6 +51,8 @@ namespace AccurateFileSystem
                     HcaColumn = i;
                 if (header.Contains("route", StringComparison.OrdinalIgnoreCase))
                     RouteColumn = i;
+                if (header.Contains("1st time", StringComparison.OrdinalIgnoreCase))
+                    FirstTimeColumn = i;
                 if (header.Contains("begin", StringComparison.OrdinalIgnoreCase))
                 {
                     if (header.Contains("mp", StringComparison.OrdinalIgnoreCase))
@@ -91,6 +94,7 @@ namespace AccurateFileSystem
             var startName = "";
             var startLineName = "";
             List<string[]> curLines = null;
+            bool? isFirstTime = null;
             for (int i = 0; i < Data.GetLength(0); ++i)
             {
                 var curName = Data[i, HcaColumn].Trim();
@@ -106,13 +110,17 @@ namespace AccurateFileSystem
                 region = region.Replace('–', '-');
                 if (region.Contains('-'))
                     region = region.Substring(0, region.IndexOf('-')).Trim();
+                bool? curIsFirstTime = null;
+                if (!Data[i, FirstTimeColumn].Contains("n/a", StringComparison.OrdinalIgnoreCase))
+                    curIsFirstTime = Data[i, FirstTimeColumn].Contains("y", StringComparison.OrdinalIgnoreCase);
 
-                var line = new string[] { curName, route, beginMp, endMp, beginGps.Latitude, beginGps.Longitude, endGps.Latitude, endGps.Longitude, region};
+                var line = new string[] { curName, route, beginMp, endMp, beginGps.Latitude, beginGps.Longitude, endGps.Latitude, endGps.Longitude, region };
                 if (startName == "")
                 {
                     startName = curName;
                     startLineName = Data[i, RouteColumn].Trim();
                     curLines = new List<string[]>() { line };
+                    isFirstTime = curIsFirstTime;
                     continue;
                 }
                 if (curName == startName)
@@ -120,12 +128,13 @@ namespace AccurateFileSystem
                     curLines.Add(line);
                     continue;
                 }
-                Hcas.Add(new Hca(startName, startLineName, curLines));
+                Hcas.Add(new Hca(startName, startLineName, curLines, isFirstTime));
                 startName = curName;
                 startLineName = line[1].Trim();
                 curLines = new List<string[]>() { line };
+                isFirstTime = curIsFirstTime;
             }
-            Hcas.Add(new Hca(startName, startLineName, curLines));
+            Hcas.Add(new Hca(startName, startLineName, curLines, isFirstTime));
             Debug.WriteLine(string.Join("\n", Hcas));
         }
 

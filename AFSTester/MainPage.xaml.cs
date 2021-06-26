@@ -42,6 +42,9 @@ using ClosedXML.Excel;
 using Windows.UI.Popups;
 using Microsoft.Graphics.Canvas;
 using DocumentFormat.OpenXml.Drawing.Wordprocessing;
+using AccurateFileSystem.Xml;
+using AccurateFileSystem.EsriShapefile;
+using AccurateFileSystem.Kmz;
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
 namespace AFSTester
@@ -157,7 +160,7 @@ namespace AFSTester
             var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
 
             NewFiles = new List<File>();
-
+            GeneralXmlFile kml = null;
             foreach (var file in files)
             {
                 var factory = new FileFactory(file);
@@ -176,8 +179,12 @@ namespace AFSTester
                         Logo = await CanvasBitmap.LoadAsync(device, stream);
                     }
                 }
+                //if (file.FileType.ToLower() == ".jpg")
+                //    kml = await GeneralXmlFile.GetGeneralXml(file);
             }
-            NewFiles.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
+            if (kml != null)
+
+                NewFiles.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
             for (int i = 0; i < NewFiles.Count; ++i)
             {
                 var curFile = NewFiles[i];
@@ -1144,14 +1151,14 @@ namespace AFSTester
             }
         }
 
-        private void AddHcaComments(CombinedAllegroCISFile file, Hca hca)
+        private (double HcaStartFootage, double HcaEndFootage) AddHcaComments(CombinedAllegroCISFile file, Hca hca)
         {
             var startGap = hca.GetStartFootageGap();
             file.ShiftPoints(startGap);
             BasicGeoposition hcaStartGps = hca.GetFirstNonSkipGps();
             BasicGeoposition hcaEndGps = hca.GetLastNonSkipGps();
-            bool hasStartBuffer = hca.StartBuffer.HasValue;
-            bool hasEndBuffer = hca.EndBuffer.HasValue;
+            bool hasStartBuffer = hca.StartBuffer != null;
+            bool hasEndBuffer = hca.EndBuffer != null;
             var (hcaStartPoint, hcaStartDistance) = file.GetClosestPoint(hcaStartGps);
             if (hasStartBuffer)
             {
@@ -1161,8 +1168,10 @@ namespace AFSTester
             {
                 hcaStartPoint = file.Points[file.HasStartSkip ? 1 : 0];
             }
-            hcaStartPoint.Point.GPS = hcaStartGps;
+
+
             hcaStartPoint.Point.OriginalComment += (hasStartBuffer ? " END OF BUFFER" : "") + " START OF HCA";
+            hcaStartPoint.Point.GPS = hcaStartGps;
 
             var (hcaEndPoint, hcaEndDistance) = file.GetClosestPoint(hcaEndGps);
             if (hasEndBuffer)
@@ -1173,8 +1182,10 @@ namespace AFSTester
             {
                 hcaEndPoint = file.Points[file.Points.Count - (file.HasEndSkip ? 2 : 1)];
             }
+
             hcaEndPoint.Point.GPS = hcaEndGps;
             hcaEndPoint.Point.OriginalComment += " END OF HCA" + (hasEndBuffer ? " START OF BUFFER" : "");
+            return (hcaStartPoint.Footage, hcaEndPoint.Footage);
         }
 
         private void AddMaxDepthComment(CombinedAllegroCISFile file, double maxDepth)
@@ -1403,7 +1414,10 @@ namespace AFSTester
                 var startGps = file.GetClosesetGps(startFoot);
                 output.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
                 var endGps = file.GetClosesetGps(endFoot);
-                output.Append($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t");
+                var firstTime = hca.FirstTimeString;
+                if (region.IsBuffer)
+                    firstTime = "N/A";
+                output.Append($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{firstTime}\t");
                 if (reason.Contains("SKIP."))
                 {
                     output.AppendLine($"NT\tNT\tNT\t{region.LongSkipReason}");
@@ -1417,28 +1431,52 @@ namespace AFSTester
                 }
             }
             ReportQ += output.ToString();
+            var shapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
             var cisShapeFileStringBuilder = new StringBuilder();
             foreach (var line in ecdaClassSeries.CISShapeFileOutput)
             {
                 var lineString = string.Join('\t', line);
                 cisShapeFileStringBuilder.AppendLine(lineString);
             }
+            var cisShapeFileTest = new ShapefileData($"{folderName} CIS Shapefile", ecdaClassSeries.CISShapeFileOutput);
+            await cisShapeFileTest.WriteToFolder(shapefileFolder);
+
+            var cisKmlFileTest = new KmlFile($"{folderName} CIS Shapefile", file.GetCisKmlData());
+            await cisKmlFileTest.WriteToFile(outputFolder);
+
             var depthShapeFileStringBuilder = new StringBuilder();
+            var depthShapeData = new List<string[]>();
             foreach (var line in ecdaClassSeries.CISShapeFileOutput)
             {
                 if (string.IsNullOrWhiteSpace(line[7]))
                     continue;
                 if (line[0] != "LABEL")
                     line[0] = $"Depth: {line[7]}";
+                depthShapeData.Add(line);
                 var lineString = string.Join('\t', line);
                 depthShapeFileStringBuilder.AppendLine(lineString);
             }
+            if (depthShapeData.Count > 1)
+            {
+                var depthShapeFileTest = new ShapefileData($"{folderName} Depth Shapefile", depthShapeData);
+                await depthShapeFileTest.WriteToFolder(shapefileFolder);
+
+                var depthKmlFileTest = new KmlFile($"{folderName} Depth Shapefile", file.GetDepthKmlData());
+                await depthKmlFileTest.WriteToFile(outputFolder);
+            }
+
             var dcvgShapeFileStringBuilder = new StringBuilder();
             foreach (var line in ecdaClassSeries.IndicationShapeFileOutput)
             {
                 var lineString = string.Join('\t', line);
                 dcvgShapeFileStringBuilder.AppendLine(lineString);
             }
+            if (dcvgData.Count > 0)
+            {
+                var dcvgShapeFileTest = new ShapefileData($"{folderName} {(isDcvg ? "DCVG" : "ACVG")} Shapefile", ecdaClassSeries.IndicationShapeFileOutput);
+                await dcvgShapeFileTest.WriteToFolder(shapefileFolder);
+            }
+
             var skipReportString = skipReport.ToString();
             var testStation = file.GetTestStationData();
             var depthException = new StringBuilder();
@@ -1543,58 +1581,58 @@ namespace AFSTester
                 wbPart.Workbook.Save();
             }
 
-            var exceptionsFullData = PGECISIndicationChartSeries.DataPoint.Headers;
-            foreach (var exception in cisIndication.DataUpdated)
-            {
-                if (!exception.IsExtrapolated)
-                    exceptionsFullData += "\n" + exception.ToString();
-            }
-            outputFile = await outputFolder.CreateFileAsync($"{folderName} CIS Exceptions Data.xlsx", CreationCollisionOption.ReplaceExisting);
-            using (var outStream = await outputFile.OpenStreamForWriteAsync())
-            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
-            {
-                var wbPart = spreadDoc.AddWorkbookPart();
-                wbPart.Workbook = new Workbook();
-                wbPart.Workbook.AppendChild(new Sheets());
-                var wbData = exceptionsFullData.TrimEnd('\n').TrimEnd('\r');
-                AddData(wbPart, wbData, 1, "Exception Data", new List<string>());
-                wbPart.Workbook.Save();
-            }
+            //var exceptionsFullData = PGECISIndicationChartSeries.DataPoint.Headers;
+            //foreach (var exception in cisIndication.DataUpdated)
+            //{
+            //    if (!exception.IsExtrapolated)
+            //        exceptionsFullData += "\n" + exception.ToString();
+            //}
+            //outputFile = await outputFolder.CreateFileAsync($"{folderName} CIS Exceptions Data.xlsx", CreationCollisionOption.ReplaceExisting);
+            //using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            //using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            //{
+            //    var wbPart = spreadDoc.AddWorkbookPart();
+            //    wbPart.Workbook = new Workbook();
+            //    wbPart.Workbook.AppendChild(new Sheets());
+            //    var wbData = exceptionsFullData.TrimEnd('\n').TrimEnd('\r');
+            //    AddData(wbPart, wbData, 1, "Exception Data", new List<string>());
+            //    wbPart.Workbook.Save();
+            //}
 
-            outputFile = await outputFolder.CreateFileAsync($"{folderName} CIS Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
-            using (var outStream = await outputFile.OpenStreamForWriteAsync())
-            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
-            {
-                var wbPart = spreadDoc.AddWorkbookPart();
-                wbPart.Workbook = new Workbook();
-                wbPart.Workbook.AppendChild(new Sheets());
-                var wbData = cisShapeFileStringBuilder.ToString().TrimEnd('\n').TrimEnd('\r');
-                AddData(wbPart, wbData, 1, "Shapefile", new List<string>());
-                wbPart.Workbook.Save();
-            }
-            outputFile = await outputFolder.CreateFileAsync($"{folderName} Depth Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
-            using (var outStream = await outputFile.OpenStreamForWriteAsync())
-            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
-            {
-                var wbPart = spreadDoc.AddWorkbookPart();
-                wbPart.Workbook = new Workbook();
-                wbPart.Workbook.AppendChild(new Sheets());
-                AddData(wbPart, depthShapeFileStringBuilder.ToString().TrimEnd('\n').TrimEnd('\r'), 1, "Shapefile", new List<string>());
-                wbPart.Workbook.Save();
-            }
-            if (dcvgData.Count > 0)
-            {
-                outputFile = await outputFolder.CreateFileAsync($"{folderName} {(isDcvg ? "DCVG" : "ACVG")} Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
-                using (var outStream = await outputFile.OpenStreamForWriteAsync())
-                using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
-                {
-                    var wbPart = spreadDoc.AddWorkbookPart();
-                    wbPart.Workbook = new Workbook();
-                    wbPart.Workbook.AppendChild(new Sheets());
-                    AddData(wbPart, dcvgShapeFileStringBuilder.ToString().TrimEnd('\n').TrimEnd('\r'), 1, "Shapefile", new List<string>());
-                    wbPart.Workbook.Save();
-                }
-            }
+            //outputFile = await outputFolder.CreateFileAsync($"{folderName} CIS Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
+            //using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            //using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            //{
+            //    var wbPart = spreadDoc.AddWorkbookPart();
+            //    wbPart.Workbook = new Workbook();
+            //    wbPart.Workbook.AppendChild(new Sheets());
+            //    var wbData = cisShapeFileStringBuilder.ToString().TrimEnd('\n').TrimEnd('\r');
+            //    AddData(wbPart, wbData, 1, "Shapefile", new List<string>());
+            //    wbPart.Workbook.Save();
+            //}
+            //outputFile = await outputFolder.CreateFileAsync($"{folderName} Depth Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
+            //using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            //using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            //{
+            //    var wbPart = spreadDoc.AddWorkbookPart();
+            //    wbPart.Workbook = new Workbook();
+            //    wbPart.Workbook.AppendChild(new Sheets());
+            //    AddData(wbPart, depthShapeFileStringBuilder.ToString().TrimEnd('\n').TrimEnd('\r'), 1, "Shapefile", new List<string>());
+            //    wbPart.Workbook.Save();
+            //}
+            //if (dcvgData.Count > 0)
+            //{
+            //    outputFile = await outputFolder.CreateFileAsync($"{folderName} {(isDcvg ? "DCVG" : "ACVG")} Shapefile.xlsx", CreationCollisionOption.ReplaceExisting);
+            //    using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            //    using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            //    {
+            //        var wbPart = spreadDoc.AddWorkbookPart();
+            //        wbPart.Workbook = new Workbook();
+            //        wbPart.Workbook.AppendChild(new Sheets());
+            //        AddData(wbPart, dcvgShapeFileStringBuilder.ToString().TrimEnd('\n').TrimEnd('\r'), 1, "Shapefile", new List<string>());
+            //        wbPart.Workbook.Save();
+            //    }
+            //}
         }
 
         private List<int> GetActualReadFootage(List<(double Start, double End, PGESeverity CisSeverity, PGESeverity DcvgSeverity, HcaRegion Region, int Overall, string Comments)> areas)
@@ -2183,332 +2221,39 @@ namespace AFSTester
 
         private async void MakeNustarGraphs(object sender, RoutedEventArgs e)
         {
-            var mainOnOffData = new List<(double, double)>
+            var folderPicker = new FolderPicker();
+            folderPicker.FileTypeFilter.Add(".");
+            var folder = await folderPicker.PickSingleFolderAsync();
+            if (folder == null)
+                return;
+            var files = await folder.GetFilesAsync();
+            StorageFile mainFile1 = null;
+            StorageFile indexFile1 = null;
+            StorageFile mainFile2 = null;
+            StorageFile indexFile2 = null;
+            AccurateFileSystem.Dbf.DbfFile dbf1 = null, dbf2 = null;
+            AccurateFileSystem.EsriShapefile.MainFile shp1 = null, shp2 = null;
+            GeneralXmlFile xml = null;
+            foreach (var file in files)
             {
-                (0,0.9),
-(10,-0.7),
-(20,-1.7),
-(30,-0.7),
-(40,5.7),
-(50,381.3),
-(60,11),
-(70,-7.7),
-(82,-0.9),
-(92,-2.3),
-(102,0.2),
-(112,3),
-(122,3.7),
-(132,3.7),
-(142,-2.3),
-(152,-0.7),
-(162,2.1),
-(172,-0.4),
-(182,-0.9),
-(192,10.6),
-(202,0),
-(212,-7.8),
-(222,-3.7),
-(232,0.7),
-(242,-2.3),
-(252,1.9),
-(262,-2.8),
-(272,-1.6),
-(282,0.7),
-(292,-0.2),
-(302,0),
-(312,0.9),
-(322,-0.2),
-(332,-1.6),
-(342,-0.7),
-(352,-0.4),
-(362,-1.9),
-(372,-0.7),
-(382,0.2),
-(392,0),
-(402,0.9),
-(412,-1.7),
-(422,3.7),
-(432,-0.4),
-(442,0),
-(452,0.2),
-(462,0.9),
-(472,0.7),
-(482,3.7),
-(492,0.9),
-(502,3.7),
-(512,-49.4),
-(522,1.6),
-(532,6.8),
-(542,-0.7),
-(552,-4),
-(562,0),
-(572,3),
-(582,17.7),
-(592,0.9),
-(602,0.9),
-(612,-2.1),
-(622,5.2),
-(632,6.1),
-(642,0.4),
-(652,3.8),
-(662,0.9),
-(672,1.6),
-(682,4.9),
-(692,5.9),
-(702,0),
-(712,5.9),
-(722,-9.7),
-(732,2.6),
-(742,0),
-(752,-42.6),
-(762,-2.3),
-(772,3.5),
-(782,-5.9),
-(792,8.7),
-(802,0.7),
-(812,3.1),
-(822,6.8),
-(832,0.2),
-(842,1),
-(852,3.1),
-(862,0),
-(872,23.3),
-(882,0),
-(892,-12.2),
-(902,14.3),
-(912,-2.8),
-(922,-0.4),
-(932,-4.9),
-(942,0.4),
-(952,1.9),
-(962,3),
-(972,0.7),
-(982,30.6),
-(992,-85.6),
-(1002,7),
-(1012,0),
-(1022,-2.1),
-(1032,41.9),
-(1042,3.1),
-(1052,-1.9),
-(1062,5),
-(1072,-0.4),
-(1082,7.8),
-(1092,-1.6),
-(1112,3.5),
-(1122,3.7),
-(1132,12.5),
-(1142,32.5),
-(1152,-29.6),
-(1162,-12.7),
-(1172,-1.7),
-(1182,0.4),
-(1192,67),
-(1202,-2.3),
-(1212,-0.4),
-(1222,-13.2),
-(1232,-13.2),
-(1242,-1.6),
-(1252,-6.4),
-(1262,-6.1),
-(1272,4.5),
-(1282,0),
-(1292,-5),
-(1302,0.4),
-(1312,11),
-(1322,10.3),
-(1332,-1.2),
-            };
-            var mainComments = new List<(double, string)>
-            {
-                (10,"Left: -2.6mV, Right: -5.6mV"),
-(70,"Power line crossing, Asphalt Road"),
-(142,"Left: 0.7mV, Right: -3.7mV"),
-(202,"Side Drain Reading , Culvert drainage"),
-(212,"Left: -579mV, Right: -5.9mV"),
-(242,"Left: 0.7mV, Right: 4.5mV"),
-(332,"Left: -0.4mV, Right: -0.4mV"),
-(412,"Left: 0.4mV, Right: 1.6mV"),
-(512,"Left: 1.7mV, Right: 6.1mV"),
-(552,"Left: 9.1mV, Right: -0.4mV"),
-(572,"Left: 6.6mV, Right: 5mV"),
-(612,"Left: 1.9mV, Right: 0.7mV"),
-(732,"Left: 3.5mV, Right: -0.4mV"),
-(762,"Left: 24.4mV, Right: 30.1mV"),
-(782,"Left: 10.6mV, Right: -2.8mV"),
-(822,"Fence"),
-(892,"Left: 5.7mV, Right: 1mV"),
-(902,"Dirt Road, Dyke tank rd"),
-(912,"Left: 8.7mV, Right: 4.9mV"),
-(980, "Leadk Grade 3: Reading 150 ppm at rock pile"),
-(982,"Side Drain Reading, Emergency valve"),
-(990, "Leak Grade 3: reading 4500 ppm at tank wall"),
-(992,"Side Drain Reading , Tank farm Left: -94.6mV, Right: -22.4mV"),
-(995, "Leak Grade 3: reading 5200 ppm south of tank wall"),
-(1000, "Leak Grade 1: reading 20% gas at edge of tank"),
-(1005, "Leak Grade 3: reading 450 ppm at NE tank 30-02"),
-(1010, "Leak Grade 3: reading 8000 ppm west of tank 30-04"),
-(1020, "Leak Grade 3: reading 6500 ppm east of tank 30-04"),
-(1022,"Left: -0.4mV, Right: -6.1mV"),
-(1052,"Left: 1mV, Right: -4mV"),
-(1152,"Left: 7.7mV, Right: -10.6mV"),
-(1202,"Left: -0.4mV, Right: -17.7mV"),
-(1232,"Left: -12.9mV, Right: -7.5mV"),
-(1292,"Left: -2.3mV, Right: -1.9mV"),
-(1320, "Leak Grade 3: reading 3000 ppm west of end of line"),
-(1330, "Leak Grade 1: reading 100% gas at end of line riser at warehouse"),
-(1332,"Cultivated Field, End of main line Left: 5.7mV, Right: -6.4mV"),
-            };
-            var mainHotAnoms = new List<(double, double, string)>
-            {
-                (10,-0.7,""),
-(142,-2.3,""),
-(212,-7.8,""),
-(242,-2.3,""),
-(332,-1.6,""),
-(412,-1.7,""),
-(512,-49.4,""),
-(552,-4,""),
-(572,3,""),
-(612,-2.1,""),
-(732,2.6,""),
-(762,-2.3,""),
-(782,-5.9,""),
-(892,-12.2,""),
-(912,-2.8,""),
-(992,-85.6,""),
-(1022,-2.1,""),
-(1052,-1.9,""),
-(1152,-29.6,""),
-(1202,-2.3,""),
-(1232,-13.2,""),
-(1292,-5,""),
-(1332,-1.2,""),
-            };
-            var mainACVG = new List<(double, double, string)>
-            {
-                (220,28,"28"),
-(317,5,"5"),
-(347,9,"9"),
-(367,17,"17"),
-(427,18,"18"),
-(510,20,"20"),
-(552,18,"18"),
-(592,16,"16"),
-(631,20,"20"),
-(672,17,"17"),
-(711,22,"22"),
-(782,15,"15"),
-(830,20,"20"),
-(872,18,"18"),
-(1022,24,"24"),
+                if (file.FileType.ToLower() == ".kml")
+                    xml = await GeneralXmlFile.GetGeneralXml(file);
+                if (file.FileType.ToLower() == ".shp" && file.DisplayName.Contains('_'))
+                    mainFile1 = file;
+                else if (file.FileType.ToLower() == ".shp")
+                    mainFile2 = file;
+                if (file.FileType.ToLower() == ".shx" && file.DisplayName.Contains('_'))
+                    indexFile1 = file;
+                else if (file.FileType.ToLower() == ".shx")
+                    indexFile2 = file;
+                if (file.FileType.ToLower() == ".dbf" && file.DisplayName.Contains('_'))
+                    dbf1 = await AccurateFileSystem.Dbf.DbfFile.GetDbfFile(file);
+                else if (file.FileType.ToLower() == ".dbf")
+                    dbf2 = await AccurateFileSystem.Dbf.DbfFile.GetDbfFile(file);
+            }
+            shp1 = await AccurateFileSystem.EsriShapefile.MainFile.GetMainFile(mainFile1, indexFile1);
+            shp2 = await AccurateFileSystem.EsriShapefile.MainFile.GetMainFile(mainFile2, indexFile2);
 
-            };
-
-            await CreateNustarGraph("Main Line", "Main Line", mainOnOffData, mainComments, mainHotAnoms, mainACVG);
-
-            var lat2OnOffData = new List<(double, double)>
-            {
-                (1332,-14.8),
-(1342,54.8),
-(1352,-41.4),
-(1362,-23),
-(1372,-27.7),
-(1382,17.6),
-(1392,8.7),
-(1402,12.9),
-(1412,24.5),
-(1422,29.8),
-(1432,-27),
-(1442,-7.7),
-(1452,-7.8),
-(1462,-0.4),
-
-            };
-            var lat2Comments = new List<(double, string)>
-            {
-                (1332,"Left: -0.0028, Right: 0.0016"),
-(1352,"Left: -0.0308, Right: -0.0162"),
-(1412,"Bend in Pipe"),
-(1432,"Left: -0.0148, Right: 0.0047"),
-(1452,"Bend in Pipe"),
-(1460,"Leak Grade 3: 80 ppm at lat 2 boiler room riser - above ground flange"),
-(1462,"Side Drain Reading , End at boiler room riser"),
-            };
-            var lat2HotAnoms = new List<(double, double, string)>
-            {
-                (1332,-14.8,""),
-(1352,-41.4,""),
-(1432,-27,""),
-            };
-            var lat2ACVG = new List<(double, double, string)>
-            {
-            };
-
-            await CreateNustarGraph("Boiler Room", "Boiler Room", lat2OnOffData, lat2Comments, lat2HotAnoms, lat2ACVG);
-
-            var lat1OnOffData = new List<(double, double)>
-            {
-                (1462,-5.2),
-(1472,-4.9),
-(1482,0),
-(1492,-0.9),
-(1502,1.6),
-(1512,-0.7),
-(1522,-6.1),
-            };
-            var lat1Comments = new List<(double, string)>
-            {
-                (1492,"Left: 0.0164, Right: -0.0026"),
-(1522,"Side Drain Reading , End at riser Left: 0.0183, Right: 0.0238"),
-            };
-            var lat1HotAnoms = new List<(double, double, string)>
-            {
-                (1492,-0.9,""),
-(1522,-6.1,""),
-            };
-            var lat1ACVG = new List<(double, double, string)>
-            {
-            };
-
-            await CreateNustarGraph("Lateral 1", "Lateral 1", lat1OnOffData, lat1Comments, lat1HotAnoms, lat1ACVG);
-
-            var toBuildingOnOffData = new List<(double, double)>
-            {
-                (1522,3.7),
-(1532,-1.7),
-(1542,-17.7),
-(1552,-7.8),
-(1562,-7),
-(1572,-7.1),
-(1582,2.3),
-(1592,0.9),
-(1602,-0.7),
-(1612,-4.2),
-(1622,-0.7),
-(1632,5),
-(1642,4.5),
-(1652,-6.6),
-            };
-            var toBuildingComments = new List<(double, string)>
-            {
-                (1542,"Left: -0.0047, Right: -0.0019"),
-(1612,"Left: -0.0038, Right: -0.0012"),
-(1642,"House, pipe runs under building"),
-(1650,"Leak Grade 3: reading 1300 ppm at 3/4\" union"),
-(1652,"Side Drain Reading , End of Svy at 3/4 riser RO room Left: 0.0007, Right: -0.008"),
-            };
-            var toBuildingHotAnoms = new List<(double, double, string)>
-            {
-                (1542,-17.7,""),
-(1612,-4.2,""),
-(1652,-6.6,""),
-            };
-            var toBuildingACVG = new List<(double, double, string)>
-            {
-            };
-
-            await CreateNustarGraph("RO Room", "RO Room", toBuildingOnOffData, toBuildingComments, toBuildingHotAnoms, toBuildingACVG);
         }
 
         private async Task CreateNustarGraph(string fileName, string title, List<(double, double)> onData, List<(double, string)> comments, List<(double, double, string)> hotspotAnoms, List<(double, double, string)> acvgAnoms)
@@ -2708,26 +2453,59 @@ namespace AFSTester
             }
             var masterFiles = await folder.GetFilesAsync();
             StorageFile regionFile = null;
-            StorageFile kml = null;
+            StorageFile kmlFile = null;
             foreach (var masterFile in masterFiles)
             {
                 if (masterFile.DisplayName.Contains("regions", StringComparison.OrdinalIgnoreCase))
                     regionFile = masterFile;
                 if (masterFile.FileType.ToLower() == ".kml")
-                    kml = masterFile;
+                    kmlFile = masterFile;
             }
-
-            var regions = await IitRegionFile.GetIitRegion(regionFile);
+            Dictionary<string, List<List<BasicGeoposition>>> lineData = null;
+            IitRegionFile regions = null;
+            if (kmlFile != null)
+                lineData = GetKmlLineData(await GeneralXmlFile.GetGeneralXml(kmlFile));
+            if (regionFile != null)
+                regions = await IitRegionFile.GetIitRegion(regionFile);
             var globalAlignData = new List<(double, double, double, double)>();
             foreach (var masterFolder in masterFolders)
             {
-                await ParseIitMasterFolder(masterFolder, regions, outputFolder);
+                await ParseIitMasterFolder(masterFolder, regions, outputFolder, lineData);
             }
             var dialog = new MessageDialog($"Finished making IIT Stuff");
             await dialog.ShowAsync();
         }
 
-        private async Task ParseIitFolder(StorageFolder folder, IitRegionFile regions, bool isDcvg, StorageFolder outputFolder)
+        private Dictionary<string, List<List<BasicGeoposition>>> GetKmlLineData(GeneralXmlFile file)
+        {
+            var placemarkData = new Dictionary<string, List<List<BasicGeoposition>>>();
+            if (file == null) return placemarkData;
+            var placemarks = file.GetObjects("Placemark");
+
+            foreach (var placemark in placemarks)
+            {
+                var name = placemark.GetObjects("name")[0].Value;
+                var coordsObjs = placemark.GetObjects("coordinates");
+                foreach (var coordsObj in coordsObjs)
+                {
+                    var gps = new List<BasicGeoposition>();
+                    var coords = coordsObj.Value.Trim().Split(' ');
+                    foreach (var coord in coords)
+                    {
+                        var split = coord.Split(',');
+                        var lon = double.Parse(split[0]);
+                        var lat = double.Parse(split[1]);
+                        gps.Add(new BasicGeoposition() { Latitude = lat, Longitude = lon });
+                    }
+                    if (!placemarkData.ContainsKey(name))
+                        placemarkData.Add(name, new List<List<BasicGeoposition>>());
+                    placemarkData[name].Add(gps);
+                }
+            }
+            return placemarkData;
+        }
+
+        private async Task ParseIitFolder(StorageFolder folder, IitRegionFile regions, bool isDcvg, StorageFolder outputFolder, Dictionary<string, List<List<BasicGeoposition>>> lineData)
         {
             var displayName = folder.DisplayName;
             var plusIndex = displayName.IndexOf('+');
@@ -2765,19 +2543,49 @@ namespace AFSTester
                     acvgReads = ParseAcvgReads(await file.GetLines());
                 }
             }
+            var hca = regions.GetHca(displayName);
             if (cisFiles.Count == 0)
             {
-                //TODO: Add empty data to report Q.
+                var (startMp, endMp) = hca.GetMpForHca();
+                var region = hca.Regions[0];
+                var startGps = region.StartGps;
+                var endGps = region.EndGps;
+                ReportQ += $"{hca.Name}\t{hca.LineName}\t{startMp}\t{endMp}\tNT\tNT\t{region.Name}\t";
+                ReportQ += $"{hca.HcaGpsLength:F0}\tNT\t{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t";
+                ReportQ += $"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{hca.FirstTimeString}\tNT\tNT\tNT\t\n";
                 return;
             }
             cisFiles = GetUniqueFiles(cisFiles);
             dcvgFiles = GetUniqueFiles(dcvgFiles);
-            var combinedCisFile = CombinedAllegroCISFile.CombineFiles("Combined", cisFiles);
+            var combinedCisFile = CombinedAllegroCISFile.CombineFiles("Combined", cisFiles, 1500);
+            var curLineData = lineData.GetValueOrDefault(hca.LineName);
 
-            var hca = regions.GetHca(displayName).Value;
             combinedCisFile.ReverseBasedOnHca(hca);
-            AddHcaComments(combinedCisFile, hca);
+            var (startHcaFootage, endHcaFootage) = AddHcaComments(combinedCisFile, hca);
             combinedCisFile.StraightenGps();
+            combinedCisFile.RemoveComments("+");
+            combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
+
+            var hcaStartPoint = combinedCisFile.GetClosesetPoint(startHcaFootage);
+            hca.Regions[0].StartGps = hcaStartPoint.Point.GPS;
+            hca.Regions[0].GpsPoints[0] = hcaStartPoint.Point.GPS;
+            if (hca.StartBuffer != null)
+            {
+                var startBufferGpsCount = hca.StartBuffer.GpsPoints.Count;
+                hca.StartBuffer.EndGps = hcaStartPoint.Point.GPS;
+                hca.StartBuffer.GpsPoints[startBufferGpsCount - 1] = hcaStartPoint.Point.GPS;
+            }
+
+            var hcaEndPoint = combinedCisFile.GetClosesetPoint(endHcaFootage);
+            hca.Regions.Last().EndGps = hcaEndPoint.Point.GPS;
+            var endHcaRegionGpsCount = hca.Regions.Last().GpsPoints.Count;
+            hca.Regions.Last().GpsPoints[endHcaRegionGpsCount - 1] = hcaEndPoint.Point.GPS;
+            if (hca.EndBuffer != null)
+            {
+                hca.EndBuffer.StartGps = hcaEndPoint.Point.GPS;
+                hca.EndBuffer.GpsPoints[0] = hcaEndPoint.Point.GPS;
+            }
+
             combinedCisFile.SetFootageFromGps();
             combinedCisFile.AddPcmDepthData(pcmFiles);
 
@@ -2909,7 +2717,7 @@ namespace AFSTester
             return output;
         }
 
-        private async Task ParseIitMasterFolder(StorageFolder masterFolder, IitRegionFile regions, StorageFolder outputFolder)
+        private async Task ParseIitMasterFolder(StorageFolder masterFolder, IitRegionFile regions, StorageFolder outputFolder, Dictionary<string, List<List<BasicGeoposition>>> lineData)
         {
             if (masterFolder.DisplayName == "Processed Data")
                 return;
@@ -2917,9 +2725,24 @@ namespace AFSTester
             var folders = await masterFolder.GetFoldersAsync();
             ReportQ = "";
 
+            var masterFiles = await masterFolder.GetFilesAsync();
+            StorageFile regionFile = null;
+            StorageFile kmlFile = null;
+            foreach (var masterFile in masterFiles)
+            {
+                if (masterFile.DisplayName.Contains("regions", StringComparison.OrdinalIgnoreCase))
+                    regionFile = masterFile;
+                if (masterFile.FileType.ToLower() == ".kml")
+                    kmlFile = masterFile;
+            }
+            if (kmlFile != null)
+                lineData = GetKmlLineData(await GeneralXmlFile.GetGeneralXml(kmlFile));
+            if (regionFile != null)
+                regions = await IitRegionFile.GetIitRegion(regionFile);
+
             foreach (var curFolder in folders)
             {
-                await ParseIitFolder(curFolder, regions, isDcvg, outputFolder);
+                await ParseIitFolder(curFolder, regions, isDcvg, outputFolder, lineData);
             }
             var outputFile = await outputFolder.CreateFileAsync($"{masterFolder.DisplayName} Report Q.xlsx", CreationCollisionOption.ReplaceExisting);
             using (var outStream = await outputFile.OpenStreamForWriteAsync())

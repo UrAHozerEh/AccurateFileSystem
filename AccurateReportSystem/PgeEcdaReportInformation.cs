@@ -16,7 +16,7 @@ namespace AccurateReportSystem
         public CombinedAllegroCISFile CisFile { get; set; }
         public List<PgeEcdaDataPoint> EcdaData { get; set; }
         public HcaInfo HcaInfo { get; set; }
-        public Hca? Hca { get; set; }
+        public Hca Hca { get; set; }
         public bool IsDcvg { get; private set; }
         public bool IsAcvg => !IsDcvg;
         public bool UseMir { get; set; }
@@ -49,9 +49,9 @@ namespace AccurateReportSystem
             public double Baseline { get; set; } = double.NaN;
             public double IndicationValue { get; set; } = double.NaN;
             public string Region { get; set; }
-            public HcaRegion? RegionUpdated { get; set; }
+            public HcaRegion RegionUpdated { get; set; }
 
-            public PgeEcdaDataPoint(double footage, double on, double off, double? depth, bool isSkipped, bool isExtrapolated, BasicGeoposition gps, bool isDcvg, string region, HcaRegion? regionUpdated = null)
+            public PgeEcdaDataPoint(double footage, double on, double off, double? depth, bool isSkipped, bool isExtrapolated, BasicGeoposition gps, bool isDcvg, string region, HcaRegion regionUpdated = null)
             {
                 Footage = footage;
                 On = on;
@@ -434,7 +434,7 @@ namespace AccurateReportSystem
             foreach (var point in file.Points)
             {
                 var curPoint = point.Point;
-                var region = Hca.Value.GetClosestRegion(curPoint.GPS);
+                var region = Hca.GetClosestRegion(curPoint.GPS);
                 if (region.Name == "0")
                     continue;
                 if ((!string.IsNullOrWhiteSpace(curPoint.OriginalComment) || curPoint.Depth.HasValue) && curPoint.HasGPS)
@@ -613,7 +613,7 @@ namespace AccurateReportSystem
                 var curDepth = curPoint.Depth;
                 if (!curDepth.HasValue)
                     curDepth = lastDepth;
-                var closeRegion = Hca.Value.GetClosestRegion(curGps);
+                var closeRegion = Hca.GetClosestRegion(curGps);
                 var newPoint = new PgeEcdaDataPoint(curFootage, curOn, curOff, curDepth, closeRegion.ShouldSkip, false, curGps, IsDcvg, closeRegion.ReportQName, closeRegion);
                 EcdaData.Add(newPoint);
 
@@ -648,7 +648,7 @@ namespace AccurateReportSystem
                     var fakeOn = lastOn + onFactor * j;
                     var fakeOff = lastOff + offFactor * j;
                     var fakeDepth = depthFactor.HasValue ? lastDepth.Value + depthFactor.Value * j : (double?)null;
-                    closeRegion = Hca.Value.GetClosestRegion(curGps);
+                    closeRegion = Hca.GetClosestRegion(curGps);
                     newPoint = new PgeEcdaDataPoint(fakeFoot, fakeOn, fakeOff, fakeDepth, isSkipped, true, fakeGps, IsDcvg, closeRegion.ReportQName, closeRegion);
                     EcdaData.Add(newPoint);
                 }
@@ -731,8 +731,8 @@ namespace AccurateReportSystem
                 output.Append(hcaInfo);
                 output.Append($"{ToStationing(area.Start.Footage)}\t");
                 output.Append($"{ToStationing(area.End.Footage)}\t");
-                if (area.Start.RegionUpdated.HasValue)
-                    output.Append($"{area.Start.RegionUpdated.Value.Name}\t");
+                if (area.Start.RegionUpdated != null)
+                    output.Append($"{area.Start.RegionUpdated.Name}\t");
                 else
                     output.Append($"{area.Start.Region}\t");
                 var dist = area.End.Footage - area.Start.Footage;
