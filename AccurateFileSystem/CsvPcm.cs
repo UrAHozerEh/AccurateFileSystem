@@ -24,7 +24,12 @@ namespace AccurateFileSystem
                 var lat = GetDecimalDegree(Data[r, latColumn]);
                 var lon = GetDecimalDegree(Data[r, lonColumn]);
                 var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
-                var depth = double.Parse(Data[r, depthColumn]);
+                var depthString = Data[r, depthColumn];
+                double depth = 0.0;
+                if(!string.IsNullOrWhiteSpace(depthString))
+                    depth = double.Parse(Data[r, depthColumn]);
+                if (depth == 0)
+                    continue;
                 DepthData.Add((gps, depth));
             }
         }

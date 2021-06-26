@@ -7,11 +7,11 @@ using Windows.Devices.Geolocation;
 
 namespace AccurateFileSystem
 {
-    public struct HcaRegion
+    public class HcaRegion
     {
         public List<BasicGeoposition> GpsPoints { get; }
-        public BasicGeoposition StartGps { get; }
-        public BasicGeoposition EndGps { get; }
+        public BasicGeoposition StartGps { get; set; }
+        public BasicGeoposition EndGps { get; set; }
         public double GpsLength { get; }
         public string Name { get; }
         public string StartMp { get; }
@@ -33,6 +33,11 @@ namespace AccurateFileSystem
             StartMp = startMp;
             EndMp = endMp;
             (ShouldSkip, ShortSkipReason, LongSkipReason) = CheckShouldSkip(name);
+        }
+
+        public HcaRegion()
+        {
+
         }
 
         private static (bool ShouldSkip, string ShortReason, string LongReason) CheckShouldSkip(string name)
@@ -68,10 +73,10 @@ namespace AccurateFileSystem
 
         public override bool Equals(object obj)
         {
-            var other = obj as HcaRegion?;
-            if (!other.HasValue)
+            var other = obj as HcaRegion;
+            if (other == null)
                 return false;
-            var otherValue = other.Value;
+            var otherValue = other;
             if (StartMp != otherValue.StartMp)
                 return false;
             if (EndMp != otherValue.EndMp)

@@ -27,7 +27,7 @@ namespace AccurateFileSystem
 
         private void ParseLines(List<string> lines)
         {
-            var firstLine = ParseLine(lines[0]);
+            var firstLine = ParseLine(lines, 0, out var nextIndex);
             Headers = new List<string>();
             for (int i = 0; i < firstLine.Count; ++i)
             {
@@ -35,31 +35,46 @@ namespace AccurateFileSystem
                 Headers.Add(text);
             }
 
-            Data = new string[lines.Count - 1, Headers.Count];
-            for (int r = 1; r < lines.Count; ++r)
+
+            var dataRows = new List<List<string>>();
+            while (nextIndex < lines.Count)
             {
-                var lineData = ParseLine(lines[r]);
+                var lineData = ParseLine(lines, nextIndex, out nextIndex);
                 if (lineData.Count > Headers.Count)
                     continue;
-                for (int c = 0; c < lineData.Count; ++c)
+                dataRows.Add(lineData);
+                
+            }
+            Data = new string[dataRows.Count, Headers.Count];
+            for(int r = 0; r < dataRows.Count; ++r)
+            {
+                var row = dataRows[r];
+                for(int c = 0; c < row.Count; ++c)
                 {
-                    Data[r - 1, c] = lineData[c];
+                    Data[r, c] = row[c];
                 }
             }
         }
 
-        private List<string> ParseLine(string line)
+        private List<string> ParseLine(List<string> lines, int index, out int nextIndex)
         {
+            var line = lines[index];
             Output = new List<string>();
 
             CurItem = "";
             InString = false;
+            nextIndex = index + 1;
             for (int i = 0; i < line.Length; ++i)
             {
                 var curChar = line[i];
                 var nextI = i + 1;
                 var nextIsQuote = (nextI < line.Length) && (line[nextI] == '"');
                 ParseCharacter(curChar, nextIsQuote, out bool skipNext);
+                if (i == line.Length - 1 && InString)
+                {
+                    line += " " + lines[nextIndex];
+                    ++nextIndex;
+                }
                 if (skipNext)
                     ++i;
             }
@@ -90,11 +105,11 @@ namespace AccurateFileSystem
                         CurItem += curChar;
                         skipNext = true;
                     }
-                    else if(CurItem == "")
+                    else if (CurItem == "")
                     {
                         InString = true;
                     }
-                    else if(InString)
+                    else if (InString)
                     {
                         InString = false;
                     }

@@ -8,14 +8,14 @@
 
   <Identity
     Name="59928b63-39ac-4a9c-8303-c76775aaea2f"
-    Publisher="CN=kcron"
-    Version="1.0.0.0" />
+    Publisher="CN=Kevin Cronk"
+    Version="1.0.2.0" />
 
   <mp:PhoneIdentity PhoneProductId="59928b63-39ac-4a9c-8303-c76775aaea2f" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
     <DisplayName>IitProcessor</DisplayName>
-    <PublisherDisplayName>kcron</PublisherDisplayName>
+    <PublisherDisplayName>Kevin Cronk</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 

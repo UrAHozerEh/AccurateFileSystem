@@ -124,6 +124,13 @@
     <Compile Include="AllegroDataPoint.cs" />
     <Compile Include="AllegroWaveformFile.cs" />
     <Compile Include="CsvPcm.cs" />
+    <Compile Include="Dbf\DbfFile.cs" />
+    <Compile Include="EsriShapefile\IndexFile.cs" />
+    <Compile Include="EsriShapefile\MainFile.cs" />
+    <Compile Include="EsriShapefile\ProjectionFile.cs" />
+    <Compile Include="EsriShapefile\ShapefileData.cs" />
+    <Compile Include="Kmz\KmlFile.cs" />
+    <Compile Include="Xml\GeneralXmlFile.cs" />
     <Compile Include="Hca.cs" />
     <Compile Include="HcaRegion.cs" />
     <Compile Include="IitRegionFile.cs" />
@@ -138,6 +145,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SurveyFile.cs" />
     <Compile Include="TestStationRead.cs" />
+    <Compile Include="Xml\XmlObject.cs" />
     <EmbeddedResource Include="Properties\AccurateFileSystem.rd.xml" />
   </ItemGroup>
   <ItemGroup>

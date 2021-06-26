@@ -90,7 +90,7 @@ namespace AccurateReportSystem
         public Color MinorColor { get; set; } = Colors.Blue;
         public Color ModerateColor { get; set; } = Colors.Green;
         public Color SevereColor { get; set; } = Colors.Red;
-        public Hca? Hca { get; set; }
+        public Hca Hca { get; set; }
         public List<DataPoint> Data { get; set; }
         public List<DataPointUpdated> DataUpdated { get; set; }
         public double SkipDistance { get; set; } = 20;
@@ -151,7 +151,7 @@ namespace AccurateReportSystem
 
         private HcaRegion GetClosestRegionUpdated(BasicGeoposition gps)
         {
-            return Hca.Value.GetClosestRegion(gps);
+            return Hca.GetClosestRegion(gps);
         }
 
         public struct ExtrapolatedDataPoint
@@ -383,6 +383,7 @@ namespace AccurateReportSystem
                     var newLat = latPerFoot * offset + startPoint.GPS.Latitude;
                     var newLong = longPerFoot * offset + startPoint.GPS.Longitude;
                     var newGps = new BasicGeoposition() { Latitude = newLat, Longitude = newLong };
+                    var extrapRegion = GetClosestRegionUpdated(newGps);
                     curExtrapPoint = new ExtrapolatedDataPointUpdated()
                     {
                         Footage = newFoot,
@@ -392,7 +393,7 @@ namespace AccurateReportSystem
                         Date = startPoint.Times[0],
                         Depth = startPoint.Depth,
                         Gps = newGps,
-                        Region = curRegion,
+                        Region = extrapRegion,
                         IsExtrapolated = true,
                         IsSkipped = dist > SkipDistance || curRegion.ShouldSkip
                     };
@@ -499,7 +500,7 @@ namespace AccurateReportSystem
 
         public override List<(double Start, double End, Color Color)> GetColorBounds(PageInformation page)
         {
-            if (Hca.HasValue)
+            if (Hca != null)
                 return GetColorBoundsUpdated(page);
             return GetColorBoundsOld(page);
         }

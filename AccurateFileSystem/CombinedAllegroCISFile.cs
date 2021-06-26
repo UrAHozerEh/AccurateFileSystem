@@ -27,6 +27,15 @@ namespace AccurateFileSystem
             //var output = FilterMir(new List<string>() { "anode", "rectifier" });
         }
 
+        public void RemoveComments(string comment)
+        {
+            foreach(var point in Points)
+            {
+                if (point.Point.OriginalComment == comment)
+                    point.Point.OriginalComment = "";
+            }
+        }
+
         public List<(string fieldName, Type fieldType)> GetFields()
         {
             var list = new List<(string fieldName, Type fieldType)>
@@ -39,6 +48,46 @@ namespace AccurateFileSystem
                 ("Comment", typeof(string))
             };
             return list;
+        }
+
+        public List<(double Footage, BasicGeoposition Gps, string Comment)> GetCisKmlData()
+        {
+            var output = new List<(double Footage, BasicGeoposition Gps, string Comment)>();
+            foreach (var point in Points)
+            {
+                output.Add((point.Footage, point.Point.GPS, $"{point.Footage}\n" + point.Point.OriginalComment));
+            }
+            return output;
+        }
+
+        public List<(double Footage, BasicGeoposition Gps, string Depth)> GetDepthKmlData()
+        {
+            var output = new List<(double Footage, BasicGeoposition Gps, string Depth)>();
+            foreach (var point in Points)
+            {
+                if(point.Point.Depth.HasValue)
+                    output.Add((point.Footage, point.Point.GPS, $"{point.Footage}\n{point.Point.Depth.Value:F0}"));
+            }
+            return output;
+        }
+
+        public void AlignToLineData(List<List<BasicGeoposition>> lineData, double? startFootage = null, double? endFootage = null)
+        {
+            if (lineData == null || lineData.Count == 0) return;
+            foreach (var point in Points)
+            {
+                if (startFootage.HasValue && startFootage.Value > point.Footage) continue;
+                if (endFootage.HasValue && endFootage.Value < point.Footage) continue;
+                var gps = point.Point.GPS;
+                var (dist, newGps) = gps.DistanceToLines(lineData);
+                if (HasStartSkip && point.Footage == Points.First().Footage)
+                    continue;
+                if (HasEndSkip && point.Footage == Points.Last().Footage)
+                    continue;
+                if (dist > 1000)
+                    continue;
+                point.Point.GPS = newGps;
+            }
         }
 
         private void CheckEndSkips(double maxDistance = 20)
