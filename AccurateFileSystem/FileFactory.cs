@@ -43,11 +43,21 @@ namespace AccurateFileSystem
                     else
                     {
                         var lines = await File.GetLines();
-                        if (lines[1].Contains("Observations:"))
-                            return new VivaxPcm(File.DisplayName, lines);
-                        if (lines[0].IndexOf("ID") <= 1)
-                            return new OtherPcm(File.DisplayName, lines);
-                        return new GeneralCsv(File.DisplayName, lines);
+                        try
+                        {
+                            if (lines[0].StartsWith("Footage"))
+                                return new GeneralCsv(File.DisplayName, lines);
+                            if (lines[1].Contains("Observations:"))
+                                return new VivaxPcm(File.DisplayName, lines);
+                            if (lines[0].IndexOf("ID") <= 1 && lines[0] != "Footage")
+                                return new OtherPcm(File.DisplayName, lines);
+                            return new GeneralCsv(File.DisplayName, lines);
+                        }
+                        catch
+                        {
+                            return null;
+                        }
+                        
                     }
                 case ".txt":
                     return await GetAllegroWaveform();

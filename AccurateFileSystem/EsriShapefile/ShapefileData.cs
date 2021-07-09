@@ -44,7 +44,6 @@ namespace AccurateFileSystem.EsriShapefile
                 switch (name)
                 {
                     case "STATION":
-                    case "ECDAREGION":
                     case "DEPTH":
                         length = 10;
                         type = "N";

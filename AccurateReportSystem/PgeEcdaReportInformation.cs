@@ -26,7 +26,7 @@ namespace AccurateReportSystem
         public List<int> GetActualReadFootage()
         {
             var output = Enumerable.Repeat(0, 5).ToList();
-            foreach(var point in EcdaData)
+            foreach (var point in EcdaData)
             {
                 if (point.IsCisSkipped || point.Footage == 0) continue;
                 output[0] += 1;
@@ -39,6 +39,9 @@ namespace AccurateReportSystem
         {
             public double Footage { get; set; }
             public double? Depth { get; set; }
+            public double? AmpValue { get; set; } = null;
+            public double? AmpPercent { get; set; } = null;
+            public BasicGeoposition? AmpGps { get; set; } = null;
             public BasicGeoposition CisGps { get; set; }
             public BasicGeoposition? IndicationGps { get; set; } = null;
             public bool IsCisExtrapolated { get; set; }
@@ -242,16 +245,21 @@ namespace AccurateReportSystem
             }
         }
 
-        public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<AllegroCISFile> dcvgFiles, HcaInfo hcaInfo, double maxSpacing, bool useMir = false, GpsInfo? gpsInfo = null)
+        public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<AllegroCISFile> dcvgFiles, List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> ampReads, Hca hca, double maxSpacing, bool useMir = false, GpsInfo? gpsInfo = null)
         {
             GpsInfo = gpsInfo;
             MaxSpacing = maxSpacing;
             IsDcvg = true;
             UseMir = useMir;
             CisFile = cisFile;
-            HcaInfo = hcaInfo;
-            ExtrapolateCisData();
+            Hca = hca;
+            ExtrapolateCisDataUpdated();
+            AlignDcvgIndications(dcvgFiles);
+            AlignAmpReads(ampReads);
+        }
 
+        private void AlignDcvgIndications(List<AllegroCISFile> dcvgFiles)
+        {
             foreach (var file in dcvgFiles)
             {
                 AllegroDataPoint lastGpsPoint = null;
@@ -289,50 +297,33 @@ namespace AccurateReportSystem
             }
         }
 
-        public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<AllegroCISFile> dcvgFiles, Hca hca, double maxSpacing, bool useMir = false, GpsInfo? gpsInfo = null)
+        private void AlignAmpReads(List<(double Footage, BasicGeoposition gps, double Value, double Percent)> pcmReads)
         {
-            GpsInfo = gpsInfo;
-            MaxSpacing = maxSpacing;
-            IsDcvg = true;
-            UseMir = useMir;
-            CisFile = cisFile;
-            Hca = hca;
-            ExtrapolateCisDataUpdated();//
-
-            foreach (var file in dcvgFiles)
+            foreach (var (footage, gps, value, percent) in pcmReads)
             {
-                AllegroDataPoint lastGpsPoint = null;
-                foreach (var (_, point) in file.Points)
+                var closestDistance = double.MaxValue;
+                PgeEcdaDataPoint closestPoint = null;
+                foreach (var surveyPoint in EcdaData)
                 {
-                    if (point.HasIndication)
+                    if (surveyPoint.IsCisSkipped)
+                        continue;
+                    var curDistance = surveyPoint.CisGps.Distance(gps);
+                    if (curDistance < closestDistance)
                     {
-                        var gps = point.GPS;
-                        if (!point.HasGPS)
-                        {
-                            gps = lastGpsPoint.GPS;
-                        }
-                        var closestDistance = double.MaxValue;
-                        PgeEcdaDataPoint closestPoint = null;
-                        foreach (var surveyPoint in EcdaData)
-                        {
-                            if (surveyPoint.IsCisSkipped)
-                                continue;
-                            var curDistance = surveyPoint.CisGps.Distance(gps);
-                            if (curDistance < closestDistance)
-                            {
-                                closestDistance = curDistance;
-                                closestPoint = surveyPoint;
-                            }
-                        }
-                        if (closestPoint == null)
-                            throw new Exception();
-                        closestPoint.IndicationValue = point.IndicationPercent;
-                        var middleGps = closestPoint.CisGps.MiddleTowards(gps);
-                        closestPoint.IndicationGps = middleGps;
+                        closestDistance = curDistance;
+                        closestPoint = surveyPoint;
                     }
-                    if (point.HasGPS)
-                        lastGpsPoint = point;
                 }
+                if (closestPoint == null)
+                    throw new Exception();
+                if (Math.Abs(closestPoint.Footage - footage) > 10)
+                    continue;
+                if (closestPoint.AmpPercent.HasValue)
+                    continue;
+                closestPoint.AmpPercent = percent;
+                closestPoint.AmpValue = value;
+                var middleGps = closestPoint.CisGps.MiddleTowards(gps);
+                closestPoint.AmpGps = middleGps;
             }
         }
 
@@ -577,6 +568,28 @@ namespace AccurateReportSystem
             {
                 if (!point.IsCisExtrapolated && !point.IsCisSkipped)
                     output.Add((point.Footage, point.On, point.Off));
+            }
+            return output;
+        }
+
+        public List<(double Footage, double Value)> GetAmpData()
+        {
+            var output = new List<(double Footage, double Value)>();
+            foreach (var point in EcdaData)
+            {
+                if (point.AmpValue.HasValue)
+                    output.Add((point.Footage, point.AmpValue.Value));
+            }
+            return output;
+        }
+
+        public List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> GetFullAmpData()
+        {
+            var output = new List<(double Footage, BasicGeoposition Gps, double Value, double Percent)>();
+            foreach (var point in EcdaData)
+            {
+                if (point.AmpValue.HasValue)
+                    output.Add((point.Footage, point.AmpGps.Value, point.AmpValue.Value, point.AmpPercent.Value));
             }
             return output;
         }

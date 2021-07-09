@@ -16,14 +16,16 @@ namespace AccurateFileSystem
         public string Name { get; }
         public string StartMp { get; }
         public string EndMp { get; }
-        public string ReportQName => Name == "0" ? "Non-HCA" : Name;
+        public string ReportQName => Name == "0" ? "Non-HCA" : Name.Replace("P", "");
         public bool ShouldSkip { get; }
         public bool IsBuffer => Name == "0";
         private static (string Value, string ShortReason, string LongReason)[] SkipRegions { get; } = new (string Value, string ShortReason, string LongReason)[] { ("7A", "Atmospheric", "Atmospheric Corrosion Inspection"), ("6A", "Atmospheric", "Atmospheric Corrosion Inspection"), ("3", "Casing", "Casing Inspection") };
         public string ShortSkipReason { get; }
         public string LongSkipReason { get; }
+        public bool? FirstTime { get; }
+        public string FirstTimeString => FirstTime.HasValue ? (FirstTime.Value ? "Y" : "N") : "N/A";
 
-        public HcaRegion(List<BasicGeoposition> gpsPoints, string name, string startMp, string endMp)
+        public HcaRegion(List<BasicGeoposition> gpsPoints, string name, string startMp, string endMp, bool? firstTime)
         {
             GpsPoints = gpsPoints;
             StartGps = gpsPoints.First();
@@ -32,6 +34,7 @@ namespace AccurateFileSystem
             Name = name;
             StartMp = startMp;
             EndMp = endMp;
+            FirstTime = firstTime;
             (ShouldSkip, ShortSkipReason, LongSkipReason) = CheckShouldSkip(name);
         }
 
@@ -55,7 +58,7 @@ namespace AccurateFileSystem
         public double DistanceToGps(BasicGeoposition gps)
         {
             var closestDistance = double.MaxValue;
-            for(int i = 0; i < GpsPoints.Count-1; ++i)
+            for (int i = 0; i < GpsPoints.Count - 1; ++i)
             {
                 var start = GpsPoints[i];
                 var end = GpsPoints[i + 1];

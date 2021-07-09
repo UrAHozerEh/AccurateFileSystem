@@ -29,7 +29,7 @@ namespace AccurateFileSystem
 
         public void RemoveComments(string comment)
         {
-            foreach(var point in Points)
+            foreach (var point in Points)
             {
                 if (point.Point.OriginalComment == comment)
                     point.Point.OriginalComment = "";
@@ -65,7 +65,7 @@ namespace AccurateFileSystem
             var output = new List<(double Footage, BasicGeoposition Gps, string Depth)>();
             foreach (var point in Points)
             {
-                if(point.Point.Depth.HasValue)
+                if (point.Point.Depth.HasValue)
                     output.Add((point.Footage, point.Point.GPS, $"{point.Footage}\n{point.Point.Depth.Value:F0}"));
             }
             return output;
@@ -135,6 +135,109 @@ namespace AccurateFileSystem
                     if (distance < 20)
                         Point.Point.Depth = depth;
                 }
+        }
+
+        public string GetDepthExceptions(double minimum, double maximum)
+        {
+            var depthException = new StringBuilder();
+            depthException.AppendLine("Start Station,End Station,Length (Feet),Shallowest Depth (Inches),Start Latitude,Start Longitude,End Latitude,End Longitude");
+            var depthData = new List<(double Footage, BasicGeoposition Gps, double Depth)>();
+            for (int i = 0; i < Points.Count; ++i)
+            {
+                var point = Points[i];
+                var curFoot = point.Footage;
+                if (!point.Point.Depth.HasValue)
+                    continue;
+                var curDepth = point.Point.Depth.Value;
+                var curGps = point.Point.GPS;
+                depthData.Add((curFoot, curGps, curDepth));
+            }
+            for (int i = 0; i < depthData.Count; ++i)
+            {
+                var (curFoot, curGps, curDepth) = depthData[i];
+                if (curDepth < minimum)
+                {
+                    var start = i;
+                    var curIndex = i;
+                    var minDepth = curDepth;
+                    while (curDepth < minimum && curIndex != depthData.Count)
+                    {
+                        (curFoot, curGps, curDepth) = depthData[curIndex];
+
+                        if (curDepth < minDepth)
+                            minDepth = curDepth;
+                        ++curIndex;
+                    }
+                    --curIndex;
+                    var (startFoot, startGps, _) = depthData[start];
+                    var (endFoot, endGps, _) = depthData[curIndex];
+                    depthException.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1):F0}\t{minDepth:F0}\t");
+                    depthException.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
+                    depthException.AppendLine($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}");
+                    i = curIndex + 1;
+                }
+                if (curDepth > maximum)
+                {
+                    var start = i;
+                    var curIndex = i;
+                    var max = curDepth;
+                    while (curDepth > maximum && curIndex != depthData.Count)
+                    {
+                        (curFoot, curGps, curDepth) = depthData[curIndex];
+                        if (curDepth > max)
+                            max = curDepth;
+                        ++curIndex;
+                    }
+                    --curIndex;
+                    var (startFoot, startGps, _) = depthData[start];
+                    var (endFoot, endGps, _) = depthData[curIndex];
+                    depthException.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1):F0}\t{max:F0}\t");
+                    depthException.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
+                    depthException.AppendLine($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}");
+
+                    i = curIndex + 1;
+                }
+            }
+            return depthException.ToString();
+        }
+
+        private string ToStationing(double footage)
+        {
+            int hundred = (int)footage / 100;
+            int tens = (int)footage % 100;
+            return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
+        }
+
+        public List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> AlignAmpReads(List<CsvPcm> files)
+        {
+            var output = new List<(double Footage, BasicGeoposition Gps, double Value, double Percent)>();
+
+            foreach (var file in files)
+            {
+                var data = file.AmpData;
+                if (data == null)
+                    continue;
+                for (int i = 0; i < data.Count; ++i)
+                {
+                    var (curGps, curAmps) = data[i];
+
+                    var (_, prevAmps) = data[Math.Max(i - 1, 0)];
+                    var prevDiff = prevAmps - curAmps;
+                    var prevPercent = Math.Max(prevDiff / curAmps * 100, 0);
+
+                    var (_, nextAmps) = data[Math.Min(i + 1, data.Count - 1)];
+                    var nextDiff = nextAmps - curAmps;
+                    var nextPercent = Math.Max(nextDiff / curAmps * 100, 0);
+
+                    var percent = Math.Max(nextPercent, prevPercent);
+
+                    var (Point, distance) = GetClosestPoint(curGps);
+                    if (distance < 20)
+                        output.Add((Point.Footage, curGps, curAmps, percent));
+                }
+            }
+
+            return output;
         }
 
         public void ShiftPoints(double footage)

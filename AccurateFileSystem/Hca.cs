@@ -15,22 +15,19 @@ namespace AccurateFileSystem
         public HcaRegion EndBuffer { get; private set; }
         public string LineName { get; private set; }
         public string Name { get; private set; }
-        public bool? FirstTime { get; private set; }
-        public string FirstTimeString => !FirstTime.HasValue ? "N/A" : (FirstTime.Value ? "Y" : "N");
         public double StartBufferGpsLength => StartBuffer?.GpsLength ?? 0;
         public double EndBufferGpsLength => EndBuffer?.GpsLength ?? 0;
         public double HcaGpsLength => Regions.Sum(region => region.GpsLength);
         public double TotalGpsLength => StartBufferGpsLength + HcaGpsLength + EndBufferGpsLength;
 
 
-        public Hca(string name, string lineName, List<string[]> lines, bool? firstTime = null)
+        public Hca(string name, string lineName, List<string[]> lines)
         {
             Regions = new List<HcaRegion>();
             Name = name;
             LineName = lineName;
             StartBuffer = null;
             EndBuffer = null;
-            FirstTime = firstTime;
             lines = SortLines(lines);
             ParseLines(lines);
         }
@@ -151,15 +148,21 @@ namespace AccurateFileSystem
             var endGps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
             var endMp = line[3];
             endIndex = startIndex;
+            bool? isFirstTime = null;
+            if (!line[9].Contains("n/a", StringComparison.OrdinalIgnoreCase))
+                isFirstTime = line[9].Contains("y", StringComparison.OrdinalIgnoreCase);
 
             var middleGps = new List<BasicGeoposition>();
 
             for (int i = startIndex + 1; i < lines.Count; ++i)
             {
                 line = lines[i];
-                if (line.Length != 9)
+                if (line.Length != 10)
                     line = line;
-                if (line[8].Trim() == name)
+                bool? curIsFirstTime = null;
+                if (!line[9].Contains("n/a", StringComparison.OrdinalIgnoreCase))
+                    curIsFirstTime = line[9].Contains("y", StringComparison.OrdinalIgnoreCase);
+                if (line[8].Trim() == name && IsSameFirstTime(isFirstTime, curIsFirstTime))
                 {
                     lat = double.Parse(line[6]);
                     lon = double.Parse(line[7]);
@@ -175,7 +178,16 @@ namespace AccurateFileSystem
             var allGps = new List<BasicGeoposition>() { startGps };
             allGps.AddRange(middleGps);
             allGps.Add(endGps);
-            return new HcaRegion(allGps, name, startMp, endMp);
+            return new HcaRegion(allGps, name, startMp, endMp, isFirstTime);
+        }
+
+        private bool IsSameFirstTime(bool? first, bool? second)
+        {
+            if (first.HasValue ^ second.HasValue)
+                return false;
+            if (!first.HasValue && !second.HasValue)
+                return true;
+            return first.Value == second.Value;
         }
 
         private List<string[]> SortLines(List<string[]> lines)
