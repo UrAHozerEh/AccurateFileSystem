@@ -38,7 +38,7 @@ namespace IitProcessor
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        public string ReportQ = "";
+        public string ReportQ { get; set; } = "";
         public MainPage()
         {
             this.InitializeComponent();
@@ -180,7 +180,7 @@ namespace IitProcessor
                 var endGps = region.EndGps;
                 ReportQ += $"{hca.Name}\t{hca.LineName}\t{startMp}\t{endMp}\tNT\tNT\t{region.Name}\t";
                 ReportQ += $"{hca.HcaGpsLength:F0}\tNT\t{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t";
-                ReportQ += $"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{hca.FirstTimeString}\tNT\tNT\tNT\t\n";
+                ReportQ += $"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{hca.Regions.First().FirstTimeString}\tNT\tNT\tNT\t\n";
                 return;
             }
             cisFiles = GetUniqueFiles(cisFiles);
@@ -216,6 +216,8 @@ namespace IitProcessor
 
             combinedCisFile.SetFootageFromGps();
             combinedCisFile.AddPcmDepthData(pcmFiles);
+
+            var ampReads = combinedCisFile.AlignAmpReads(pcmFiles);
 
             var dcvgData = new List<(double, double, BasicGeoposition)>();
             if (combinedCisFile.HasStartSkip)
@@ -254,7 +256,7 @@ namespace IitProcessor
             PgeEcdaReportInformation reportInfo;
             if (isDcvg)
             {
-                reportInfo = new PgeEcdaReportInformation(combinedCisFile, dcvgFiles, hca, 10, false);
+                reportInfo = new PgeEcdaReportInformation(combinedCisFile, dcvgFiles, ampReads, hca, 10, false);
             }
             else
             {
@@ -265,6 +267,34 @@ namespace IitProcessor
             var reportQ = "";
             reportQ += reportInfo.GetReportQ();
             await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, isDcvg, displayName, hca, outputFolder);
+        }
+
+        private List<(BasicGeoposition Gps, double Value, double Percent)> GetAmpReads(List<CsvPcm> files)
+        {
+            var output = new List<(BasicGeoposition Gps, double Value, double Percent)>();
+            foreach (var file in files)
+            {
+                var data = file.AmpData;
+                if (data == null)
+                    return output;
+                for (int i = 0; i < data.Count; ++i)
+                {
+                    var (curGps, curAmps) = data[i];
+
+                    var (_, prevAmps) = data[Math.Max(i - 1, 0)];
+                    var prevDiff = prevAmps - curAmps;
+                    var prevPercent = Math.Max(prevDiff / curAmps * 100, 0);
+
+                    var (_, nextAmps) = data[Math.Min(i + 1, data.Count - 1)];
+                    var nextDiff = nextAmps - curAmps;
+                    var nextPercent = Math.Max(nextDiff / curAmps * 100, 0);
+
+                    var percent = Math.Max(nextPercent, prevPercent);
+                    output.Add((curGps, curAmps, percent));
+                }
+
+            }
+            return output;
         }
 
         private void AddMaxDepthComment(CombinedAllegroCISFile file, double maxDepth)
@@ -288,12 +318,12 @@ namespace IitProcessor
             var maxDepth = 200;
             var curDepth = 50.0;
             var directionData = new List<(double, bool, string)>();
-            var pcmLables = new List<(double, string)>();
             AddMaxDepthComment(file, maxDepth);
 
             var depthData = file.GetDoubleData("Depth");
             var offData = ecdaReport.GetOffData();
             var onData = ecdaReport.GetOnData();
+            var ampData = ecdaReport.GetAmpData();
             //if (CheckDepthGaps(depthData, onData.First().footage, onData.Last().footage, 75))
             //    onData = onData;
             var commentData = file.GetCommentData();
@@ -348,8 +378,8 @@ namespace IitProcessor
             onOffGraph.YAxesInfo.Y2MaximumValue = maxDepth;
             onOffGraph.CommentSeries = commentSeries;
             onOffGraph.Series.Add(on);
-            if(hca.Name != "331")
-            onOffGraph.Series.Add(off);
+            if (hca.Name != "331")
+                onOffGraph.Series.Add(off);
             onOffGraph.Series.Add(redLine);
             onOffGraph.DrawTopBorder = false;
 
@@ -359,6 +389,7 @@ namespace IitProcessor
             }
 
             var dcvgLabels = dcvgData.Select((value) => (value.Item1, value.Item2.ToString("F1") + (isDcvg ? "%" : ""))).ToList();
+            var ampLabels = ampData.Select((value) => (value.Item1, value.Item2.ToString("F0"))).ToList();
 
             var indicationLabel = isDcvg ? "DCVG" : "ACVG";
             var dcvgIndication = new PointWithLabelGraphSeries($"{indicationLabel} Indication", -0.2, dcvgLabels)
@@ -368,6 +399,16 @@ namespace IitProcessor
                 BackdropOpacity = 1f
             };
             onOffGraph.Series.Add(dcvgIndication);
+
+            var ampSeries = new PointWithLabelGraphSeries("PCM (mA)", -0.4, ampLabels)
+            {
+                ShapeRadius = 3,
+                PointColor = Colors.Navy,
+                BackdropOpacity = 1f,
+                PointShape = GraphSeries.Shape.Square
+            };
+            if (ampData.Count > 0)
+                onOffGraph.Series.Add(ampSeries);
 
             report.XAxisInfo.IsEnabled = false;
             report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
@@ -397,7 +438,7 @@ namespace IitProcessor
             dcvgClass.LegendInfo.NameFontSize = 13f;
 
             var ecdaClassChart = new Chart(report, "ECDA Clas.");
-            var ecdaClassSeries = new PGEDirectExaminationPriorityChartSeries(ecdaClassChart, cisIndication, dcvgIndicationSeries);
+            var ecdaClassSeries = new PGEDirectExaminationPriorityChartSeries(ecdaClassChart, cisIndication, dcvgIndicationSeries, ecdaReport.GetFullAmpData());
             ecdaClassChart.Series.Add(ecdaClassSeries);
 
             var surveyDirectionSeries = new SurveyDirectionWithDateSeries(file.GetDirectionWithDateData());
@@ -463,7 +504,7 @@ namespace IitProcessor
                 }
             }
             var skipReport = new StringBuilder();
-            foreach (var (startFoot, endFoot, cisSeverity, dcvgSeverity, region, priority, reason) in areas)
+            foreach (var (startFoot, endFoot, cisSeverity, dcvgSeverity, thirdToolSeverity, region, priority, reason) in areas)
             {
                 var depthInArea = extrapolatedDepth.Where(value => value.Item1 >= startFoot && value.Item1 <= endFoot);
                 var minDepth = depthInArea.Count() != 0 ? depthInArea.Min(value => value.Item2) : -1;
@@ -475,20 +516,23 @@ namespace IitProcessor
                 var startGps = file.GetClosesetGps(startFoot);
                 output.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
                 var endGps = file.GetClosesetGps(endFoot);
-                var firstTime = hca.FirstTimeString;
+                var firstTime = region.FirstTimeString;
                 if (region.IsBuffer)
                     firstTime = "N/A";
                 output.Append($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{firstTime}\t");
                 if (reason.Contains("SKIP."))
                 {
-                    output.AppendLine($"NT\tNT\tNT\t{region.LongSkipReason}");
+                    output.AppendLine($"NT\tNT\tNT\tNT\t{region.LongSkipReason}");
                     skipReport.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{Math.Max(endFoot - startFoot, 1):F0}\t");
                     skipReport.Append($"{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t");
                     skipReport.AppendLine($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{region.ShortSkipReason}");
                 }
                 else
                 {
-                    output.AppendLine($"{cisSeverity.GetDisplayName()}\t{dcvgSeverity.GetDisplayName()}\t{PriorityDisplayName(priority)}\t{reason}");
+                    var thirdToolValue = thirdToolSeverity.GetDisplayName();
+                    if (!region.Name.Contains("P"))
+                        thirdToolValue = "NT";
+                    output.AppendLine($"{cisSeverity.GetDisplayName()}\t{dcvgSeverity.GetDisplayName()}\t{thirdToolValue}\t{PriorityDisplayName(priority)}\t{reason}");
                 }
             }
             ReportQ += output.ToString();
@@ -536,6 +580,18 @@ namespace IitProcessor
             {
                 var dcvgShapeFileTest = new ShapefileData($"{folderName} {(isDcvg ? "DCVG" : "ACVG")} Shapefile", ecdaClassSeries.IndicationShapeFileOutput);
                 await dcvgShapeFileTest.WriteToFolder(shapefileFolder);
+            }
+
+            var pcmShapeFileStringBuilder = new StringBuilder();
+            foreach (var line in ecdaClassSeries.AmpsShapeFileOutput)
+            {
+                var lineString = string.Join('\t', line);
+                dcvgShapeFileStringBuilder.AppendLine(lineString);
+            }
+            if (ampLabels.Count > 0)
+            {
+                var pcmShapeFileTest = new ShapefileData($"{folderName} PCM Shapefile", ecdaClassSeries.AmpsShapeFileOutput);
+                await pcmShapeFileTest.WriteToFolder(shapefileFolder);
             }
 
             var skipReportString = skipReport.ToString();
@@ -595,7 +651,8 @@ namespace IitProcessor
             var (hcaStartMp, hcaEndMp) = hca.GetMpForHca();
             //var reportLLengths = ecdaReport.GetActualReadFootage();
             var reportLLengths2 = GetActualReadFootage(areas);
-            var reportLString = $"Indirect Inspection:\tCIS\t{indicationLabel}\t{uniqueRegionsString}\t{hcaStartMp}\t{hcaEndMp}\t{hca.LineName}\t{"HCA " + hca.Name}\nLength (feet)\t{reportLLengths2[0]}\t{reportLLengths2[0]}\n\t";
+            var reportLLengthsToolThree = GetActualThirdToolFootage(areas);
+            var reportLString = $"Indirect Inspection:\tCIS\t{indicationLabel}\t{uniqueRegionsString}\t{hcaStartMp}\t{hcaEndMp}\t{hca.LineName}\t{"HCA " + hca.Name}\nLength (feet)\t{reportLLengths2[0]}\t{reportLLengths2[0]}\t{reportLLengthsToolThree[0]}\n\t";
             var reportLNext = "Length (feet)\t";
             for (int i = 1; i <= 4; ++i)
             {
@@ -819,12 +876,25 @@ namespace IitProcessor
             return output;
         }
 
-        private List<int> GetActualReadFootage(List<(double Start, double End, PGESeverity CisSeverity, PGESeverity DcvgSeverity, HcaRegion Region, int Overall, string Comments)> areas)
+        private List<int> GetActualReadFootage(List<(double Start, double End, PGESeverity CisSeverity, PGESeverity DcvgSeverity, PGESeverity PcmSeverity, HcaRegion Region, int Overall, string Comments)> areas)
         {
             var output = Enumerable.Repeat(0, 5).ToList();
             foreach (var area in areas)
             {
                 if (area.Comments.Contains("SKIP")) continue;
+                var distance = (int)(area.End - area.Start);
+                output[0] += distance;
+                output[area.Overall] += distance;
+            }
+            return output;
+        }
+
+        private List<int> GetActualThirdToolFootage(List<(double Start, double End, PGESeverity CisSeverity, PGESeverity DcvgSeverity, PGESeverity PcmSeverity, HcaRegion Region, int Overall, string Comments)> areas)
+        {
+            var output = Enumerable.Repeat(0, 5).ToList();
+            foreach (var area in areas)
+            {
+                if (area.Comments.Contains("SKIP") || !area.Region.Name.Contains("P")) continue;
                 var distance = (int)(area.End - area.Start);
                 output[0] += distance;
                 output[area.Overall] += distance;

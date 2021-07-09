@@ -54,7 +54,6 @@
             </Grid>
             <Button Content="Hide" Click="HideButtonClick" Grid.Row="5" HorizontalAlignment="Center"/>
             <Button Content="IIT" Click="IITClick"  Grid.Row="6" HorizontalAlignment="Center"/>
-            <Button Content="Batch IIT" Click="BatchIITClick"  Grid.Row="7" HorizontalAlignment="Center"/>
             <Button Content="NuStar" Click="MakeNustarGraphs"  Grid.Row="8" HorizontalAlignment="Center"/>
             <Button Content="Combine All" Grid.Row="9" HorizontalAlignment="Center" Click="Button_Click_4"/>
             <Button Content="Import Order" Grid.Row="10" HorizontalAlignment="Center" Click="ImportFilesOrder"/>

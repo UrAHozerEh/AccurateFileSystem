@@ -20,6 +20,7 @@ namespace AccurateFileSystem
         private int EndGpsColumn = -1;
         private int RegionColumn = -1;
         private int FirstTimeColumn = -1;
+        private int ThirdToolColumn = -1;
 
         public IitRegionFile(string name, List<string> lines) : base(name, lines)
         {
@@ -53,6 +54,8 @@ namespace AccurateFileSystem
                     RouteColumn = i;
                 if (header.Contains("1st time", StringComparison.OrdinalIgnoreCase))
                     FirstTimeColumn = i;
+                if (header.Contains("3rd iit", StringComparison.OrdinalIgnoreCase))
+                    ThirdToolColumn = i;
                 if (header.Contains("begin", StringComparison.OrdinalIgnoreCase))
                 {
                     if (header.Contains("mp", StringComparison.OrdinalIgnoreCase))
@@ -98,6 +101,7 @@ namespace AccurateFileSystem
             for (int i = 0; i < Data.GetLength(0); ++i)
             {
                 var curName = Data[i, HcaColumn].Trim();
+
                 var route = Data[i, RouteColumn].Trim();
 
                 var beginMp = Data[i, BeginMpColumn].Trim();
@@ -110,17 +114,23 @@ namespace AccurateFileSystem
                 region = region.Replace('–', '-');
                 if (region.Contains('-'))
                     region = region.Substring(0, region.IndexOf('-')).Trim();
-                bool? curIsFirstTime = null;
-                if (!Data[i, FirstTimeColumn].Contains("n/a", StringComparison.OrdinalIgnoreCase))
-                    curIsFirstTime = Data[i, FirstTimeColumn].Contains("y", StringComparison.OrdinalIgnoreCase);
+                
 
-                var line = new string[] { curName, route, beginMp, endMp, beginGps.Latitude, beginGps.Longitude, endGps.Latitude, endGps.Longitude, region };
+                if (ThirdToolColumn != -1)
+                {
+                    var thirdToolValue = Data[i, ThirdToolColumn].Trim();
+                    if (thirdToolValue.Contains("pcm", StringComparison.OrdinalIgnoreCase))
+                    {
+                        region += "P";
+                    }
+                }
+
+                var line = new string[] { curName, route, beginMp, endMp, beginGps.Latitude, beginGps.Longitude, endGps.Latitude, endGps.Longitude, region, Data[i, FirstTimeColumn] };
                 if (startName == "")
                 {
                     startName = curName;
                     startLineName = Data[i, RouteColumn].Trim();
                     curLines = new List<string[]>() { line };
-                    isFirstTime = curIsFirstTime;
                     continue;
                 }
                 if (curName == startName)
@@ -128,13 +138,12 @@ namespace AccurateFileSystem
                     curLines.Add(line);
                     continue;
                 }
-                Hcas.Add(new Hca(startName, startLineName, curLines, isFirstTime));
+                Hcas.Add(new Hca(startName, startLineName, curLines));
                 startName = curName;
                 startLineName = line[1].Trim();
                 curLines = new List<string[]>() { line };
-                isFirstTime = curIsFirstTime;
             }
-            Hcas.Add(new Hca(startName, startLineName, curLines, isFirstTime));
+            Hcas.Add(new Hca(startName, startLineName, curLines));
             Debug.WriteLine(string.Join("\n", Hcas));
         }
 

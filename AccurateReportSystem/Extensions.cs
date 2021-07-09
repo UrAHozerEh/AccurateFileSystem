@@ -98,5 +98,12 @@ namespace AccurateReportSystem
                     throw new ArgumentException();
             }
         }
+
+        public static PGESeverity GetWorseOf(this PGESeverity cur, PGESeverity other)
+        {
+            if (cur.CompareTo(other) <= 0)
+                return cur;
+            return other;
+        }
     }
 }

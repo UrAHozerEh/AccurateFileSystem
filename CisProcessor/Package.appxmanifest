@@ -7,15 +7,15 @@
   IgnorableNamespaces="uap mp">
 
   <Identity
-    Name="59928b63-39ac-4a9c-8303-c76775aaea2f"
-    Publisher="CN=Kevin Cronk"
-    Version="1.0.3.0" />
+    Name="002be0f0-15d8-416a-a6f6-6f13eb1923d7"
+    Publisher="CN=kcron"
+    Version="1.0.0.0" />
 
-  <mp:PhoneIdentity PhoneProductId="59928b63-39ac-4a9c-8303-c76775aaea2f" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+  <mp:PhoneIdentity PhoneProductId="002be0f0-15d8-416a-a6f6-6f13eb1923d7" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>IitProcessor</DisplayName>
-    <PublisherDisplayName>Kevin Cronk</PublisherDisplayName>
+    <DisplayName>CisProcessor</DisplayName>
+    <PublisherDisplayName>kcron</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -30,12 +30,12 @@
   <Applications>
     <Application Id="App"
       Executable="$targetnametoken$.exe"
-      EntryPoint="IitProcessor.App">
+      EntryPoint="CisProcessor.App">
       <uap:VisualElements
-        DisplayName="IitProcessor"
+        DisplayName="CisProcessor"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
-        Description="IitProcessor"
+        Description="CisProcessor"
         BackgroundColor="transparent">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"/>
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
