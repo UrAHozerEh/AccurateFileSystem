@@ -24,6 +24,21 @@ namespace AccurateFileSystem.EsriShapefile
             CreateRecords(data.Skip(1).ToList());
         }
 
+        public ShapefileData(string name, string dataString)
+        {
+            var data = new List<string[]>();
+            var dataLines = dataString.Split('\n');
+            foreach(var line in dataLines)
+            {
+                var lineSplit = line.Split('\t');
+                data.Add(lineSplit);
+            }
+            Name = name;
+            var headers = data[0];
+            CreateFields(headers);
+            CreateRecords(data.Skip(1).ToList());
+        }
+
         public async Task WriteToFolder(StorageFolder folder)
         {
             var outputFolder = await folder.CreateFolderAsync(Name, CreationCollisionOption.ReplaceExisting);
@@ -82,10 +97,17 @@ namespace AccurateFileSystem.EsriShapefile
                 {
                     var field = Fields[i];
                     var value = row[i] ?? "";
-                    if (field.Name == "LATITUDE")
-                        lat = double.Parse(value);
-                    if (field.Name == "LONGITUDE")
-                        lon = double.Parse(value);
+                    try
+                    {
+                        if (field.Name == "LATITUDE")
+                            lat = double.Parse(value);
+                        if (field.Name == "LONGITUDE")
+                            lon = double.Parse(value);
+                    }
+                    catch
+                    {
+                        return;
+                    }
                     if (field.Type == "D")
                     {
                         var split = value.Split('/');

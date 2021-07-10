@@ -150,9 +150,25 @@
     </Page>
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="DocumentFormat.OpenXml">
+      <Version>2.9.1</Version>
+    </PackageReference>
     <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform">
       <Version>6.2.11</Version>
     </PackageReference>
+    <PackageReference Include="Win2D.uwp">
+      <Version>1.23.0</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AccurateFileSystem\AccurateFileSystem.csproj">
+      <Project>{4099B184-BDF8-428B-AF37-325BDBE37D5B}</Project>
+      <Name>AccurateFileSystem</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\AccurateReportSystem\AccurateReportSystem.csproj">
+      <Project>{3777E8DF-DE95-4EC4-8ACA-CBE4EF6CD112}</Project>
+      <Name>AccurateReportSystem</Name>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>

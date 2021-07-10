@@ -49,7 +49,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1*"/>
                 </Grid.ColumnDefinitions>
-                <Button Content="Combine" Click="CombineButtonClick" Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center"/>
+                <Button Content="Combine" Click="CombineButtonClick" Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
                 <TextBox x:Name="CombineMaxGap" Text="1500" VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Row="1" InputScope="Number"/>
             </Grid>
             <Button Content="Hide" Click="HideButtonClick" Grid.Row="5" HorizontalAlignment="Center"/>
