@@ -862,7 +862,7 @@ namespace AccurateFileSystem
 
             foreach (var (footage, isReverse, point, useMir, file) in Points)
             {
-                curLine = new string[31];
+                curLine = new string[34];
                 curLine[0] = $"On: {point.MirOn.ToString(readFormat)}, Off: {point.MirOff.ToString(readFormat)}";
                 curLine[1] = footage.ToString("F0");
                 if (point.HasTime)
@@ -954,11 +954,11 @@ namespace AccurateFileSystem
 
                 if (curFoot - 10 == prevFoot && curFoot + 10 == nextFoot)
                 {
-                    if ((prevOnDiff > 0.1 && nextOnDiff > 0.1) || (prevOnDiff < -0.1 && nextOnDiff < -0.1))
+                    if ((prevOnDiff > 0.09 && nextOnDiff > 0.09) || (prevOnDiff < -0.09 && nextOnDiff < -0.09))
                     {
                         curPoint.On = (prevOn + nextOn) / 2;
                     }
-                    if ((prevOffDiff > 0.1 && nextOffDiff > 0.1) || (prevOffDiff < -0.1 && nextOffDiff < -0.1))
+                    if ((prevOffDiff > 0.09 && nextOffDiff > 0.09) || (prevOffDiff < -0.09 && nextOffDiff < -0.09))
                     {
                         curPoint.Off = (prevOff + nextOff) / 2;
                     }
