@@ -140,7 +140,7 @@ namespace AccurateFileSystem
         public string GetDepthExceptions(double minimum, double maximum)
         {
             var depthException = new StringBuilder();
-            depthException.AppendLine("Start Station,End Station,Length (Feet),Shallowest Depth (Inches),Start Latitude,Start Longitude,End Latitude,End Longitude");
+            depthException.AppendLine("Start Station\tEnd Station\tLength (Feet)\tShallowest Depth (Inches)\tStart Latitude\tStart Longitude\tEnd Latitude\tEnd Longitude");
             var depthData = new List<(double Footage, BasicGeoposition Gps, double Depth)>();
             for (int i = 0; i < Points.Count; ++i)
             {
