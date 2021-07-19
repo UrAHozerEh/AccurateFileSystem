@@ -457,7 +457,7 @@ namespace CisProcessor
             var testStation = allegroFile.GetTestStationData();
             await CreateExcelFile($"{fileName} Test Station Data", new List<(string Name, string Data)>() { ("Test Station Data", testStation) }, outputFolder);
             var cisSkips = allegroFile.GetSkipData();
-            await CreateExcelFile($"{fileName} Skip Data", new List<(string Name, string Data)>() { ("Skip Data", cisSkips) }, outputFolder);
+            await CreateExcelFile($"{fileName} CIS Skip Data", new List<(string Name, string Data)>() { ("CIS Skip Data", cisSkips) }, outputFolder);
             var depthExceptions = allegroFile.GetDepthExceptions(36, double.MaxValue);
             await CreateExcelFile($"{fileName} Shallow Cover", new List<(string Name, string Data)>() { ("Shallow Cover", depthExceptions) }, outputFolder);
             var shapefile = allegroFile.GetShapeFile();
