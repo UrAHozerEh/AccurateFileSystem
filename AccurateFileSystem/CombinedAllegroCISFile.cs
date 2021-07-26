@@ -1417,14 +1417,14 @@ namespace AccurateFileSystem
 
             public string GetExcelDataHeader()
             {
-                return $"File Name\tIs Reversed\tOffset\tNumber of Points Used\tNumber of Points Total\tPercent Used\tStart Index\tStart Footage\tEnd Index\tEnd Footage\tLength";
+                return $"File Name\tIs Reversed\tOffset\tNumber of Points Used\tNumber of Points Total\tPercent Used\tStart Index\tStart Footage\tEnd Index\tEnd Footage\tLength\tStarting Footage\tEnding Footage";
             }
 
-            public string GetExcelData()
+            public string GetExcelData(double prevEndFootage)
             {
                 var numPoints = Math.Abs(End - Start) + 1;
-                var numFoot = Math.Abs(File.Points[Start].Footage - File.Points[End].Footage);
-                var output = $"{File.Name}\t{(IsReversed ? "Reverse" : "")}\t{Offset}\t{numPoints}\t{File.Points.Count}\t{((double)numPoints / File.Points.Count):P1}\t{Start}\t{File.Points[Start].Footage}\t{End}\t{File.Points[End].Footage}\t{numFoot}";
+                var startFootage = prevEndFootage + Offset;
+                var output = $"{File.Name}\t{(IsReversed ? "Reverse" : "")}\t{Offset}\t{numPoints}\t{File.Points.Count}\t{((double)numPoints / File.Points.Count):P1}\t{Start}\t{File.Points[Start].Footage}\t{End}\t{File.Points[End].Footage}\t{TotalFootage}\t{startFootage}\t{startFootage + TotalFootage}";
                 return output;
             }
         }
@@ -1445,11 +1445,12 @@ namespace AccurateFileSystem
                 return Info.ToString() + "\n" + Next?.ToString() ?? "";
             }
 
-            public string GetExcelData()
+            public string GetExcelData(double startFootage)
             {
+                var footageAndOffset = Info.TotalFootage + Info.Offset;
                 if (Prev == null)
-                    return Info.GetExcelDataHeader() + "\n" + Info.GetExcelData() + "\n" + Next?.GetExcelData() ?? "";
-                return Info.GetExcelData() + "\n" + Next?.GetExcelData() ?? "";
+                    return Info.GetExcelDataHeader() + "\n" + Info.GetExcelData(0) + "\n" + Next?.GetExcelData(footageAndOffset) ?? "";
+                return Info.GetExcelData(startFootage) + "\n" + Next?.GetExcelData(startFootage + footageAndOffset) ?? "";
             }
 
             public FileInfoLinkedList(FileInfo info)

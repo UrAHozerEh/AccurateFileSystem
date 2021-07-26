@@ -26,6 +26,7 @@ using DocumentFormat.OpenXml.Spreadsheet;
 using Windows.UI.Popups;
 using Windows.Storage.Pickers;
 using AccurateFileSystem.EsriShapefile;
+using AccurateFileSystem.Kmz;
 
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -217,8 +218,13 @@ namespace CisProcessor
                 var combinedFiles = CombinedAllegroCISFile.CombineFiles(folder.DisplayName, cisFiles, maxGap);
                 var finishedFinalName = finishedFileNames.GetValueOrDefault(folder.DisplayName, null);
                 combinedFiles.FixContactSpikes();
+                combinedFiles.FixGps();
+                var cisKmlFile = new KmlFile($"{finishedFinalName.Value.Item1} CIS Map Pre Straighten", combinedFiles.GetCisKmlData());
+                await cisKmlFile.WriteToFile(outputFolder);
+                combinedFiles.StraightenGps();
+                combinedFiles.RemoveComments("+");
                 var name = await MakeGraphs(combinedFiles, outputFolder, finishedFinalName);
-                await CreateExcelFile($"{folder.DisplayName}+{name.Text}+{(name.IsReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedFiles.FileInfos.GetExcelData()) }, fileOrder);
+                await CreateExcelFile($"{folder.DisplayName}+{name.Text}+{(name.IsReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedFiles.FileInfos.GetExcelData(0)) }, fileOrder);
             }
         }
 
@@ -263,7 +269,7 @@ namespace CisProcessor
             var graph2 = new Graph(report);
             var graph3 = new Graph(report);
             //var mirFilterData = "Start Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tReason\n" + ((MirFilter.IsChecked ?? false) ? allegroFile.FilterMir(new List<string>() { "anode", "rectifier" }) : "");
-            allegroFile.FixGps();
+            
             var on = new GraphSeries("On", allegroFile.GetDoubleData("On"))
             {
                 LineColor = Colors.Blue
@@ -421,7 +427,7 @@ namespace CisProcessor
             report.Container = splitContainer;
             var pages = report.PageSetup.GetAllPages(0, allegroFile.Points.Last().Footage);
             var curFileName = $"{response.Value.Item1}\\{topGlobalXAxis.Title}";
-            await CreateStandardExcel(curFileName, allegroFile, outputFolder);
+            await CreateStandardFiles(curFileName, allegroFile, outputFolder);
             var cisShapeFile = new ShapefileData($"{response.Value.Text}", allegroFile.GetShapeFile());
             var shapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
             await cisShapeFile.WriteToFolder(shapefileFolder);
@@ -448,7 +454,7 @@ namespace CisProcessor
             //await dialog.ShowAsync();
         }
 
-        private async Task CreateStandardExcel(string fileName, CombinedAllegroCISFile allegroFile, StorageFolder outputFolder)
+        private async Task CreateStandardFiles(string fileName, CombinedAllegroCISFile allegroFile, StorageFolder outputFolder)
         {
             var tabular = allegroFile.GetTabularData();
             await CreateExcelFile($"{fileName} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) }, outputFolder);
@@ -462,7 +468,11 @@ namespace CisProcessor
             await CreateExcelFile($"{fileName} Shallow Cover", new List<(string Name, string Data)>() { ("Shallow Cover", depthExceptions) }, outputFolder);
             var shapefile = allegroFile.GetShapeFile();
             await CreateExcelFile($"{fileName} Shapefile", new List<(string Name, string Data)>() { ("Shapefile", shapefile) }, outputFolder);
-            await CreateExcelFile($"{fileName} Files Order", new List<(string Name, string Data)>() { ("Order", allegroFile.FileInfos.GetExcelData()) }, outputFolder);
+            await CreateExcelFile($"{fileName} Files Order", new List<(string Name, string Data)>() { ("Order", allegroFile.FileInfos.GetExcelData(0)) }, outputFolder);
+            var cisKmlFile = new KmlFile($"{fileName} CIS Map", allegroFile.GetCisKmlData());
+            await cisKmlFile.WriteToFile(outputFolder);
+            var depthKmlFile = new KmlFile($"{fileName} Depth Map", allegroFile.GetDepthKmlData());
+            await depthKmlFile.WriteToFile(outputFolder);
         }
 
         public async Task CreateExcelFile(string fileName, List<(string Name, string Data)> sheets, StorageFolder outputFolder)
