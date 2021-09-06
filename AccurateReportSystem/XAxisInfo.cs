@@ -167,42 +167,31 @@ namespace AccurateReportSystem
 
         public Color OverlapColor
         {
-            get
-            {
-                return overlapColor ?? MasterInfo.OverlapColor;
-            }
-            set
-            {
-                overlapColor = value;
-            }
+            get => overlapColor ?? MasterInfo.OverlapColor;
+            set => overlapColor = value;
         }
         private Color? overlapColor = null;
 
         public float OverlapOpacity
         {
-            get
-            {
-                return overlapOpacity ?? MasterInfo.OverlapOpacity;
-            }
-            set
-            {
-                overlapOpacity = value;
-            }
+            get => overlapOpacity ?? MasterInfo.OverlapOpacity;
+            set => overlapOpacity = value;
         }
         private float? overlapOpacity = null;
 
         public bool IsEnabled
         {
-            get
-            {
-                return isEnabled ?? MasterInfo.IsEnabled;
-            }
-            set
-            {
-                isEnabled = value;
-            }
+            get => isEnabled ?? MasterInfo.IsEnabled;
+            set => isEnabled = value;
         }
         private bool? isEnabled = null;
+
+        public DateTime StartDate
+        {
+            get => startDate ?? MasterInfo.StartDate;
+            set => startDate = value;
+        }
+        private DateTime? startDate = null;
         public XAxisInfo MasterInfo { get; set; }
 
         public XAxisInfo()
@@ -211,10 +200,10 @@ namespace AccurateReportSystem
             LabelHeightInches = 0.15;
             LabelTickLength = 2;
             IsTickDrawn = false;
-            LabelFontSize = 8f;
+            LabelFontSize = 10f;
             LabelFormat = "F0";
             Title = "Footage";
-            TitleFontSize = 10f;
+            TitleFontSize = 14f;
             IsEnabled = true;
             ExtraTitleHeight = 2f;
             MinorGridline = new GridlineInfo(100, Colors.Gray)
@@ -334,7 +323,7 @@ namespace AccurateReportSystem
             using (var format = new CanvasTextFormat())
             {
                 format.HorizontalAlignment = CanvasHorizontalAlignment.Left;
-                format.WordWrapping = CanvasWordWrapping.WholeWord;
+                format.WordWrapping = CanvasWordWrapping.NoWrap;
                 format.FontSize = LabelFontSize;
                 format.FontFamily = "Arial";
                 format.FontWeight = FontWeights.Thin;
@@ -343,7 +332,21 @@ namespace AccurateReportSystem
                 foreach (var (location, value) in values)
                 {
                     var endLocation = location;
-                    var label = value.ToString(LabelFormat);
+                    var label = value.ToString();
+                    if (LabelFormat == "Hours")
+                    {
+                        var time = new DateTime().Date.AddHours(value);
+                        label = time.ToShortTimeString();
+                    }
+                    else if (LabelFormat.StartsWith("Date"))
+                    {
+                        label = ParseDateFormat(value);
+                    }
+                    else
+                    {
+                        label = value.ToString(LabelFormat);
+                    }
+
                     using (var layout = new CanvasTextLayout(session, label, format, 0, 0))
                     {
                         var halfLayoutWidth = (float)Math.Round(layout.LayoutBounds.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
@@ -389,6 +392,35 @@ namespace AccurateReportSystem
                     }
                 }
             }
+        }
+
+        private string ParseDateFormat(double value)
+        {
+            if (StartDate == null)
+            {
+                throw new ArgumentNullException("StartDate with Date format is null for XAxisInfo.");
+            }
+            var type = LabelFormat.Replace("Date", "").Trim();
+            var labelDate = StartDate;
+            switch (type)
+            {
+                case "Hour":
+                    labelDate = labelDate.AddHours(value);
+                    break;
+                case "Day":
+                    labelDate = labelDate.AddDays(value);
+                    break;
+                case "Minute":
+                    labelDate = labelDate.AddMinutes(value);
+                    break;
+                case "Second":
+                    labelDate = labelDate.AddSeconds(value);
+                    break;
+                default:
+                    break;
+            }
+
+            return labelDate.ToString("g");
         }
     }
 }

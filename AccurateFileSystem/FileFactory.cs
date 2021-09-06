@@ -47,6 +47,8 @@ namespace AccurateFileSystem
                         {
                             if (lines[0].StartsWith("Footage"))
                                 return new GeneralCsv(File.DisplayName, lines);
+                            if (lines[0].StartsWith("Record Type"))
+                                return new Udl.UdlFile(File.DisplayName, lines);
                             if (lines[1].Contains("Observations:"))
                                 return new VivaxPcm(File.DisplayName, lines);
                             if (lines[0].IndexOf("ID") <= 1 && lines[0] != "Footage")
@@ -189,7 +191,7 @@ namespace AccurateFileSystem
                 string line = reader.ReadLine();
                 ++lineCount;
                 if (!line.Contains("Start survey:")) throw new Exception();
-                Match extraCommasMatch = Regex.Match(line, ",+");
+                Match extraCommasMatch = Regex.Match(line, ",,+");
                 string extraCommasShort = extraCommasMatch.Success ? extraCommasMatch.Value.Substring(1) : "";
                 double? startFoot = null;
                 AllegroDataPoint lastPoint = null;

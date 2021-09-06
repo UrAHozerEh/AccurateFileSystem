@@ -209,7 +209,7 @@ namespace AccurateReportSystem
         // Y1 calculated sizes.
         public float Y1TitleHeight => Y1TitleFontSize + Y1ExtraTitleHeight;
         public float Y1TotalHeight => Y1TitleHeight + Y1LabelHeight;
-        public double Y1ValuesHeight => Y1MaximumValue - Y1MinimumValue;
+        public double Y1ValuesHeight => Math.Abs(Y1MaximumValue - Y1MinimumValue);
 
 
         // Y2 Axis

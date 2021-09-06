@@ -334,7 +334,7 @@ namespace AccurateReportSystem
                 if (cisSeverities.ContainsKey(curFoot))
                     (curOn, curOff, curPrimaryDes, curDate, curDepth, curIsExtrapolated, curCisSeverity, curCisReason, curGps, curRegion) = cisSeverities[curFoot];
 
-                var curPrio = GetPriority(curCisSeverity, curDcvgSeverity, PGESeverity.NRI);
+                var curPrio = GetPriority(curCisSeverity, curDcvgSeverity, curAmpSeverity);
                 if (!curIsExtrapolated && !curRegion.ShouldSkip)
                 {
                     var shapeValues = new string[34];
@@ -494,12 +494,12 @@ namespace AccurateReportSystem
                         lastAmpSeverity = curAmpSeverity;
                         lastAmpReason = curAmpReason;
                         lastRegion = curRegion;
-                        lastPrio = GetPriority(lastCisSeverity, lastDcvgSeverity, PGESeverity.NRI);
+                        lastPrio = GetPriority(lastCisSeverity, lastDcvgSeverity, lastAmpSeverity);
                     }
                 lastEndFoot = curFoot;
             }
 
-            var finalPrio = GetPriority(lastCisSeverity, lastDcvgSeverity, PGESeverity.NRI);
+            var finalPrio = GetPriority(lastCisSeverity, lastDcvgSeverity, lastAmpSeverity);
             var finalReason = lastCisReason;
             if (string.IsNullOrWhiteSpace(finalReason))
                 finalReason = lastDcvgReason;

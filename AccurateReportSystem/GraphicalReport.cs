@@ -77,6 +77,7 @@ namespace AccurateReportSystem
                 Container.Draw(page, session, drawArea);
             }
             return offscreen;
+
         }
     }
 

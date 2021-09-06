@@ -54,6 +54,7 @@ namespace AccurateReportSystem
             using (var format = new CanvasTextFormat())
             {
                 format.HorizontalAlignment = CanvasHorizontalAlignment.Center;
+                format.VerticalAlignment = CanvasVerticalAlignment.Center;
                 format.WordWrapping = CanvasWordWrapping.WholeWord;
                 format.FontSize = TitleFontSize;
                 format.FontFamily = "Arial";
