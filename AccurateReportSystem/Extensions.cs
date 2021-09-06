@@ -101,9 +101,13 @@ namespace AccurateReportSystem
 
         public static PGESeverity GetWorseOf(this PGESeverity cur, PGESeverity other)
         {
-            if (cur.CompareTo(other) <= 0)
-                return cur;
-            return other;
+            if (cur == PGESeverity.Severe || other == PGESeverity.Severe)
+                return PGESeverity.Severe;
+            if (cur == PGESeverity.Moderate || other == PGESeverity.Moderate)
+                return PGESeverity.Moderate;
+            if (cur == PGESeverity.Minor || other == PGESeverity.Minor)
+                return PGESeverity.Minor;
+            return PGESeverity.NRI;
         }
     }
 }

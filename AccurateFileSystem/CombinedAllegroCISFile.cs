@@ -221,13 +221,19 @@ namespace AccurateFileSystem
                 {
                     var (curGps, curAmps) = data[i];
 
-                    var (_, prevAmps) = data[Math.Max(i - 1, 0)];
+                    var (prevGps, prevAmps) = data[Math.Max(i - 1, 0)];
+                    var prevDist = prevGps.Distance(curGps);
                     var prevDiff = prevAmps - curAmps;
-                    var prevPercent = Math.Max(prevDiff / curAmps * 100, 0);
+                    var prevPercent = Math.Max(prevDiff / prevAmps * 100, 0);
+                    if (prevDist > 100)
+                        prevPercent = 0;
 
-                    var (_, nextAmps) = data[Math.Min(i + 1, data.Count - 1)];
-                    var nextDiff = nextAmps - curAmps;
+                    var (nextGps, nextAmps) = data[Math.Min(i + 1, data.Count - 1)];
+                    var nextDist = nextGps.Distance(curGps);
+                    var nextDiff = curAmps - nextAmps;
                     var nextPercent = Math.Max(nextDiff / curAmps * 100, 0);
+                    if (nextDist > 100)
+                        nextPercent = 0;
 
                     var percent = Math.Max(nextPercent, prevPercent);
 
@@ -819,10 +825,9 @@ namespace AccurateFileSystem
             return output.ToString();
         }
 
-        public string GetShapeFile(int readDecimals = 4)
+        private StringBuilder GetShapefileStringBuilder()
         {
             var output = new StringBuilder();
-            var readFormat = $"F{readDecimals}";
             var curLine = new string[34];
             curLine[0] = "LABEL";
             curLine[1] = "STATION";
@@ -859,11 +864,25 @@ namespace AccurateFileSystem
             curLine[32] = "ACVG";
             curLine[33] = "ACVGCAT";
             output.AppendLine(string.Join("\t", curLine));
+            return output;
+        }
+
+        public string GetShapeFile(int readDecimals = 4, bool globalUseMir = false)
+        {
+            var output = GetShapefileStringBuilder();
+            var readFormat = $"F{readDecimals}";
 
             foreach (var (footage, isReverse, point, useMir, file) in Points)
             {
-                curLine = new string[34];
-                curLine[0] = $"On: {point.MirOn.ToString(readFormat)}, Off: {point.MirOff.ToString(readFormat)}";
+                var on = point.On;
+                var off = point.Off;
+                if (useMir && globalUseMir)
+                {
+                    on = point.MirOn;
+                    off = point.MirOff;
+                }
+                var curLine = new string[34];
+                curLine[0] = $"On: {on.ToString(readFormat)}, Off: {off.ToString(readFormat)}";
                 curLine[1] = footage.ToString("F0");
                 if (point.HasTime)
                     curLine[2] = point.Times[0].ToString("MM/dd/yyyy");
@@ -883,12 +902,109 @@ namespace AccurateFileSystem
                     curLine[12] = "N/A";
                     curLine[13] = "N/A";
                 }
-                curLine[19] = point.MirOn.ToString(readFormat);
-                curLine[20] = point.MirOff.ToString(readFormat);
+                curLine[19] = on.ToString(readFormat);
+                curLine[20] = off.ToString(readFormat);
                 curLine[25] = "CECIS";
                 output.AppendLine(string.Join("\t", curLine));
             }
             return output.ToString().TrimEnd('\n');
+        }
+
+        public string GetPassingShapeFile(int readDecimals = 4, bool globalUseMir = false)
+        {
+            var output = GetShapefileStringBuilder();
+            var readFormat = $"F{readDecimals}";
+            var hasRead = false;
+
+            foreach (var (footage, isReverse, point, useMir, file) in Points)
+            {
+                var on = point.On;
+                var off = point.Off;
+                if (useMir && globalUseMir)
+                {
+                    on = point.MirOn;
+                    off = point.MirOff;
+                }
+                if (off > -0.850)
+                    continue;
+                hasRead = true;
+                var curLine = new string[34];
+                curLine[0] = $"On: {on.ToString(readFormat)}, Off: {off.ToString(readFormat)}";
+                curLine[1] = footage.ToString("F0");
+                if (point.HasTime)
+                    curLine[2] = point.Times[0].ToString("MM/dd/yyyy");
+                else
+                    curLine[2] = "N/A";
+                curLine[3] = point.OriginalComment;
+                if (point.Depth.HasValue)
+                    curLine[7] = point.Depth.Value.ToString("F0");
+
+                if (point.HasGPS)
+                {
+                    curLine[12] = point.GPS.Latitude.ToString("F8");
+                    curLine[13] = point.GPS.Longitude.ToString("F8");
+                }
+                else
+                {
+                    curLine[12] = "N/A";
+                    curLine[13] = "N/A";
+                }
+                curLine[19] = on.ToString(readFormat);
+                curLine[20] = off.ToString(readFormat);
+                curLine[25] = "CECIS";
+                output.AppendLine(string.Join("\t", curLine));
+            }
+            if (hasRead)
+                return output.ToString().TrimEnd('\n');
+            return "";
+        }
+
+        public string GetFailingShapeFile(int readDecimals = 4, bool globalUseMir = false)
+        {
+            var output = GetShapefileStringBuilder();
+            var readFormat = $"F{readDecimals}";
+            var hasRead = false;
+            foreach (var (footage, isReverse, point, useMir, file) in Points)
+            {
+                var on = point.On;
+                var off = point.Off;
+                if (useMir && globalUseMir)
+                {
+                    on = point.MirOn;
+                    off = point.MirOff;
+                }
+                if (off <= -0.850)
+                    continue;
+                hasRead = true;
+                var curLine = new string[34];
+                curLine[0] = $"On: {on.ToString(readFormat)}, Off: {off.ToString(readFormat)}";
+                curLine[1] = footage.ToString("F0");
+                if (point.HasTime)
+                    curLine[2] = point.Times[0].ToString("MM/dd/yyyy");
+                else
+                    curLine[2] = "N/A";
+                curLine[3] = point.OriginalComment;
+                if (point.Depth.HasValue)
+                    curLine[7] = point.Depth.Value.ToString("F0");
+
+                if (point.HasGPS)
+                {
+                    curLine[12] = point.GPS.Latitude.ToString("F8");
+                    curLine[13] = point.GPS.Longitude.ToString("F8");
+                }
+                else
+                {
+                    curLine[12] = "N/A";
+                    curLine[13] = "N/A";
+                }
+                curLine[19] = on.ToString(readFormat);
+                curLine[20] = off.ToString(readFormat);
+                curLine[25] = "CECIS";
+                output.AppendLine(string.Join("\t", curLine));
+            }
+            if (hasRead)
+                return output.ToString().TrimEnd('\n');
+            return "";
         }
 
         public void FixGps()

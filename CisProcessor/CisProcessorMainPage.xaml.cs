@@ -219,12 +219,15 @@ namespace CisProcessor
                 var finishedFinalName = finishedFileNames.GetValueOrDefault(folder.DisplayName, null);
                 combinedFiles.FixContactSpikes();
                 combinedFiles.FixGps();
-                var cisKmlFile = new KmlFile($"{finishedFinalName.Value.Item1} CIS Map Pre Straighten", combinedFiles.GetCisKmlData());
-                await cisKmlFile.WriteToFile(outputFolder);
+                var preStraightenData = combinedFiles.GetCisKmlData();
+                
                 combinedFiles.StraightenGps();
                 combinedFiles.RemoveComments("+");
                 var name = await MakeGraphs(combinedFiles, outputFolder, finishedFinalName);
                 await CreateExcelFile($"{folder.DisplayName}+{name.Text}+{(name.IsReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedFiles.FileInfos.GetExcelData(0)) }, fileOrder);
+
+                var cisKmlFile = new KmlFile($"{name.Text} CIS Map Pre Straighten", preStraightenData);
+                await cisKmlFile.WriteToFile(outputFolder);
             }
         }
 
@@ -335,6 +338,7 @@ namespace CisProcessor
                 graph1.YAxesInfo.MajorGridlines.Offset = 0.125;
                 graph1.YAxesInfo.MinorGridlines.Offset = 0.025;
             }
+            graph1.YAxesInfo.Y1MinimumValue = -7;
 
             graph1.Series.Add(on);
             if (allegroFile.Type == FileType.OnOff)
@@ -372,7 +376,7 @@ namespace CisProcessor
 
             var topGlobalXAxis = new GlobalXAxis(report, true)
             {
-                Title = response.Value.Item1
+                Title = response.Value.Text
             };
 
             var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
@@ -428,9 +432,27 @@ namespace CisProcessor
             var pages = report.PageSetup.GetAllPages(0, allegroFile.Points.Last().Footage);
             var curFileName = $"{response.Value.Item1}\\{topGlobalXAxis.Title}";
             await CreateStandardFiles(curFileName, allegroFile, outputFolder);
-            var cisShapeFile = new ShapefileData($"{response.Value.Text}", allegroFile.GetShapeFile());
+
             var shapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
+            var cisShapeFile = new ShapefileData($"{response.Value.Text}", allegroFile.GetShapeFile());
             await cisShapeFile.WriteToFolder(shapefileFolder);
+
+            var passShapefileFolder = await outputFolder.CreateFolderAsync("Passing Shapefiles", CreationCollisionOption.OpenIfExists);
+            var passingCisShapefileData = allegroFile.GetPassingShapeFile();
+            if (!string.IsNullOrEmpty(passingCisShapefileData))
+            {
+                var passingCisShapeFile = new ShapefileData($"{response.Value.Text}", passingCisShapefileData);
+                await passingCisShapeFile.WriteToFolder(passShapefileFolder);
+            }
+
+            var failingShapefileFolder = await outputFolder.CreateFolderAsync("Failing Shapefiles", CreationCollisionOption.OpenIfExists);
+            var failingCisShapefileData = allegroFile.GetFailingShapeFile();
+            if (!string.IsNullOrEmpty(failingCisShapefileData))
+            {
+                var failingCisShapeFile = new ShapefileData($"{response.Value.Text}", failingCisShapefileData);
+                await failingCisShapeFile.WriteToFolder(failingShapefileFolder);
+            }
+
             //if (MirFilter.IsChecked ?? false)
             //    await CreateExcelFile($"{curFileName} MIR Skips", new List<(string Name, string Data)>() { ("MIR Skips", mirFilterData) });
             var imageFiles = new List<StorageFile>();

@@ -166,6 +166,13 @@ namespace AccurateFileSystem
             return output;
         }
 
+        public static DateTime GetTimeFromExcelTime(this string text)
+        {
+            var number = double.Parse(text);
+            var date = new DateTime(1900, 1, 1);
+            return date.AddDays(number - 2);
+        }
+
         private static int GetMultiplier(string suffix)
         {
             switch (suffix)
@@ -338,12 +345,12 @@ namespace AccurateFileSystem
             var closeDist = double.MaxValue;
             var closePoint = point;
 
-            for(int i = 1; i < points.Count; ++i)
+            for (int i = 1; i < points.Count; ++i)
             {
                 var start = points[i - 1];
                 var end = points[i];
                 var (curDist, curPoint) = point.DistanceToSegment(start, end);
-                if(curDist < closeDist)
+                if (curDist < closeDist)
                 {
                     closeDist = curDist;
                     closePoint = curPoint;
@@ -358,7 +365,7 @@ namespace AccurateFileSystem
             var closeDist = double.MaxValue;
             var closePoint = point;
 
-            foreach(var line in lines)
+            foreach (var line in lines)
             {
                 var (curDist, curPoint) = point.DistanceToLine(line);
                 if (curDist < closeDist)
