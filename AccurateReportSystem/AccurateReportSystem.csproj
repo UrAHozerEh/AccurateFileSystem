@@ -120,6 +120,8 @@
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="AccurateDrawingDevices\AccurateDrawingDevice.cs" />
+    <Compile Include="AccurateDrawingDevices\AccurateTextFormat.cs" />
     <Compile Include="Chart.cs" />
     <Compile Include="ChartSeries.cs" />
     <Compile Include="CommentSeries.cs" />
@@ -158,6 +160,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform">
       <Version>6.2.8</Version>
+    </PackageReference>
+    <PackageReference Include="PdfSharp">
+      <Version>1.50.5147</Version>
     </PackageReference>
     <PackageReference Include="Win2D.uwp">
       <Version>1.23.0</Version>

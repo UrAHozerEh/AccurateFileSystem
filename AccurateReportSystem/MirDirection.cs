@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AccurateFileSystem;
+using AccurateReportSystem.AccurateDrawingDevices;
 using Microsoft.Graphics.Canvas;
 using Windows.Foundation;
 using Windows.UI;
@@ -35,7 +36,7 @@ namespace AccurateReportSystem
             OffArrowInfoZero = new ArrowInfo(0.45f, 0.25f, Colors.Black, Colors.White, finWidthPercent: 0f, finHeightPercent: 0.425f, tailPercent: 1f);
         }
 
-        public override void Draw(PageInformation page, CanvasDrawingSession session, Rect drawArea, TransformInformation1d transform)
+        public override void Draw(PageInformation page, AccurateDrawingDevice device, Rect drawArea, TransformInformation1d transform)
         {
 
             var onHalfHeight = Math.Round(OnArrowInfo.Height / 2, GraphicalReport.DIGITS_TO_ROUND);
@@ -74,56 +75,19 @@ namespace AccurateReportSystem
                 lastFootage = footage;
                 lastIsReverse = isReverse;
             }
-            if(start.HasValue && start.Value != lastFootage)
+            if (start.HasValue && start.Value != lastFootage)
             {
                 values.Add((start.Value, lastFootage, startValue.On, startValue.Off, lastIsReverse));
             }
 
             if (values.Count == 0)
                 return;
-            using (var _ = session.CreateLayer(1f, drawArea))
+
+            if (values.Count == 1)
             {
-                if (values.Count == 1)
+                var (curStart, curEnd, on, off, isReverse) = values.First();
+                if (curStart <= page.StartFootage && curEnd >= page.EndFootage)
                 {
-                    var (curStart, curEnd, on, off, isReverse) = values.First();
-                    if (curStart <= page.StartFootage && curEnd >= page.EndFootage)
-                    {
-                        var positiveDirection = !isReverse ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right;
-                        var negativeDirection = !isReverse ? ArrowInfo.Direction.Right : ArrowInfo.Direction.Left;
-
-                        var onDirection = on < 0 ? negativeDirection : positiveDirection;
-                        var mirOn = on * 1000;
-                        var offDirection = off < 0 ? negativeDirection : positiveDirection;
-                        var mirOff = off * 1000;
-
-                        var middleX = drawArea.GetMiddlePoint().X;
-
-                        if (Math.Round(mirOn, 3) != 0)
-                            OnArrowInfo.DrawOnTopOf(session, middleX, onY, onDirection, mirOn.ToString("F3"));
-                        else
-                            OnArrowInfoZero.DrawOnTopOf(session, middleX, onY, onDirection, mirOn.ToString("F3"));
-
-                        if (Math.Round(mirOff, 3) != 0)
-                            OffArrowInfo.DrawOnTopOf(session, middleX, offY, offDirection, mirOff.ToString("F3"));
-                        else
-                            OffArrowInfoZero.DrawOnTopOf(session, middleX, offY, offDirection, mirOff.ToString("F3"));
-                        return;
-                    }
-                }
-
-                foreach (var (curStart, curEnd, on, off, isReverse) in values)
-                {
-                    var realStart = curStart;
-                    var realEnd = curEnd;
-                    if (curStart <= page.StartFootage)
-                        realStart = page.StartFootage - page.Width;
-                    if (curEnd >= page.EndFootage)
-                        realEnd = page.EndFootage + page.Width;
-
-                    var x1 = transform.ToDrawArea(realStart);
-                    var x2 = transform.ToDrawArea(realEnd);
-
-
                     var positiveDirection = !isReverse ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right;
                     var negativeDirection = !isReverse ? ArrowInfo.Direction.Right : ArrowInfo.Direction.Left;
 
@@ -132,28 +96,64 @@ namespace AccurateReportSystem
                     var offDirection = off < 0 ? negativeDirection : positiveDirection;
                     var mirOff = off * 1000;
 
+                    var middleX = drawArea.GetMiddlePoint().X;
 
                     if (Math.Round(mirOn, 3) != 0)
-                        OnArrowInfo.DrawRightOf(session, x1, onY, onDirection, mirOn.ToString("F3"));
+                        OnArrowInfo.DrawOnTopOf(device, middleX, onY, onDirection, mirOn.ToString("F3"));
                     else
-                        OnArrowInfoZero.DrawRightOf(session, x1, onY, onDirection, mirOn.ToString("F3"));
+                        OnArrowInfoZero.DrawOnTopOf(device, middleX, onY, onDirection, mirOn.ToString("F3"));
 
                     if (Math.Round(mirOff, 3) != 0)
-                        OffArrowInfo.DrawRightOf(session, x1, offY, offDirection, mirOff.ToString("F3"));
+                        OffArrowInfo.DrawOnTopOf(device, middleX, offY, offDirection, mirOff.ToString("F3"));
                     else
-                        OffArrowInfoZero.DrawRightOf(session, x1, offY, offDirection, mirOff.ToString("F3"));
-
-                    if (Math.Round(mirOn, 3) != 0)
-                        OnArrowInfo.DrawLeftOf(session, x2, onY, onDirection, mirOn.ToString("F3"));
-                    else
-                        OnArrowInfoZero.DrawLeftOf(session, x2, onY, onDirection, mirOn.ToString("F3"));
-
-                    if (Math.Round(mirOff, 3) != 0)
-                        OffArrowInfo.DrawLeftOf(session, x2, offY, offDirection, mirOff.ToString("F3"));
-                    else
-                        OffArrowInfoZero.DrawLeftOf(session, x2, offY, offDirection, mirOff.ToString("F3"));
+                        OffArrowInfoZero.DrawOnTopOf(device, middleX, offY, offDirection, mirOff.ToString("F3"));
+                    return;
                 }
             }
+
+            foreach (var (curStart, curEnd, on, off, isReverse) in values)
+            {
+                var realStart = curStart;
+                var realEnd = curEnd;
+                if (curStart <= page.StartFootage)
+                    realStart = page.StartFootage - page.Width;
+                if (curEnd >= page.EndFootage)
+                    realEnd = page.EndFootage + page.Width;
+
+                var x1 = transform.ToDrawArea(realStart);
+                var x2 = transform.ToDrawArea(realEnd);
+
+
+                var positiveDirection = !isReverse ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right;
+                var negativeDirection = !isReverse ? ArrowInfo.Direction.Right : ArrowInfo.Direction.Left;
+
+                var onDirection = on < 0 ? negativeDirection : positiveDirection;
+                var mirOn = on * 1000;
+                var offDirection = off < 0 ? negativeDirection : positiveDirection;
+                var mirOff = off * 1000;
+
+
+                if (Math.Round(mirOn, 3) != 0)
+                    OnArrowInfo.DrawRightOf(device, x1, onY, onDirection, mirOn.ToString("F3"));
+                else
+                    OnArrowInfoZero.DrawRightOf(device, x1, onY, onDirection, mirOn.ToString("F3"));
+
+                if (Math.Round(mirOff, 3) != 0)
+                    OffArrowInfo.DrawRightOf(device, x1, offY, offDirection, mirOff.ToString("F3"));
+                else
+                    OffArrowInfoZero.DrawRightOf(device, x1, offY, offDirection, mirOff.ToString("F3"));
+
+                if (Math.Round(mirOn, 3) != 0)
+                    OnArrowInfo.DrawLeftOf(device, x2, onY, onDirection, mirOn.ToString("F3"));
+                else
+                    OnArrowInfoZero.DrawLeftOf(device, x2, onY, onDirection, mirOn.ToString("F3"));
+
+                if (Math.Round(mirOff, 3) != 0)
+                    OffArrowInfo.DrawLeftOf(device, x2, offY, offDirection, mirOff.ToString("F3"));
+                else
+                    OffArrowInfoZero.DrawLeftOf(device, x2, offY, offDirection, mirOff.ToString("F3"));
+            }
+
         }
     }
 }

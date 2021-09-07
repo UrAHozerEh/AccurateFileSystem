@@ -1,4 +1,6 @@
-﻿using Microsoft.Graphics.Canvas;
+﻿using AccurateReportSystem.AccurateDrawingDevices;
+using Microsoft.Graphics.Canvas;
+using PdfSharp.Pdf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,9 +15,10 @@ namespace AccurateReportSystem
         public Container Child { get; set; }
         public Container()
         {
+
         }
 
-        public abstract void Draw(PageInformation pageInformation, CanvasDrawingSession session, Rect drawArea);
+        public abstract void Draw(PageInformation pageInformation, AccurateDrawingDevice drawingDevice, Rect drawArea);
 
         //TODO: Add function to get requested container size. probably return double.maxvalue for things that want as much space as possible (graph)
         public abstract double GetRequestedWidth();

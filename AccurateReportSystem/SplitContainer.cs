@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using AccurateReportSystem.AccurateDrawingDevices;
 using Microsoft.Graphics.Canvas;
 using Windows.Foundation;
 using Windows.UI;
@@ -22,7 +23,7 @@ namespace AccurateReportSystem
             Orientation = orientation;
         }
 
-        public override void Draw(PageInformation pageInformation, CanvasDrawingSession session, Rect drawArea)
+        public override void Draw(PageInformation pageInformation, AccurateDrawingDevice drawingDevice, Rect drawArea)
         {
             //TODO: Containers should probably have a "calculate" that is done once per session so I dont need to do all this each page.
             //session.DrawRectangle(drawArea, Colors.Red);
@@ -79,7 +80,7 @@ namespace AccurateReportSystem
                 }
                 rect = GetRect(offset, curSize, drawArea);
                 //session.DrawRectangle(rect, Colors.Blue);
-                measure.Container.Draw(pageInformation, session, rect);
+                measure.Container.Draw(pageInformation, drawingDevice, rect);
                 offset += curSize;
             }
         }

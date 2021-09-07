@@ -1396,7 +1396,7 @@ namespace AFSTester
             if (distance < 500)
             {
                 report.PageSetup.Overlap = 10;
-                report.PageSetup.FootagePerPage = 100;
+                report.PageSetup.UnitsPerPage = 100;
                 report.XAxisInfo.MajorGridline.Offset = 10;
                 report.XAxisInfo.MinorGridline.IsEnabled = false;
             }
@@ -2169,7 +2169,7 @@ namespace AFSTester
             splitContainer.AddContainer(mainGraph);
             splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
             report.Container = splitContainer;
-            report.PageSetup.FootagePerPage = 10000;
+            report.PageSetup.UnitsPerPage = 10000;
             var pages = report.PageSetup.GetAllPages(0, soilResData[60].Last().Footage);
             var curFileName = $"{topGlobalXAxis.Title}";
             //var tabular = GetOnOffDepolPcmTabularData(allegroFile, depolFile, depolExceptions.PolarizationData, pcmReads);

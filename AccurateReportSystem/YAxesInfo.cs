@@ -1,4 +1,5 @@
-﻿using Microsoft.Graphics.Canvas;
+﻿using AccurateReportSystem.AccurateDrawingDevices;
+using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.Text;
 using System;
@@ -483,14 +484,14 @@ namespace AccurateReportSystem
             Y2Title = y2Name;
         }
 
-        public void DrawGridlines(CanvasDrawingSession session, Rect graphBodyDrawArea, TransformInformation2d y1Transform)
+        public void DrawGridlines(AccurateDrawingDevice device, Rect graphBodyDrawArea, TransformInformation2d y1Transform)
         {
             if (MinorGridlines.IsEnabled)
             {
                 var values = GetGridlineValues(y1Transform, MinorGridlines.Offset);
                 foreach (var (y, _) in values)
                 {
-                    session.DrawLine((float)graphBodyDrawArea.Left, y, (float)graphBodyDrawArea.Right, y, MinorGridlines.Color, MinorGridlines.Thickness);
+                    device.DrawLine((float)graphBodyDrawArea.Left, y, (float)graphBodyDrawArea.Right, y, MinorGridlines.Thickness, MinorGridlines.Color);
                 }
             }
             if (MajorGridlines.IsEnabled)
@@ -498,7 +499,7 @@ namespace AccurateReportSystem
                 var values = GetGridlineValues(y1Transform, MajorGridlines.Offset);
                 foreach (var (y, _) in values)
                 {
-                    session.DrawLine((float)graphBodyDrawArea.Left, y, (float)graphBodyDrawArea.Right, y, MajorGridlines.Color, MajorGridlines.Thickness);
+                    device.DrawLine((float)graphBodyDrawArea.Left, y, (float)graphBodyDrawArea.Right, y, MajorGridlines.Thickness, MajorGridlines.Color);
                 }
             }
         }

@@ -1,4 +1,5 @@
-﻿using Microsoft.Graphics.Canvas;
+﻿using AccurateReportSystem.AccurateDrawingDevices;
+using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.Text;
 using System;
@@ -163,7 +164,7 @@ namespace AccurateReportSystem
             Name = name;
         }
 
-        public void Draw(CanvasDrawingSession session, IEnumerable<Series> series, Rect drawArea)
+        public void Draw(AccurateDrawingDevice device, IEnumerable<Series> series, Rect drawArea)
         {
             var height = 0f;
             var labelPercentWidth = float.NaN;
@@ -181,91 +182,43 @@ namespace AccurateReportSystem
                 labelPercentWidth = 1f;
             var width = (float)(drawArea.Width * labelPercentWidth);
             var filteredSeries = series.Where(s => s.IsDrawnInLegend).ToList();
+            var nameFormat = new AccurateTextFormat()
+            {
+                FontWeight = AccurateFontWeight.Bold,
+                FontSize = NameFontSize
+            };
+            var seriesFormat = new AccurateTextFormat()
+            {
+                FontWeight = AccurateFontWeight.Bold,
+                FontSize = SeriesNameFontSize
+            };
 
-            using (var format = new CanvasTextFormat())
+            var layout = device.GetTextSize(Name, nameFormat);
+            height += (float)layout.Height;
+
+
+            foreach (var curSeries in filteredSeries)
             {
-                format.HorizontalAlignment = HorizontalAlignment;
-                format.FontSize = NameFontSize;
-                format.FontFamily = "Arial";
-                format.FontWeight = FontWeights.Bold;
-                format.FontStyle = FontStyle.Normal;
-                using (var layout = new CanvasTextLayout(session, Name, format, width, 0))
-                {
-                    var curHeight = (float)layout.LayoutBounds.Height;
-                    height += curHeight;
-                }
-            }
-            using (var format = new CanvasTextFormat())
-            {
-                format.HorizontalAlignment = HorizontalAlignment;
-                format.FontSize = SeriesNameFontSize;
-                format.FontFamily = "Arial";
-                format.FontWeight = FontWeights.Bold;
-                format.FontStyle = FontStyle.Normal;
-                foreach (var curSeries in filteredSeries)
-                {
-                    using (var layout = new CanvasTextLayout(session, curSeries.Name, format, width, 0))
-                    {
-                        var curHeight = (float)layout.LayoutBounds.Height;
-                        height += curHeight;
-                    }
-                }
+                layout = device.GetTextSize(curSeries.Name, seriesFormat);
+                height += (float)layout.Height;
             }
 
-            //session.DrawRectangle(drawArea, Colors.Orange);
-            using (var layer = session.CreateLayer(1f, drawArea))
-            {
-                var offset = 0f;
-                if (VerticalAlignment == CanvasVerticalAlignment.Center)
-                    offset = (float)Math.Round(drawArea.Height / 2 - height / 2, GraphicalReport.DIGITS_TO_ROUND);
-                else if (VerticalAlignment == CanvasVerticalAlignment.Bottom)
-                    offset = (float)(drawArea.Bottom - height);
-                using (var format = new CanvasTextFormat())
-                {
-                    format.HorizontalAlignment = HorizontalAlignment;
-                    format.FontSize = NameFontSize;
-                    format.FontFamily = "Arial";
-                    format.FontWeight = FontWeights.Bold;
-                    format.FontStyle = FontStyle.Normal;
-                    using (var layout = new CanvasTextLayout(session, Name, format, width, 0))
-                    {
-                        using (var geo = CanvasGeometry.CreateText(layout))
-                        {
-                            session.FillGeometry(geo, (float)drawArea.X, (float)drawArea.Y + offset, NameColor);
-                        }
-                        var curHeight = (float)layout.LayoutBounds.Height;
-                        offset += curHeight;
-                    }
-                }
-                using (var format = new CanvasTextFormat())
-                {
-                    format.HorizontalAlignment = HorizontalAlignment;
-                    format.FontSize = SeriesNameFontSize;
-                    format.FontFamily = "Arial";
-                    format.FontWeight = FontWeights.Bold;
-                    format.FontStyle = FontStyle.Normal;
-                    foreach (var curSeries in filteredSeries)
-                    {
-                        using (var layout = new CanvasTextLayout(session, curSeries.Name, format, width, 0))
-                        {
-                            using (var geo = CanvasGeometry.CreateText(layout))
-                            {
-                                if (SeriesNameUsesSeriesColor)
-                                    session.FillGeometry(geo, (float)drawArea.X, (float)drawArea.Y + offset, curSeries.LegendNameColor);
-                                else
-                                    session.FillGeometry(geo, (float)drawArea.X, (float)drawArea.Y + offset, SeriesNameColor);
-                                using (var strokeStyle = new CanvasStrokeStyle())
-                                {
-                                    strokeStyle.TransformBehavior = CanvasStrokeTransformBehavior.Hairline;
-                                    session.DrawGeometry(geo, (float)drawArea.X, (float)drawArea.Y + offset, Colors.Black, 1, strokeStyle);
-                                }
+            var offset = 0f;
+            if (VerticalAlignment == CanvasVerticalAlignment.Center)
+                offset = (float)Math.Round(drawArea.Height / 2 - height / 2, GraphicalReport.DIGITS_TO_ROUND);
+            else if (VerticalAlignment == CanvasVerticalAlignment.Bottom)
+                offset = (float)(drawArea.Bottom - height);
 
-                            }
-                            var curHeight = (float)layout.LayoutBounds.Height;
-                            offset += curHeight;
-                        }
-                    }
-                }
+            layout = device.GetTextSize(Name, nameFormat);
+            offset += (float)layout.Height;
+            device.DrawFormattedText(Name, nameFormat, NameColor, drawArea.X, drawArea.Y + offset, 0);
+
+            foreach (var curSeries in filteredSeries)
+            {
+                layout = device.GetTextSize(curSeries.Name, seriesFormat);
+                var color = SeriesNameUsesSeriesColor ? curSeries.LegendNameColor : SeriesNameColor;
+                device.DrawFormattedText(curSeries.Name, seriesFormat, color, drawArea.X, drawArea.Y + offset, 0);
+                offset += (float)layout.Height;
             }
         }
     }

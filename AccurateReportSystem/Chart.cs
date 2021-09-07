@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using AccurateReportSystem.AccurateDrawingDevices;
 using Microsoft.Graphics.Canvas;
+using PdfSharp.Drawing;
+using PdfSharp.Pdf;
 using Windows.Foundation;
 using Windows.UI;
 
@@ -24,6 +27,8 @@ namespace AccurateReportSystem
         public List<ChartSeries> Series { get; set; } = new List<ChartSeries>();
         public bool DrawTopBorder { get; set; } = true;
         public bool DrawBottomBorder { get; set; } = false;
+        public bool DrawChartAreaBorder { get; set; } = true;
+        public Color ChartAreaBorderColor { get; set; } = Colors.Black;
 
         public Chart(GraphicalReport report, string name)
         {
@@ -34,7 +39,8 @@ namespace AccurateReportSystem
             YAxesInfo.Y2IsDrawn = false;
             YAxesInfo.Y1IsDrawn = false;
         }
-        public override void Draw(PageInformation page, CanvasDrawingSession session, Rect drawArea)
+
+        private Rect GetBodyDrawArea(Rect drawArea)
         {
             var leftSpace = LegendInfo.Width + YAxesInfo.Y1TotalHeight;
             var rightSpace = YAxesInfo.Y2TotalHeight;
@@ -44,38 +50,52 @@ namespace AccurateReportSystem
             var bottomSpace = ((XAxisInfo.IsEnabled && !XAxisInfo.IsFlippedVertical) ? XAxisInfo.TotalHeight : 0) + TopPadding;
             var remainingHeight = drawArea.Height - topSpace - bottomSpace;
 
-            var bodyDrawArea = new Rect(drawArea.Left + leftSpace, drawArea.Top + topSpace, remainingWidth, remainingHeight);
-            //session.DrawRectangle(drawArea, Colors.Orange);
+            return new Rect(drawArea.Left + leftSpace, drawArea.Top + topSpace, remainingWidth, remainingHeight);
+        }
+
+        private TransformInformation1d GetBodyDrawAreaTransform(Rect bodyDrawArea, PageInformation page)
+        {
+            return new TransformInformation1d((float)bodyDrawArea.Left, (float)bodyDrawArea.Right, page.StartFootage, page.EndFootage, false);
+        }
+
+        public override void Draw(PageInformation page, AccurateDrawingDevice device, Rect drawArea)
+        {
+            var bodyDrawArea = GetBodyDrawArea(drawArea);
             var offset = 0f;
-            var transform = new TransformInformation1d((float)bodyDrawArea.Left, (float)bodyDrawArea.Right, page.StartFootage, page.EndFootage, false);
+            var transform = GetBodyDrawAreaTransform(bodyDrawArea, page);
             var gridlineDrawArea = new Rect(bodyDrawArea.Left, drawArea.Top, bodyDrawArea.Width, drawArea.Height);
-            session.DrawRectangle(gridlineDrawArea, Colors.Black);
-            XAxisInfo.DrawGridlines(session, page, gridlineDrawArea, transform);
+
+            if (DrawChartAreaBorder)
+            {
+                device.DrawRectangle(gridlineDrawArea, ChartAreaBorderColor);
+            }
+            device.DrawRectangle(gridlineDrawArea, Colors.Black);
+            XAxisInfo.DrawGridlines(device, page, gridlineDrawArea, transform);
             foreach (ChartSeries series in Series)
             {
                 var curDrawArea = new Rect(bodyDrawArea.Left, bodyDrawArea.Top + offset, bodyDrawArea.Width, series.Height);
                 //session.DrawRectangle(curDrawArea, Colors.Blue);
-                series.Draw(page, session, curDrawArea, transform);
+                series.Draw(page, device, curDrawArea, transform);
                 offset += series.Height + BetweenPadding;
             }
 
             var xAxisY = XAxisInfo.IsFlippedVertical ? (bodyDrawArea.Top - XAxisInfo.TotalHeight) : bodyDrawArea.Bottom;
             var xAxisDrawArea = new Rect(bodyDrawArea.Left, xAxisY, bodyDrawArea.Width, XAxisInfo.TotalHeight);
-            XAxisInfo.DrawInfo(session, page, transform, xAxisDrawArea);
-            
+            XAxisInfo.DrawInfo(device, page, transform, xAxisDrawArea);
+
 
             if (DrawTopBorder)
-                session.DrawLine((float)drawArea.Left, (float)drawArea.Top, (float)drawArea.Right, (float)drawArea.Top, Colors.Black, 1);
+                device.DrawLine((float)drawArea.Left, (float)drawArea.Top, (float)drawArea.Right, (float)drawArea.Top, 1, Colors.Black);
             if (DrawBottomBorder)
-                session.DrawLine((float)drawArea.Left, (float)drawArea.Bottom, (float)drawArea.Right, (float)drawArea.Bottom, Colors.Black, 1);
-            DrawOverlapShadow(page, session, transform, gridlineDrawArea);
+                device.DrawLine((float)drawArea.Left, (float)drawArea.Bottom, (float)drawArea.Right, (float)drawArea.Bottom, 1, Colors.Black);
+            DrawOverlapShadow(page, device, transform, gridlineDrawArea);
 
             var legendWidth = LegendInfo.Width + (YAxesInfo.Y1IsDrawn ? 0 : YAxesInfo.Y1TotalHeight);
             var legendDrawArea = new Rect(drawArea.X, drawArea.Y, legendWidth, drawArea.Height);
-            LegendInfo.Draw(session, Series, legendDrawArea);
+            LegendInfo.Draw(device, Series, legendDrawArea);
         }
 
-        private void DrawOverlapShadow(PageInformation page, CanvasDrawingSession session, TransformInformation1d transform, Rect drawArea)
+        private void DrawOverlapShadow(PageInformation page, AccurateDrawingDevice device, TransformInformation1d transform, Rect drawArea)
         {
             var color = Colors.Black;
             var opacity = 0.25f;
@@ -85,11 +105,9 @@ namespace AccurateReportSystem
             var endShadowWidth = transform.ToDrawArea(page.EndFootage) - endShadowStart;
             var startRect = new Rect(startShadowStart, drawArea.Y, startShadowWidth, drawArea.Height);
             var endRect = new Rect(endShadowStart, drawArea.Y, endShadowWidth, drawArea.Height);
-            using (var layer = session.CreateLayer(opacity))
-            {
-                session.FillRectangle(startRect, color);
-                session.FillRectangle(endRect, color);
-            }
+            device.FillRectangle(startRect, color, opacity);
+            device.FillRectangle(endRect, color, opacity);
+
         }
 
         public override double GetRequestedHeight()

@@ -158,7 +158,7 @@ namespace UdlProcessor
             report.XAxisInfo.StartDate = dataSet.StartTime;
             report.XAxisInfo.LabelFormat = "DateHour";
             report.XAxisInfo.ExtraTitleHeight = report.XAxisInfo.TitleFontSize + 5;
-            report.PageSetup.FootagePerPage = hoursPerPage;
+            report.PageSetup.UnitsPerPage = hoursPerPage;
             report.PageSetup.Overlap = overlap;
 
             var timeSpan = dataSet.EndTime - dataSet.StartTime;
@@ -208,7 +208,7 @@ namespace UdlProcessor
             report.XAxisInfo.LabelFormat = "DateHour";
             report.XAxisInfo.StartDate = dataSet.StartTime;
             report.XAxisInfo.MinorGridline.IsEnabled = true;
-            report.PageSetup.FootagePerPage = totalHours;
+            report.PageSetup.UnitsPerPage = totalHours;
             report.PageSetup.Overlap = 0;
 
             var pages = report.PageSetup.GetAllPages(startHour, totalHours);

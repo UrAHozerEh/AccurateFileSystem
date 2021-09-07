@@ -1,6 +1,8 @@
-﻿using Microsoft.Graphics.Canvas;
+﻿using AccurateReportSystem.AccurateDrawingDevices;
+using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.Text;
+using PdfSharp.Drawing;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -228,14 +230,14 @@ namespace AccurateReportSystem
             isEnabled = null;
         }
 
-        public void DrawGridlines(CanvasDrawingSession session, PageInformation page, Rect graphBodyDrawArea, TransformInformation1d transform)
+        public void DrawGridlines(AccurateDrawingDevice device, PageInformation page, Rect graphBodyDrawArea, TransformInformation1d transform)
         {
             if (MinorGridline.IsEnabled)
             {
                 var values = GetGridlineValues(page, transform, MinorGridline.Offset);
                 foreach (var (x, _) in values)
                 {
-                    session.DrawLine(x, (float)graphBodyDrawArea.Top, x, (float)graphBodyDrawArea.Bottom, MinorGridline.Color);
+                    device.DrawLine(x, (float)graphBodyDrawArea.Top, x, (float)graphBodyDrawArea.Bottom, MinorGridline.Color);
                 }
             }
             if (MajorGridline.IsEnabled)
@@ -243,7 +245,7 @@ namespace AccurateReportSystem
                 var values = GetGridlineValues(page, transform, MajorGridline.Offset);
                 foreach (var (x, _) in values)
                 {
-                    session.DrawLine(x, (float)graphBodyDrawArea.Top, x, (float)graphBodyDrawArea.Bottom, MinorGridline.Color);
+                    device.DrawLine(x, (float)graphBodyDrawArea.Top, x, (float)graphBodyDrawArea.Bottom, MajorGridline.Color);
                 }
             }
         }
@@ -268,130 +270,88 @@ namespace AccurateReportSystem
             return output;
         }
 
-        public void DrawInfo(CanvasDrawingSession session, PageInformation page, TransformInformation1d transform, Rect drawArea)
+        public void DrawInfo(AccurateDrawingDevice device, PageInformation page, TransformInformation1d transform, Rect drawArea)
         {
             if (!IsEnabled)
                 return;
             if (!IsFlippedVertical)
             {
                 Rect labelDrawArea = new Rect(drawArea.Left, drawArea.Top, drawArea.Width, LabelHeight);
-                DrawLabels(session, page, transform, labelDrawArea);
+                DrawLabels(device, page, transform, labelDrawArea);
                 Rect titleDrawArea = new Rect(drawArea.Left, drawArea.Top + LabelHeight, drawArea.Width, TitleTotalHeight);
-                DrawTitle(session, titleDrawArea);
+                DrawTitle(device, titleDrawArea);
             }
             else
             {
                 Rect labelDrawArea = new Rect(drawArea.Left, drawArea.Top + TitleTotalHeight, drawArea.Width, LabelHeight);
-                DrawLabels(session, page, transform, labelDrawArea);
+                DrawLabels(device, page, transform, labelDrawArea);
                 Rect titleDrawArea = new Rect(drawArea.Left, drawArea.Top, drawArea.Width, TitleTotalHeight);
-                DrawTitle(session, titleDrawArea);
+                DrawTitle(device, titleDrawArea);
             }
         }
 
-        public void DrawTitle(CanvasDrawingSession session, Rect drawArea)
+        public void DrawTitle(AccurateDrawingDevice device, Rect drawArea)
         {
             //session.DrawRectangle(drawArea, Colors.Purple);
-            using (var format = new CanvasTextFormat())
+            var format2 = new AccurateTextFormat()
             {
-                format.HorizontalAlignment = CanvasHorizontalAlignment.Center;
-                format.WordWrapping = CanvasWordWrapping.WholeWord;
-                format.FontSize = TitleFontSize;
-                format.FontFamily = "Arial";
-                format.FontWeight = FontWeights.Thin;
-                format.FontStyle = FontStyle.Normal;
-                using (var layout = new CanvasTextLayout(session, Title, format, (float)drawArea.Width, (float)drawArea.Height))
-                {
-                    using (var geometry = CanvasGeometry.CreateText(layout))
-                    {
-                        var bounds = layout.DrawBounds;
-                        var translateMatrix = bounds.CreateTranslateMiddleTo(drawArea);
-                        var rotationMatrix = drawArea.CreateRotationAroundMiddle(90);
-                        using (var rotatedGeo = geometry.Transform(translateMatrix))//.Transform(rotationMatrix))
-                        {
-                            session.FillGeometry(rotatedGeo, Colors.Black);
-                        }
-                    }
-                }
-            }
+                FontWeight = AccurateFontWeight.Thin,
+                FontSize = TitleFontSize,
+            };
+            device.DrawFormattedText(Title, format2, Colors.Black, drawArea, 90);
         }
 
-        public void DrawLabels(CanvasDrawingSession session, PageInformation page, TransformInformation1d transform, Rect drawArea)
+        public void DrawLabels(AccurateDrawingDevice device, PageInformation page, TransformInformation1d transform, Rect drawArea)
         {
-            //session.DrawRectangle(drawArea, Colors.Orange);
             var tickColor = MajorGridline.Color;
             var tickThickness = MajorGridline.Thickness;
-            using (var format = new CanvasTextFormat())
+            var format2 = new AccurateTextFormat()
             {
-                format.HorizontalAlignment = CanvasHorizontalAlignment.Left;
-                format.WordWrapping = CanvasWordWrapping.NoWrap;
-                format.FontSize = LabelFontSize;
-                format.FontFamily = "Arial";
-                format.FontWeight = FontWeights.Thin;
-                format.FontStyle = FontStyle.Normal;
-                var values = GetGridlineValues(page, transform, MajorGridline.Offset);
-                foreach (var (location, value) in values)
+                FontSize = LabelFontSize,
+                WordWrapping = AccurateWordWrapping.NoWrap,
+                HorizontalAlignment = AccurateAlignment.Start
+            };
+            var values = GetGridlineValues(page, transform, MajorGridline.Offset);
+            foreach (var (location, value) in values)
+            {
+                var endLocation = location;
+                var label = value.ToString();
+                if (LabelFormat == "Hours")
                 {
-                    var endLocation = location;
-                    var label = value.ToString();
-                    if (LabelFormat == "Hours")
-                    {
-                        var time = new DateTime().Date.AddHours(value);
-                        label = time.ToShortTimeString();
-                    }
-                    else if (LabelFormat.StartsWith("Date"))
-                    {
-                        label = ParseDateFormat(value);
-                    }
-                    else
-                    {
-                        label = value.ToString(LabelFormat);
-                    }
+                    var time = new DateTime().Date.AddHours(value);
+                    label = time.ToShortTimeString();
+                }
+                else if (LabelFormat.StartsWith("Date"))
+                {
+                    label = ParseDateFormat(value);
+                }
+                else
+                {
+                    label = value.ToString(LabelFormat);
+                }
+                var layout = device.GetTextSize(label, format2);
+                var halfLayoutWidth = (float)Math.Round(layout.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
+                var finalLocation = location - halfLayoutWidth;
+                if (finalLocation < drawArea.Left)
+                {
+                    endLocation = (float)drawArea.Left + halfLayoutWidth;
+                    finalLocation = (float)drawArea.Left;
+                }
+                else if (finalLocation + (2 * halfLayoutWidth) > drawArea.Right)
+                {
+                    endLocation = (float)drawArea.Right - halfLayoutWidth;
+                    finalLocation = (float)Math.Round(drawArea.Right - (2 * halfLayoutWidth), GraphicalReport.DIGITS_TO_ROUND);
+                }
+                var height = layout.Height;
+                var y = !IsFlippedVertical ? (float)(drawArea.Top + LabelTickLength) : (float)(drawArea.Bottom - LabelTickLength - height);
+                device.DrawFormattedText(label, format2, Colors.Black, finalLocation, y);
 
-                    using (var layout = new CanvasTextLayout(session, label, format, 0, 0))
-                    {
-                        var halfLayoutWidth = (float)Math.Round(layout.LayoutBounds.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
-                        var finalLocation = location - halfLayoutWidth;
-                        if (finalLocation < drawArea.Left)
-                        {
-                            endLocation = (float)drawArea.Left + halfLayoutWidth;
-                            finalLocation = (float)drawArea.Left;
-                        }
-                        else if (finalLocation + (2 * halfLayoutWidth) > drawArea.Right)
-                        {
-                            endLocation = (float)drawArea.Right - halfLayoutWidth;
-                            finalLocation = (float)Math.Round(drawArea.Right - (2 * halfLayoutWidth), GraphicalReport.DIGITS_TO_ROUND);
-                        }
-                        var height = layout.LayoutBounds.Height;
-                        var y = !IsFlippedVertical ? (float)(drawArea.Top + LabelTickLength) : (float)(drawArea.Bottom - LabelTickLength - height);
-                        var translate = Matrix3x2.CreateTranslation(finalLocation, y);
-                        using (var geo = CanvasGeometry.CreateText(layout))
-                        {
-                            using (var translatedGeo = geo.Transform(translate))
-                            {
-                                session.FillGeometry(translatedGeo, Colors.Black);
-                            }
-                        }
-                    }
-
-                    if (IsTickDrawn)
-                    {
-                        using (var pathBuilder = new CanvasPathBuilder(session))
-                        {
-                            pathBuilder.BeginFigure(location, (float)drawArea.Top);
-                            pathBuilder.AddLine(endLocation, (float)(drawArea.Top + LabelTickLength));
-                            pathBuilder.EndFigure(CanvasFigureLoop.Open);
-                            using (var geo = CanvasGeometry.CreatePath(pathBuilder))
-                            {
-                                var style = new CanvasStrokeStyle
-                                {
-                                    TransformBehavior = CanvasStrokeTransformBehavior.Fixed
-                                };
-                                session.DrawGeometry(geo, tickColor, tickThickness, style);
-                            }
-                        }
-                    }
+                if (IsTickDrawn)
+                {
+                    device.DrawLine(location, drawArea.Top, endLocation, drawArea.Top + LabelTickLength, tickThickness, tickColor);
                 }
             }
+
         }
 
         private string ParseDateFormat(double value)

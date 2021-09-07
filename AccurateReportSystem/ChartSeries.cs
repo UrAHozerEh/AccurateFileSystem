@@ -1,4 +1,5 @@
-﻿using Microsoft.Graphics.Canvas;
+﻿using AccurateReportSystem.AccurateDrawingDevices;
+using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.Text;
 using System;
@@ -18,7 +19,7 @@ namespace AccurateReportSystem
         public float HeightInches { get; set; }
         public virtual float Height => (float)Math.Round(HeightInches * GraphicalReport.DEFAULT_DIP, GraphicalReport.DIGITS_TO_ROUND);
 
-        public abstract void Draw(PageInformation page, CanvasDrawingSession session, Rect drawArea, TransformInformation1d transform);
+        public abstract void Draw(PageInformation page, AccurateDrawingDevice device, Rect drawArea, TransformInformation1d transform);
     }
 
     public class ArrowInfo

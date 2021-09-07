@@ -1,5 +1,6 @@
 ﻿using AccurateFileSystem;
 using Microsoft.Graphics.Canvas.Geometry;
+using PdfSharp.Drawing;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,11 +10,28 @@ using System.Text;
 using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.Storage;
+using Windows.UI;
 
 namespace AccurateReportSystem
 {
     public static class Extensions
     {
+
+        public static XColor ToPdfColor(this Color color)
+        {
+            return XColor.FromArgb(color.A, color.R, color.G, color.B);
+        }
+
+        public static XBrush ToSolidPdfBrush(this Color color)
+        {
+            return new XSolidBrush(color.ToPdfColor());
+        }
+
+        public static XPen ToPdfPen(this Color color, double width = 1)
+        {
+            return new XPen(color.ToPdfColor(), width);
+        }
+
         public static void BeginFigure(this CanvasPathBuilder path, (float X, float Y) value)
         {
             path.BeginFigure(value.X, value.Y);

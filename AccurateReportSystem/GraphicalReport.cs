@@ -1,5 +1,6 @@
 ﻿using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Text;
+using PdfSharp.Pdf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,35 +28,6 @@ namespace AccurateReportSystem
         public static int DEFAULT_DIP = 96;
         public static int DIGITS_TO_ROUND = 2;
 
-        public List<CanvasRenderTarget> GetImages(double startFootage, double endFootage, float dpi = 1200)
-        {
-            var pageAreaWidth = Math.Round(DEFAULT_DIP * 11.0, DIGITS_TO_ROUND);
-            var pageAreaHeight = Math.Round(DEFAULT_DIP * 8.5, DIGITS_TO_ROUND);
-            var pageArea = new Rect(0, 0, pageAreaWidth, pageAreaHeight);
-
-
-            var drawArea = new Rect(MarginInfo.LeftDip, MarginInfo.TopDip, pageAreaWidth - MarginInfo.MarginWidthDip, pageAreaHeight - MarginInfo.MarginHeightDip);
-
-            var totalFootage = endFootage - startFootage;
-            var pages = PageSetup.GetAllPages(startFootage, totalFootage);
-            CanvasDevice device = CanvasDevice.GetSharedDevice();
-            var list = new List<CanvasRenderTarget>();
-            foreach (var page in pages)
-            {
-                CanvasRenderTarget offscreen = new CanvasRenderTarget(device, (float)pageArea.Width, (float)pageArea.Height, dpi);
-                using (CanvasDrawingSession session = offscreen.CreateDrawingSession())
-                {
-                    session.Clear(Colors.White);
-                    session.TextRenderingParameters = new CanvasTextRenderingParameters(CanvasTextRenderingMode.NaturalSymmetric, CanvasTextGridFit.Default);
-                    Container.Draw(page, session, drawArea);
-
-                }
-                list.Add(offscreen);
-            }
-
-            return list;
-        }
-
         public CanvasRenderTarget GetImage(PageInformation page, float dpi = 300)
         {
             var pageAreaWidth = Math.Round(DEFAULT_DIP * 11.0, DIGITS_TO_ROUND);
@@ -74,10 +46,23 @@ namespace AccurateReportSystem
                     session.DrawImage(Logo, new Rect((float)MarginInfo.LeftDip * 0.1, (float)MarginInfo.TopDip * 0.1, MarginInfo.TopDip * scale, MarginInfo.TopDip));
                 }
                 session.TextRenderingParameters = new CanvasTextRenderingParameters(CanvasTextRenderingMode.NaturalSymmetric, CanvasTextGridFit.Default);
-                Container.Draw(page, session, drawArea);
+                var drawingDevice = new AccurateDrawingDevice(session);
+                Container.Draw(page, drawingDevice, drawArea);
             }
             return offscreen;
+        }
 
+        public PdfDocument GetPdf(List<PageInformation> pages)
+        {
+            var output = new PdfDocument();
+
+            foreach(var page in pages)
+            {
+                var pdfPage = output.AddPage();
+
+            }
+
+            return output;
         }
     }
 

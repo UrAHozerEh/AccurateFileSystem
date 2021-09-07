@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using AccurateReportSystem.AccurateDrawingDevices;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.Text;
@@ -28,7 +29,7 @@ namespace AccurateReportSystem
             XAxisInfo.IsEnabled = true;
         }
 
-        public override void Draw(PageInformation page, CanvasDrawingSession session, Rect drawArea)
+        public override void Draw(PageInformation page, AccurateDrawingDevice device, Rect drawArea)
         {
             var graphArea = new Rect(page.StartFootage, 0, page.Width, 0);
 
@@ -40,13 +41,18 @@ namespace AccurateReportSystem
             //TODO: No need to make a 2d transform.
             var transform = new TransformInformation2d(realDrawArea, graphArea, false);
 
-            XAxisInfo.DrawInfo(session, page, transform.GetXTransform(), realDrawArea);
+            XAxisInfo.DrawInfo(device, page, transform.GetXTransform(), realDrawArea);
             var pageRect = new Rect(drawArea.Left, drawArea.Top + XAxisInfo.LabelHeight, leftSpace, XAxisInfo.TitleTotalHeight);
             var titleRect = new Rect(drawArea.Left, drawArea.Top - TitleFontSize - 5, drawArea.Width, TitleFontSize);
             if (DrawPageInfo)
-                DrawPageCount(page, session, pageRect);
-            if(Title != null)
-                DrawTitle(page, session, titleRect);
+            {
+                DrawPageCount(page, device, pageRect);
+            }
+
+            if (Title != null)
+            {
+                DrawTitle(page, device, titleRect);
+            }
         }
 
         private void DrawTitle(PageInformation page, CanvasDrawingSession session, Rect drawArea)
