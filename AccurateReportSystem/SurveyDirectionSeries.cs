@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using AccurateReportSystem.AccurateDrawingDevices;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Geometry;
 using Windows.Foundation;
@@ -59,61 +60,59 @@ namespace AccurateReportSystem
                 DirectionAreas.Add(curData.Value);
         }
 
-        public override void Draw(PageInformation page, CanvasDrawingSession session, Rect drawArea, TransformInformation1d transform)
+        public override void Draw(PageInformation page, AccurateDrawingDevice device, Rect drawArea, TransformInformation1d transform)
         {
-            using (session.CreateLayer(1f, drawArea))
+            var areasOnPage = DirectionAreas.Where(area => area.Start < page.EndFootage && area.End > page.StartFootage).ToList();
+            var y = (float)(drawArea.Top + Math.Round(drawArea.Height / 2, GraphicalReport.DIGITS_TO_ROUND));
+            if (areasOnPage.Count == 0)
+                return;
+            if (areasOnPage.Count == 1)
             {
-                var areasOnPage = DirectionAreas.Where(area => area.Start < page.EndFootage && area.End > page.StartFootage).ToList();
-                var y = (float)(drawArea.Top + Math.Round(drawArea.Height / 2, GraphicalReport.DIGITS_TO_ROUND));
-                if (areasOnPage.Count == 0)
-                    return;
-                if (areasOnPage.Count == 1)
+                var (_, _, value) = areasOnPage[0];
+                var middleX = drawArea.GetMiddlePoint().X;
+                ArrowInfo.DrawCenteredOn(device, middleX, drawArea, value ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right);
+            }
+            else
+            {
+                foreach (var (start, end, isReverse) in areasOnPage)
                 {
-                    var (_, _, value) = areasOnPage[0];
-                    var middleX = drawArea.GetMiddlePoint().X;
-                    ArrowInfo.DrawOnTopOf(session, middleX, y, value ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right);
-                }
-                else
-                {
-                    foreach (var (start, end, isReverse) in areasOnPage)
+                    var direction = isReverse ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right;
+                    if (start < page.StartFootage)
                     {
-                        var direction = isReverse ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right;
-                        if (start < page.StartFootage)
-                        {
-                            var x = transform.ToDrawArea(end);
-                            ArrowInfo.DrawLeftOf(session, x, y, direction);
-                            continue;
-                        }
-                        if (end > page.EndFootage)
-                        {
-                            var x = transform.ToDrawArea(start);
-                            ArrowInfo.DrawRightOf(session, x, y, direction);
-                            continue;
-                        }
-                        var startX = transform.ToDrawArea(start);
-                        var endX = transform.ToDrawArea(end);
-                        var middleX = (startX + endX) / 2;
-                        var xWidth = endX - startX;
-                        if (xWidth < ArrowInfo.Width)
-                        {
-                            var xScale = xWidth / ArrowInfo.Width;
-                            var arrowWidthInches = ArrowInfo.WidthInches;
-                            ArrowInfo.WidthInches *= xScale;
-                            ArrowInfo.DrawOnTopOf(session, middleX, y, direction);
-                            ArrowInfo.WidthInches = arrowWidthInches;
-                        }
-                        else if (xWidth < ArrowInfo.Width * 2)
-                        {
-                            ArrowInfo.DrawOnTopOf(session, middleX, y, direction);
-                        }
-                        else
-                        {
-                            ArrowInfo.DrawRightOf(session, startX, y, direction);
-                            ArrowInfo.DrawLeftOf(session, endX, y, direction);
-                        }
+                        var x = transform.ToDrawArea(end);
+                        ArrowInfo.DrawLeftOf(device, x, drawArea, direction);
+                        continue;
+                    }
+                    if (end > page.EndFootage)
+                    {
+                        var x = transform.ToDrawArea(start);
+                        ArrowInfo.DrawRightOf(device, x, drawArea, direction);
+                        continue;
+                    }
+                    var startX = transform.ToDrawArea(start);
+                    var endX = transform.ToDrawArea(end);
+                    var middleX = (startX + endX) / 2;
+                    var xWidth = endX - startX;
+                    if (xWidth < ArrowInfo.Width)
+                    {
+                        var xScale = xWidth / ArrowInfo.Width;
+                        var arrowWidthInches = ArrowInfo.WidthInches;
+                        ArrowInfo.WidthInches *= xScale;
+                        ArrowInfo.DrawCenteredOn(device, middleX, drawArea, direction);
+                        ArrowInfo.WidthInches = arrowWidthInches;
+                    }
+                    else if (xWidth < ArrowInfo.Width * 2)
+                    {
+                        ArrowInfo.DrawCenteredOn(device, middleX, drawArea, direction);
+                    }
+                    else
+                    {
+                        ArrowInfo.DrawRightOf(device, startX, drawArea, direction);
+                        ArrowInfo.DrawLeftOf(device, endX, drawArea, direction);
                     }
                 }
             }
+
         }
     }
 
@@ -165,61 +164,59 @@ namespace AccurateReportSystem
                 DirectionAreas.Add(curData.Value);
         }
 
-        public override void Draw(PageInformation page, CanvasDrawingSession session, Rect drawArea, TransformInformation1d transform)
+        public override void Draw(PageInformation page, AccurateDrawingDevice device, Rect drawArea, TransformInformation1d transform)
         {
-            using (session.CreateLayer(1f, drawArea))
+            var areasOnPage = DirectionAreas.Where(area => area.Start < page.EndFootage && area.End > page.StartFootage).ToList();
+            var y = (float)(drawArea.Top + Math.Round(drawArea.Height / 2, GraphicalReport.DIGITS_TO_ROUND));
+            if (areasOnPage.Count == 0)
+                return;
+            if (areasOnPage.Count == 1)
             {
-                var areasOnPage = DirectionAreas.Where(area => area.Start < page.EndFootage && area.End > page.StartFootage).ToList();
-                var y = (float)(drawArea.Top + Math.Round(drawArea.Height / 2, GraphicalReport.DIGITS_TO_ROUND));
-                if (areasOnPage.Count == 0)
-                    return;
-                if (areasOnPage.Count == 1)
+                var (_, _, value, date) = areasOnPage[0];
+                var middleX = drawArea.GetMiddlePoint().X;
+                ArrowInfo.DrawCenteredOn(device, middleX, drawArea, value ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right, date);
+            }
+            else
+            {
+                foreach (var (start, end, isReverse, date) in areasOnPage)
                 {
-                    var (_, _, value, date) = areasOnPage[0];
-                    var middleX = drawArea.GetMiddlePoint().X;
-                    ArrowInfo.DrawOnTopOf(session, middleX, y, value ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right, date);
-                }
-                else
-                {
-                    foreach (var (start, end, isReverse, date) in areasOnPage)
+                    var direction = isReverse ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right;
+                    if (start < page.StartFootage)
                     {
-                        var direction = isReverse ? ArrowInfo.Direction.Left : ArrowInfo.Direction.Right;
-                        if (start < page.StartFootage)
-                        {
-                            var x = transform.ToDrawArea(end);
-                            ArrowInfo.DrawLeftOf(session, x, y, direction, date);
-                            continue;
-                        }
-                        if (end > page.EndFootage)
-                        {
-                            var x = transform.ToDrawArea(start);
-                            ArrowInfo.DrawRightOf(session, x, y, direction, date);
-                            continue;
-                        }
-                        var startX = transform.ToDrawArea(start);
-                        var endX = transform.ToDrawArea(end);
-                        var middleX = (startX + endX) / 2;
-                        var xWidth = endX - startX;
-                        if (xWidth < ArrowInfo.Width)
-                        {
-                            var xScale = xWidth / ArrowInfo.Width;
-                            var arrowWidthInches = ArrowInfo.WidthInches;
-                            ArrowInfo.WidthInches *= xScale;
-                            ArrowInfo.DrawOnTopOf(session, middleX, y, direction, date);
-                            ArrowInfo.WidthInches = arrowWidthInches;
-                        }
-                        else if (xWidth < ArrowInfo.Width * 2)
-                        {
-                            ArrowInfo.DrawOnTopOf(session, middleX, y, direction, date);
-                        }
-                        else
-                        {
-                            ArrowInfo.DrawRightOf(session, startX, y, direction, date);
-                            ArrowInfo.DrawLeftOf(session, endX, y, direction, date);
-                        }
+                        var x = transform.ToDrawArea(end);
+                        ArrowInfo.DrawLeftOf(device, x, drawArea, direction, date);
+                        continue;
+                    }
+                    if (end > page.EndFootage)
+                    {
+                        var x = transform.ToDrawArea(start);
+                        ArrowInfo.DrawRightOf(device, x, drawArea, direction, date);
+                        continue;
+                    }
+                    var startX = transform.ToDrawArea(start);
+                    var endX = transform.ToDrawArea(end);
+                    var middleX = (startX + endX) / 2;
+                    var xWidth = endX - startX;
+                    if (xWidth < ArrowInfo.Width)
+                    {
+                        var xScale = xWidth / ArrowInfo.Width;
+                        var arrowWidthInches = ArrowInfo.WidthInches;
+                        ArrowInfo.WidthInches *= xScale;
+                        ArrowInfo.DrawCenteredOn(device, middleX, drawArea, direction, date);
+                        ArrowInfo.WidthInches = arrowWidthInches;
+                    }
+                    else if (xWidth < ArrowInfo.Width * 2)
+                    {
+                        ArrowInfo.DrawCenteredOn(device, middleX, drawArea, direction, date);
+                    }
+                    else
+                    {
+                        ArrowInfo.DrawRightOf(device, startX, drawArea, direction, date);
+                        ArrowInfo.DrawLeftOf(device, endX, drawArea, direction, date);
                     }
                 }
             }
+
         }
     }
 }

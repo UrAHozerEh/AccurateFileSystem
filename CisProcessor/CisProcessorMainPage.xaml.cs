@@ -332,13 +332,14 @@ namespace CisProcessor
             graph1.Gridlines[(int)GridlineName.MajorHorizontal].Offset = 15;
             graph1.Gridlines[(int)GridlineName.MinorHorizontal].Offset = 5;
             */
-            if (allegroFile.Type != FileType.OnOff)
-            {
+            // Ak Chin
+            //if (allegroFile.Type != FileType.OnOff)
+            //{
                 graph1.YAxesInfo.Y1MinimumValue = -0.75;
                 graph1.YAxesInfo.MajorGridlines.Offset = 0.125;
                 graph1.YAxesInfo.MinorGridlines.Offset = 0.025;
-            }
-            graph1.YAxesInfo.Y1MinimumValue = -7;
+            //}
+            graph1.YAxesInfo.Y1MinimumValue = -1;
 
             graph1.Series.Add(on);
             if (allegroFile.Type == FileType.OnOff)
@@ -348,7 +349,8 @@ namespace CisProcessor
                 graph1.Series.Add(offMir);
             }
             if (allegroFile.Type != FileType.Native)
-                graph1.Series.Add(redLine);
+                redLine = redLine;
+                //graph1.Series.Add(redLine);
             else
                 on.Name = "Static";
             //graph1.XAxisInfo.IsEnabled = false;
@@ -422,8 +424,9 @@ namespace CisProcessor
                 splitContainer.AddContainer(commentGraphMeasurement);
             }
             splitContainer.AddContainer(graph1);
-            if (allegroFile.Type != FileType.Native)
-                splitContainer.AddSelfSizedContainer(chart2);//On
+            // Ak chin
+            //if (allegroFile.Type != FileType.Native)
+            //    splitContainer.AddSelfSizedContainer(chart2);//On
             splitContainer.AddSelfSizedContainer(chart1);
             //splitContainer.AddContainer(graph2);
             //splitContainer.AddContainer(graph3);
