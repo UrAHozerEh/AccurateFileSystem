@@ -102,7 +102,7 @@ namespace AccurateReportSystem
             foreach (var (name, _) in LegendInfo())
             {
                 var layout = device.GetTextSize(name, format);
-                device.DrawFormattedText(name, format, Colors.Black, drawArea.Right - longest, drawArea.Top + yOffset);
+                device.DrawTextCenteredOn(name, format, Colors.Black, drawArea.Right - longest, drawArea.Top + yOffset);
                 yOffset += (float)layout.Height + 2;
             }
 

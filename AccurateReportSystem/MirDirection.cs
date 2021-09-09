@@ -99,14 +99,14 @@ namespace AccurateReportSystem
                     var middleX = drawArea.GetMiddlePoint().X;
 
                     if (Math.Round(mirOn, 3) != 0)
-                        OnArrowInfo.DrawOnTopOf(device, middleX, onY, onDirection, mirOn.ToString("F3"));
+                        OnArrowInfo.DrawCenteredOn(device, middleX, drawArea, onDirection, mirOn.ToString("F3"));
                     else
-                        OnArrowInfoZero.DrawOnTopOf(device, middleX, onY, onDirection, mirOn.ToString("F3"));
+                        OnArrowInfoZero.DrawCenteredOn(device, middleX, drawArea, onDirection, mirOn.ToString("F3"));
 
                     if (Math.Round(mirOff, 3) != 0)
-                        OffArrowInfo.DrawOnTopOf(device, middleX, offY, offDirection, mirOff.ToString("F3"));
+                        OffArrowInfo.DrawCenteredOn(device, middleX, drawArea, offDirection, mirOff.ToString("F3"));
                     else
-                        OffArrowInfoZero.DrawOnTopOf(device, middleX, offY, offDirection, mirOff.ToString("F3"));
+                        OffArrowInfoZero.DrawCenteredOn(device, middleX, drawArea, offDirection, mirOff.ToString("F3"));
                     return;
                 }
             }

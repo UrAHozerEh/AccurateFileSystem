@@ -211,13 +211,13 @@ namespace AccurateReportSystem
 
             layout = device.GetTextSize(Name, nameFormat);
             offset += (float)layout.Height;
-            device.DrawFormattedText(Name, nameFormat, NameColor, drawArea.X, drawArea.Y + offset, 0);
+            device.DrawTextCenteredOn(Name, nameFormat, NameColor, drawArea.X, drawArea.Y + offset, 0);
 
             foreach (var curSeries in filteredSeries)
             {
                 layout = device.GetTextSize(curSeries.Name, seriesFormat);
                 var color = SeriesNameUsesSeriesColor ? curSeries.LegendNameColor : SeriesNameColor;
-                device.DrawFormattedText(curSeries.Name, seriesFormat, color, drawArea.X, drawArea.Y + offset, 0);
+                device.DrawTextCenteredOn(curSeries.Name, seriesFormat, color, drawArea.X, drawArea.Y + offset, 0);
                 offset += (float)layout.Height;
             }
         }

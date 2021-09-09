@@ -101,12 +101,11 @@ namespace AccurateReportSystem
             {
                 FontSize = FontSize
             };
-            device.DrawFormattedText(text, format, FontColor, textBox, rotation);
+            device.DrawText(text, format, FontColor, textBox, rotation);
         }
 
-        public void DrawCenteredOn(AccurateDrawingDevice device, float x, Rect drawArea, Direction direction, string text = null)
+        public void DrawCenteredOn(AccurateDrawingDevice device, float x, float y, Direction direction, string text = null)
         {
-            var centerY = drawArea.GetMiddlePoint().Y;
             switch (direction)
             {
                 case Direction.Left:
@@ -116,65 +115,78 @@ namespace AccurateReportSystem
                     x += Width / 2;
                     break;
                 case Direction.Up:
-                    centerY -= Width / 2;
+                    y -= Width / 2;
                     x -= Height / 4;
                     break;
                 case Direction.Down:
-                    centerY += Width / 2;
+                    y += Width / 2;
                     x -= Height / 4;
                     break;
                 default:
                     break;
             }
-            var points = GetPoints(x, centerY, direction);
+            var points = GetPoints(x, y, direction);
             DrawPoints(device, points, direction, text);
         }
 
-        public void DrawLeftOf(AccurateDrawingDevice device, float x, Rect drawArea, Direction direction, string text = null)
+        public void DrawCenteredOn(AccurateDrawingDevice device, float x, Rect drawArea, Direction direction, string text = null)
         {
-            var centerY = drawArea.GetMiddlePoint().Y;
+            DrawCenteredOn(device, x, drawArea.GetMiddlePoint().Y, direction, text);
+        }
+
+        public void DrawLeftOf(AccurateDrawingDevice device, float x, float y, Direction direction, string text = null)
+        {
             switch (direction)
             {
                 case Direction.Left:
                     x -= Width;
                     break;
                 case Direction.Up:
-                    centerY -= Width / 2;
+                    y -= Width / 2;
                     x -= Height / 2;
                     break;
                 case Direction.Down:
-                    centerY += Width / 2;
+                    y += Width / 2;
                     x -= Height / 2;
                     break;
                 default:
                     break;
             }
-            var points = GetPoints(x, centerY, direction);
+            var points = GetPoints(x, y, direction);
             DrawPoints(device, points, direction, text);
 
         }
 
-        public void DrawRightOf(AccurateDrawingDevice device, float x, Rect drawArea, Direction direction, string text = null)
+        public void DrawLeftOf(AccurateDrawingDevice device, float x, Rect drawArea, Direction direction, string text = null)
         {
-            var centerY = drawArea.GetMiddlePoint().Y;
+            DrawLeftOf(device, x, drawArea.GetMiddlePoint().Y, direction, text);
+        }
+
+        public void DrawRightOf(AccurateDrawingDevice device, float x, float y, Direction direction, string text = null)
+        {
             switch (direction)
             {
                 case Direction.Right:
                     x += Width;
                     break;
                 case Direction.Up:
-                    centerY -= Width / 2;
+                    y -= Width / 2;
                     x += Height / 2;
                     break;
                 case Direction.Down:
-                    centerY += Width / 2;
+                    y += Width / 2;
                     x += Height / 2;
                     break;
                 default:
                     break;
             }
-            var points = GetPoints(x, centerY, direction);
+            var points = GetPoints(x, y, direction);
             DrawPoints(device, points, direction, text);
+        }
+
+        public void DrawRightOf(AccurateDrawingDevice device, float x, Rect drawArea, Direction direction, string text = null)
+        {
+            DrawRightOf(device, x, drawArea.GetMiddlePoint().Y, direction, text);
         }
 
         private List<Point> GetPoints(float x, float y, Direction direction)

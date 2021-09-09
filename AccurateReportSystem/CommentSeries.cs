@@ -1,4 +1,5 @@
-﻿using Microsoft.Graphics.Canvas;
+﻿using AccurateReportSystem.AccurateDrawingDevices;
+using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.Text;
 using System;
@@ -208,6 +209,11 @@ namespace AccurateReportSystem
                 Geometry = lineOutputGeo
             };
             return (commentOutput, lineOutput, backdropOutputGeo);
+        }
+
+        public void DrawGeometry(PageInformation page, Rect drawArea, AccurateDrawingDevice device)
+        {
+
         }
 
         private class CommentBoundsInfo : IDisposable

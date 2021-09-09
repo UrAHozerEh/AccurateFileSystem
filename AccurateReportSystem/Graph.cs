@@ -84,22 +84,7 @@ namespace AccurateReportSystem
             //TODO: Comment should draw itself. Should have a way to order drawing of everything (gridlines, series, shadow, comments, comment backdrop, etc.)
             if (CommentSeries != null)
             {
-                var (commentGeoInfo, lineGeoInfo, backdropGeo) = CommentSeries.GetGeometry(page, graphBodyDrawArea, device);
-                var style = new CanvasStrokeStyle
-                {
-
-                };
-                if (backdropGeo != null)
-                {
-                    using (var _ = device.CreateLayer(CommentSeries.BackdropOpacity))
-                        device.FillGeometry(backdropGeo, CommentSeries.BackdropColor);
-                }
-                if (lineGeoInfo != null)
-                    device.DrawGeometry(lineGeoInfo.Geometry, lineGeoInfo.Color, 1, style);
-                if (commentGeoInfo != null)
-                    device.FillGeometry(commentGeoInfo.Geometry, commentGeoInfo.Color);
-
-                //TODO: Canvas Stroke Style should be in Geo Info. Also should have different styles for text and the indicators.
+                CommentSeries.DrawGeometry(page, graphBodyDrawArea, device);
             }
 
             DrawOverlapShadow(page, device, graphBodyDrawArea);
@@ -123,7 +108,7 @@ namespace AccurateReportSystem
                 device.DrawLine((float)DrawArea.Left, (float)DrawArea.Bottom, (float)DrawArea.Right, (float)DrawArea.Bottom, Colors.Black, 1);
         }
 
-        private void DrawOverlapShadow(PageInformation page, CanvasDrawingSession session, Rect graphBodyDrawArea)
+        private void DrawOverlapShadow(PageInformation page, AccurateDrawingDevice device, Rect graphBodyDrawArea)
         {
             var color = XAxisInfo.OverlapColor;
             var opacity = XAxisInfo.OverlapOpacity;
@@ -131,11 +116,8 @@ namespace AccurateReportSystem
             var shadowWidth = (float)Math.Round(pixelToFootRatio * page.Overlap, GraphicalReport.DIGITS_TO_ROUND);
             var startRect = new Rect(graphBodyDrawArea.X, graphBodyDrawArea.Y, shadowWidth, graphBodyDrawArea.Height);
             var endRect = new Rect(graphBodyDrawArea.Right - shadowWidth, graphBodyDrawArea.Y, shadowWidth, graphBodyDrawArea.Height);
-            using (var layer = session.CreateLayer(opacity))
-            {
-                session.FillRectangle(startRect, color);
-                session.FillRectangle(endRect, color);
-            }
+            device.FillRectangle(startRect, color, opacity);
+            device.FillRectangle(endRect, color, opacity);
         }
 
         public override double GetRequestedWidth()

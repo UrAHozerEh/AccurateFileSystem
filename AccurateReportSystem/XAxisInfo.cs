@@ -298,7 +298,7 @@ namespace AccurateReportSystem
                 FontWeight = AccurateFontWeight.Thin,
                 FontSize = TitleFontSize,
             };
-            device.DrawFormattedText(Title, format2, Colors.Black, drawArea, 90);
+            device.DrawText(Title, format2, Colors.Black, drawArea, 90);
         }
 
         public void DrawLabels(AccurateDrawingDevice device, PageInformation page, TransformInformation1d transform, Rect drawArea)
@@ -344,11 +344,11 @@ namespace AccurateReportSystem
                 }
                 var height = layout.Height;
                 var y = !IsFlippedVertical ? (float)(drawArea.Top + LabelTickLength) : (float)(drawArea.Bottom - LabelTickLength - height);
-                device.DrawFormattedText(label, format2, Colors.Black, finalLocation, y);
+                device.DrawTextCenteredOn(label, format2, Colors.Black, finalLocation, y);
 
                 if (IsTickDrawn)
                 {
-                    device.DrawLine(location, drawArea.Top, endLocation, drawArea.Top + LabelTickLength, tickThickness, tickColor);
+                    device.DrawLine(location, drawArea.Top, endLocation, drawArea.Top + LabelTickLength, tickColor, tickThickness);
                 }
             }
 

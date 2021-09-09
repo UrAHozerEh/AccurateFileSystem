@@ -32,11 +32,11 @@ namespace AccurateReportSystem.AccurateDrawingDevices
         public abstract void FillLines(List<Point> points, Color color, float opacity = 1);
 
         public abstract Rect GetTextSize(string text, AccurateTextFormat textFormat);
-        public abstract void DrawFormattedText(string text, AccurateTextFormat textFormat, Color color, float centerX, float centerY, float rotation = 0);
-        public abstract void DrawFormattedText(string text, AccurateTextFormat textFormat, Color color, Rect drawArea, float rotation = 0);
-        public void DrawFormattedText(string text, AccurateTextFormat textFormat, Color color, double centerX, double centerY, float rotation = 0)
+        public abstract void DrawTextCenteredOn(string text, AccurateTextFormat textFormat, Color color, float centerX, float centerY, float rotation = 0);
+        public abstract void DrawText(string text, AccurateTextFormat textFormat, Color color, Rect drawArea, float rotation = 0);
+        public void DrawTextCenteredOn(string text, AccurateTextFormat textFormat, Color color, double centerX, double centerY, float rotation = 0)
         {
-            DrawFormattedText(text, textFormat, color, (float)centerX, (float)centerY, rotation);
+            DrawTextCenteredOn(text, textFormat, color, (float)centerX, (float)centerY, rotation);
         }
     }
 }
