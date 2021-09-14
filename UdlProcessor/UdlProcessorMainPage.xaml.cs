@@ -100,7 +100,29 @@ namespace UdlProcessor
         {
             var report = new GraphicalReport();
             var graph1 = new Graph(report);
-            var valueSeries = new GraphSeries(readName, dataSet.Values)
+            var values = dataSet.Values;
+            var largest = Math.Max(Math.Abs(max), Math.Abs(min));
+            var diff = max - min;
+            if (diff < .05)
+            {
+                max = 50;
+                min = -50;
+                graph1.YAxesInfo.Y1Title = "Potentials (Millivolts)";
+                values = values.Select(data => (data.Hour, data.Value * 1000)).ToList();
+                report.YAxesInfo.MinorGridlines.Offset = 1.0;
+                report.YAxesInfo.MajorGridlines.Offset = 10.0;
+            }
+            else if (diff < .5)
+            {
+                max *= 1000;
+                min *= 1000;
+                graph1.YAxesInfo.Y1Title = "Potentials (Millivolts)";
+                values = values.Select(data => (data.Hour, data.Value * 1000)).ToList();
+                report.YAxesInfo.MinorGridlines.Offset = 10.0;
+                report.YAxesInfo.MajorGridlines.Offset = 100.0;
+            }
+
+            var valueSeries = new GraphSeries(readName, values)
             {
                 LineColor = Colors.Blue
             };
