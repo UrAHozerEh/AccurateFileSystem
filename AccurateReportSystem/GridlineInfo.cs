@@ -15,50 +15,26 @@ namespace AccurateReportSystem
         public GridlineInfo Master { get; set; }
         public bool IsEnabled
         {
-            get
-            {
-                return isEnabled ?? Master.IsEnabled;
-            }
-            set
-            {
-                isEnabled = value;
-            }
+            get => isEnabled ?? Master.IsEnabled;
+            set => isEnabled = value;
         }
         private bool? isEnabled = null;
         public int Thickness
         {
-            get
-            {
-                return thickness ?? Master.Thickness;
-            }
-            set
-            {
-                thickness = value;
-            }
+            get => thickness ?? Master.Thickness;
+            set => thickness = value;
         }
         public int? thickness = null;
         public Color Color
         {
-            get
-            {
-                return color ?? Master.Color;
-            }
-            set
-            {
-                color = value;
-            }
+            get => color ?? Master.Color;
+            set => color = value;
         }
         private Color? color = null;
         public double Offset
         {
-            get
-            {
-                return offset ?? Master.Offset;
-            }
-            set
-            {
-                offset = value;
-            }
+            get => offset ?? Master.Offset;
+            set => offset = value;
         }
         private double? offset = null;
 

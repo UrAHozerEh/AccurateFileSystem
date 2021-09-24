@@ -1,4 +1,5 @@
-﻿using Microsoft.Graphics.Canvas;
+﻿using AccurateReportSystem.AccurateDrawingDevices;
+using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.Text;
 using System;
@@ -37,14 +38,14 @@ namespace AccurateReportSystem
             PointShape = Shape.Triangle;
         }
 
-        public override void Draw(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
+        public override void Draw(AccurateDrawingDevice device, PageInformation page, TransformInformation2d transform)
         {
-            base.Draw(session, page, transform);
+            base.Draw(device, page, transform);
 
-            DrawLabels(session, page, transform);
+            DrawLabels(device, page, transform);
         }
 
-        private List<(float X, float Y, CanvasTextLayout TextLayout)> GetLayouts(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
+        private List<(float X, float Y, CanvasTextLayout TextLayout)> GetLayouts(AccurateDrawingDevice device, PageInformation page, TransformInformation2d transform)
         {
             var output = new List<(float X, float Y, CanvasTextLayout TextLayout)>();
             for (int i = 0; i < Labels.Count; ++i)
@@ -58,39 +59,37 @@ namespace AccurateReportSystem
                 var (x, y) = transform.ToDrawArea(foot, value);
 
                 var drawArea = transform.DrawArea;
-                using (var format = new CanvasTextFormat())
+                var format = new AccurateTextFormat()
                 {
-                    format.HorizontalAlignment = CanvasHorizontalAlignment.Left;
-                    format.WordWrapping = CanvasWordWrapping.WholeWord;
-                    format.FontSize = FontSize;
-                    format.FontFamily = "Arial";
-                    format.FontWeight = FontWeights.Normal;
-                    format.FontStyle = FontStyle.Normal;
-                    var endLocation = x;
-                    var layout = new CanvasTextLayout(session, label, format, 0, 0);
-                    var halfLayoutWidth = (float)Math.Round(layout.LayoutBounds.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
-                    var finalLocation = x - halfLayoutWidth;
-                    if (finalLocation < drawArea.Left)
-                    {
-                        endLocation = (float)drawArea.Left + halfLayoutWidth;
-                        finalLocation = (float)drawArea.Left;
-                    }
-                    else if (finalLocation + (2 * halfLayoutWidth) > drawArea.Right)
-                    {
-                        endLocation = (float)drawArea.Right - halfLayoutWidth;
-                        finalLocation = (float)Math.Round(drawArea.Right - (2 * halfLayoutWidth), GraphicalReport.DIGITS_TO_ROUND);
-                    }
-                    y -= ((float)layout.LayoutBounds.Height) + 2f + ShapeRadius;
-                    output.Add((finalLocation, y, layout));
+                    HorizontalAlignment = AccurateAlignment.Start,
+                    FontSize = FontSize
+                };
+
+                var endLocation = x;
+                var textSize = device.GetTextSize(label, format);
+                var halfTextWidth = (float)Math.Round(textSize.Width / 2, GraphicalReport.DIGITS_TO_ROUND);
+                var finalLocation = x - halfTextWidth;
+                if (finalLocation < drawArea.Left)
+                {
+                    endLocation = (float)drawArea.Left + halfTextWidth;
+                    finalLocation = (float)drawArea.Left;
                 }
+                else if (finalLocation + (2 * halfTextWidth) > drawArea.Right)
+                {
+                    endLocation = (float)drawArea.Right - halfTextWidth;
+                    finalLocation = (float)Math.Round(drawArea.Right - (2 * halfTextWidth), GraphicalReport.DIGITS_TO_ROUND);
+                }
+                y -= ((float)textSize.Height) + 2f + ShapeRadius;
+                output.Add((finalLocation, y, layout));
+
             }
             return output;
         }
 
-        protected void DrawLabels(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
+        protected void DrawLabels(AccurateDrawingDevice device, PageInformation page, TransformInformation2d transform)
         {
             //TODO: Add so you can show above and below. Maybe an anti collision check.
-            var layouts = GetLayouts(session, page, transform);
+            var layouts = GetLayouts(device, page, transform);
             for (int i = 0; i < layouts.Count; ++i)
             {
                 var (x, y, layout) = layouts[i];
@@ -118,15 +117,15 @@ namespace AccurateReportSystem
                 {
                     using (var translatedGeo = geo.Transform(translate))
                     {
-                        using (var _ = session.CreateLayer(BackdropOpacity))
+                        using (var _ = device.CreateLayer(BackdropOpacity))
                         {
                             var translatedBounds = translatedGeo.ComputeBounds();
                             var yShift = translatedBounds.Height * (BackdropIncrease / 2);
                             translatedBounds.Height *= 1 + BackdropIncrease;
                             translatedBounds.Y -= yShift;
-                            session.FillRectangle(translatedBounds, BackdropColor);
+                            device.FillRectangle(translatedBounds, BackdropColor);
                         }
-                        session.FillGeometry(translatedGeo, Colors.Black);
+                        device.FillGeometry(translatedGeo, Colors.Black);
                     }
                 }
             }

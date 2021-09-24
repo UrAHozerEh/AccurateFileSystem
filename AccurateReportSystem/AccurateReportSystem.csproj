@@ -122,6 +122,7 @@
   <ItemGroup>
     <Compile Include="AccurateDrawingDevices\AccurateDrawingDevice.cs" />
     <Compile Include="AccurateDrawingDevices\AccurateTextFormat.cs" />
+    <Compile Include="AccurateDrawingDevices\WindowsDrawingDevice.cs" />
     <Compile Include="ArrowInfo.cs" />
     <Compile Include="Chart.cs" />
     <Compile Include="ChartSeries.cs" />

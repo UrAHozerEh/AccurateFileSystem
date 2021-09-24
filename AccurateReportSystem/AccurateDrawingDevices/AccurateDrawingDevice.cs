@@ -19,6 +19,12 @@ namespace AccurateReportSystem.AccurateDrawingDevices
             DrawRectangle(rect, color, opacity);
         }
 
+        public abstract void DrawCircle(double x, double y, double radius, Color color, double thickness = 1, float opacity = 1);
+        public abstract void FillCircle(double x, double y, double radius, Color color, float opacity = 1);
+
+        public abstract void DrawTriangle(double x, double y, double radius, Color color, double thickness = 1, float opacity = 1);
+        public abstract void FillTriangle(double x, double y, double radius, Color color, float opacity = 1);
+
         public abstract void FillRectangle(Rect rect, Color color, float opacity = 1);
         public void FillRectangle(double x, double y, double width, double height, Color color, float opacity = 1)
         {

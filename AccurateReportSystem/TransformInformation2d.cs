@@ -50,7 +50,7 @@ namespace AccurateReportSystem
             var footageInGraph = Math.Round(scaledFootage / xScale, GraphicalReport.DIGITS_TO_ROUND);
             var footage = footageInGraph + GraphArea.X;
 
-            var scaledValue = (IsInverted ? y - DrawArea.Top : DrawArea.Bottom - y);
+            var scaledValue = IsInverted ? y - DrawArea.Top : DrawArea.Bottom - y;
             var valueInGraph = Math.Round(scaledValue / yScale, GraphicalReport.DIGITS_TO_ROUND);
             var value = valueInGraph + GraphArea.Y;
 

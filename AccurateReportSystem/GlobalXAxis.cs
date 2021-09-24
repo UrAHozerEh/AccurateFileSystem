@@ -55,56 +55,28 @@ namespace AccurateReportSystem
             }
         }
 
-        private void DrawTitle(PageInformation page, CanvasDrawingSession session, Rect drawArea)
+        private void DrawTitle(PageInformation page, AccurateDrawingDevice device, Rect drawArea)
         {
-            using (var format = new CanvasTextFormat())
+            var format = new AccurateTextFormat()
             {
-                format.HorizontalAlignment = CanvasHorizontalAlignment.Center;
-                format.VerticalAlignment = CanvasVerticalAlignment.Center;
-                format.WordWrapping = CanvasWordWrapping.WholeWord;
-                format.FontSize = TitleFontSize;
-                format.FontFamily = "Arial";
-                format.FontWeight = FontWeights.Bold;
-                format.FontStyle = FontStyle.Normal;
-                using (var layout = new CanvasTextLayout(session, Title, format, (float)drawArea.Width, (float)drawArea.Height))
-                {
-                    using (var geometry = CanvasGeometry.CreateText(layout))
-                    {
-                        var bounds = layout.DrawBounds;
-                        var translateMatrix = bounds.CreateTranslateMiddleTo(drawArea);
-                        using (var rotatedGeo = geometry.Transform(translateMatrix))//.Transform(rotationMatrix))
-                        {
-                            session.FillGeometry(rotatedGeo, Colors.Black);
-                        }
-                    }
-                }
-            }
+                FontSize = TitleFontSize,
+                FontWeight = AccurateFontWeight.Bold
+            };
+            device.DrawText(Title, format, Colors.Black, drawArea);
         }
 
-        private void DrawPageCount(PageInformation page, CanvasDrawingSession session, Rect drawArea)
+        private void DrawPageCount(PageInformation page, AccurateDrawingDevice device, Rect drawArea)
         {
-            using (var format = new CanvasTextFormat())
+            var format = new AccurateTextFormat()
             {
-                format.HorizontalAlignment = CanvasHorizontalAlignment.Center;
-                format.WordWrapping = CanvasWordWrapping.WholeWord;
-                format.FontSize = XAxisInfo.TitleFontSize;
-                format.FontFamily = "Arial";
-                format.FontWeight = FontWeights.Thin;
-                format.FontStyle = FontStyle.Normal;
-                var text = $"Page {page.PageNumber} of {page.TotalPages}";
-                using (var layout = new CanvasTextLayout(session, text, format, (float)drawArea.Width, (float)drawArea.Height))
-                {
-                    using (var geometry = CanvasGeometry.CreateText(layout))
-                    {
-                        var bounds = layout.DrawBounds;
-                        var translateMatrix = bounds.CreateTranslateMiddleTo(drawArea);
-                        using (var rotatedGeo = geometry.Transform(translateMatrix))//.Transform(rotationMatrix))
-                        {
-                            session.FillGeometry(rotatedGeo, Colors.Black);
-                        }
-                    }
-                }
-            }
+                HorizontalAlignment = AccurateAlignment.Center,
+                WordWrapping = AccurateWordWrapping.WholeWord,
+                FontSize = XAxisInfo.TitleFontSize,
+                FontWeight = AccurateFontWeight.Thin
+            };
+
+            var text = $"Page {page.PageNumber} of {page.TotalPages}";
+            device.DrawText(text, format, Colors.Black, drawArea);
         }
 
         public override double GetRequestedWidth()

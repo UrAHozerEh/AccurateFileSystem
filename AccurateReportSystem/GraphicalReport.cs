@@ -1,4 +1,5 @@
-﻿using Microsoft.Graphics.Canvas;
+﻿using AccurateReportSystem.AccurateDrawingDevices;
+using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Text;
 using PdfSharp.Pdf;
 using System;
@@ -46,7 +47,7 @@ namespace AccurateReportSystem
                     session.DrawImage(Logo, new Rect((float)MarginInfo.LeftDip * 0.1, (float)MarginInfo.TopDip * 0.1, MarginInfo.TopDip * scale, MarginInfo.TopDip));
                 }
                 session.TextRenderingParameters = new CanvasTextRenderingParameters(CanvasTextRenderingMode.NaturalSymmetric, CanvasTextGridFit.Default);
-                var drawingDevice = new AccurateDrawingDevice(session);
+                var drawingDevice = new WindowsDrawingDevice(session);
                 Container.Draw(page, drawingDevice, drawArea);
             }
             return offscreen;

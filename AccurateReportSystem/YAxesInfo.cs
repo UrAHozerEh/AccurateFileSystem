@@ -491,7 +491,7 @@ namespace AccurateReportSystem
                 var values = GetGridlineValues(y1Transform, MinorGridlines.Offset);
                 foreach (var (y, _) in values)
                 {
-                    device.DrawLine((float)graphBodyDrawArea.Left, y, (float)graphBodyDrawArea.Right, y, MinorGridlines.Thickness, MinorGridlines.Color);
+                    device.DrawLine((float)graphBodyDrawArea.Left, y, (float)graphBodyDrawArea.Right, y, MinorGridlines.Color, MinorGridlines.Thickness);
                 }
             }
             if (MajorGridlines.IsEnabled)
@@ -499,7 +499,7 @@ namespace AccurateReportSystem
                 var values = GetGridlineValues(y1Transform, MajorGridlines.Offset);
                 foreach (var (y, _) in values)
                 {
-                    device.DrawLine((float)graphBodyDrawArea.Left, y, (float)graphBodyDrawArea.Right, y, MajorGridlines.Thickness, MajorGridlines.Color);
+                    device.DrawLine((float)graphBodyDrawArea.Left, y, (float)graphBodyDrawArea.Right, y, MajorGridlines.Color, MajorGridlines.Thickness);
                 }
             }
         }
@@ -543,31 +543,17 @@ namespace AccurateReportSystem
             }
         }
 
-        public void DrawTitle(CanvasDrawingSession session, string title, float fontSize, Rect drawArea, float rotation)
+        public void DrawTitle(AccurateDrawingDevice device, string title, float fontSize, Rect drawArea, float rotation)
         {
             //session.DrawRectangle(drawArea, Colors.Purple);
-            using (var format = new CanvasTextFormat())
+            var format = new AccurateTextFormat()
             {
-                format.HorizontalAlignment = CanvasHorizontalAlignment.Center;
-                format.WordWrapping = CanvasWordWrapping.WholeWord;
-                format.FontSize = fontSize;
-                format.FontFamily = "Arial";
-                format.FontWeight = FontWeights.Thin;
-                format.FontStyle = FontStyle.Normal;
-                using (var layout = new CanvasTextLayout(session, title, format, (float)drawArea.Height, (float)drawArea.Width))
-                {
-                    using (var geometry = CanvasGeometry.CreateText(layout))
-                    {
-                        var bounds = layout.DrawBounds;
-                        var translateMatrix = bounds.CreateTranslateMiddleTo(drawArea);
-                        var rotationMatrix = drawArea.CreateRotationAroundMiddle(rotation);
-                        using (var rotatedGeo = geometry.Transform(translateMatrix).Transform(rotationMatrix))
-                        {
-                            session.FillGeometry(rotatedGeo, Colors.Black);
-                        }
-                    }
-                }
-            }
+                HorizontalAlignment = AccurateAlignment.Center,
+                WordWrapping = AccurateWordWrapping.WholeWord,
+                FontSize = fontSize,
+                FontWeight = AccurateFontWeight.Thin
+            };
+            device.DrawText(title, format, Colors.Black, drawArea, rotation);
         }
 
         public void DrawY1Labels(AccurateDrawingDevice device, TransformInformation2d transform, Rect drawArea)
@@ -607,85 +593,52 @@ namespace AccurateReportSystem
 
                 if (Y1TickIsDrawn)
                 {
-                    using (var pathBuilder = new CanvasPathBuilder(device))
-                    {
-                        pathBuilder.BeginFigure((float)drawArea.Right, location);
-                        pathBuilder.AddLine((float)(drawArea.Right - Y1LabelTickLength), endLocation);
-                        pathBuilder.EndFigure(CanvasFigureLoop.Open);
-                        using (var geo = CanvasGeometry.CreatePath(pathBuilder))
-                        {
-                            var style = new CanvasStrokeStyle
-                            {
-                                TransformBehavior = CanvasStrokeTransformBehavior.Fixed
-                            };
-                            device.DrawGeometry(geo, tickColor, tickThickness, style);
-                        }
-                    }
+                    device.DrawLine(drawArea.Right, location, drawArea.Right - Y1LabelTickLength, endLocation, tickColor, tickThickness);
                 }
             }
-
         }
 
-        public void DrawY2Labels(CanvasDrawingSession session, List<(float Y, double _)> values, TransformInformation2d y2Transform, Rect drawArea)
+        public void DrawY2Labels(AccurateDrawingDevice device, List<(float Y, double _)> values, TransformInformation2d y2Transform, Rect drawArea)
         {
             //session.DrawRectangle(drawArea, Colors.Orange);
             var tickColor = MajorGridlines.Color;
             var tickThickness = MajorGridlines.Thickness;
-            using (var format = new CanvasTextFormat())
+            var format = new AccurateTextFormat()
             {
-                format.HorizontalAlignment = CanvasHorizontalAlignment.Left;
-                format.WordWrapping = CanvasWordWrapping.WholeWord;
-                format.FontSize = Y1LabelFontSize;
-                format.FontFamily = "Arial";
-                format.FontWeight = FontWeights.Thin;
-                format.FontStyle = FontStyle.Normal;
-                foreach (var (location, _) in values)
-                {
-                    var (_, value) = y2Transform.ToGraphArea(0, location);
-                    var endLocation = location;
-                    var label = value.ToString(Y2LabelFormat);
-                    using (var layout = new CanvasTextLayout(session, label, format, 0, 0))
-                    {
-                        var halfLayoutHeight = (float)Math.Round(layout.LayoutBounds.Height / 2, GraphicalReport.DIGITS_TO_ROUND);
-                        var finalLocation = location - halfLayoutHeight;
-                        if (finalLocation < drawArea.Top)
-                        {
-                            endLocation = (float)drawArea.Top + halfLayoutHeight;
-                            finalLocation = (float)drawArea.Top;
-                        }
-                        else if (finalLocation + (2 * halfLayoutHeight) > drawArea.Bottom)
-                        {
-                            endLocation = (float)drawArea.Bottom - halfLayoutHeight;
-                            finalLocation = (float)Math.Round(drawArea.Bottom - (2 * halfLayoutHeight), GraphicalReport.DIGITS_TO_ROUND);
-                        }
-                        var x = (float)(drawArea.Left + Y1LabelTickLength);
-                        var translate = Matrix3x2.CreateTranslation(x, finalLocation);
-                        using (var geo = CanvasGeometry.CreateText(layout))
-                        {
-                            using (var translatedGeo = geo.Transform(translate))
-                            {
-                                session.FillGeometry(translatedGeo, Colors.Black);
-                            }
-                        }
-                    }
+                HorizontalAlignment = AccurateAlignment.Start,
+                WordWrapping = AccurateWordWrapping.WholeWord,
+                FontSize = Y1LabelFontSize,
+                FontWeight = AccurateFontWeight.Thin
+            };
 
-                    if (Y2TickIsDrawn)
-                    {
-                        using (var pathBuilder = new CanvasPathBuilder(session))
-                        {
-                            pathBuilder.BeginFigure((float)drawArea.Left, location);
-                            pathBuilder.AddLine((float)(drawArea.Left - Y2LabelTickLength), endLocation);
-                            pathBuilder.EndFigure(CanvasFigureLoop.Open);
-                            using (var geo = CanvasGeometry.CreatePath(pathBuilder))
-                            {
-                                var style = new CanvasStrokeStyle
-                                {
-                                    TransformBehavior = CanvasStrokeTransformBehavior.Fixed
-                                };
-                                session.DrawGeometry(geo, tickColor, tickThickness, style);
-                            }
-                        }
-                    }
+            foreach (var (location, _) in values)
+            {
+                var (_, value) = y2Transform.ToGraphArea(0, location);
+                var endLocation = location;
+                var label = value.ToString(Y2LabelFormat);
+                var textBox = device.GetTextSize(label, format);
+
+                var halfLayoutHeight = (float)Math.Round(textBox.Height / 2, GraphicalReport.DIGITS_TO_ROUND);
+                var finalLocation = location - halfLayoutHeight;
+                if (finalLocation < drawArea.Top)
+                {
+                    endLocation = (float)drawArea.Top + halfLayoutHeight;
+                    finalLocation = (float)drawArea.Top;
+                }
+                else if (finalLocation + (2 * halfLayoutHeight) > drawArea.Bottom)
+                {
+                    endLocation = (float)drawArea.Bottom - halfLayoutHeight;
+                    finalLocation = (float)Math.Round(drawArea.Bottom - (2 * halfLayoutHeight), GraphicalReport.DIGITS_TO_ROUND);
+                }
+                var x = (float)(drawArea.Left + Y1LabelTickLength);
+                var translate = Matrix3x2.CreateTranslation(x, finalLocation);
+
+                device.DrawTextCenteredOn(label, format, tickColor, x, location);
+
+
+                if (Y2TickIsDrawn)
+                {
+                    device.DrawLine(drawArea.Left, location, drawArea.Left - Y2LabelTickLength, endLocation, tickColor, tickThickness);
                 }
             }
         }

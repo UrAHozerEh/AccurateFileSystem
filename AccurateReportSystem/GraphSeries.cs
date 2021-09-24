@@ -1,4 +1,5 @@
-﻿using Microsoft.Graphics.Canvas;
+﻿using AccurateReportSystem.AccurateDrawingDevices;
+using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Brushes;
 using Microsoft.Graphics.Canvas.Geometry;
 using System;
@@ -61,20 +62,23 @@ namespace AccurateReportSystem
             Values.Sort((first, second) => first.footage.CompareTo(second.footage));
         }
 
-        public virtual void Draw(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
+        public virtual void Draw(AccurateDrawingDevice device, PageInformation page, TransformInformation2d transform)
         {
             if (Values == null || Values.Count == 0)
-                return;
-            using (var _ = session.CreateLayer(Opcaity))
             {
-                if (GraphType == Type.Line)
-                    DrawLineGeometry(session, page, transform);
-                if (PointShape != Shape.None)
-                    DrawPoints(session, page, transform);
+                return;
+            }
+            if (GraphType == Type.Line)
+            {
+                DrawLineGeometry(device, page, transform);
+            }
+            if (PointShape != Shape.None)
+            {
+                DrawPoints(device, page, transform);
             }
         }
 
-        protected void DrawLineGeometry(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
+        protected void DrawLineGeometry(AccurateDrawingDevice device, PageInformation page, TransformInformation2d transform)
         {
             if (Values == null || Values.Count == 0)
                 return;
@@ -82,103 +86,93 @@ namespace AccurateReportSystem
             (double footage, double value)? last = null;
             (double footage, double value)? next = null;
 
-            using (var pathBuilder = new CanvasPathBuilder(session))
-            {
-                for (int i = 0; i < Values.Count; ++i)
-                {
-                    var (footage, value) = Values[i];
-                    if (i + 1 < Values.Count)
-                        next = Values[i + 1];
-                    if (footage < page.StartFootage)
-                    {
-                        last = (footage, value);
-                        continue;
-                    }
-                    if (!hasBegun)
-                    {
-                        if (footage >= page.StartFootage)
-                        {
-                            if (last.HasValue)
-                            {
-                                pathBuilder.BeginFigure(transform.ToDrawArea(last.Value));
-                            }
-                            else
-                            {
-                                pathBuilder.BeginFigure(transform.ToDrawArea(footage, value));
-                            }
-                            hasBegun = true;
-                        }
-                    }
-                    if (hasBegun)
-                    {
-                        var lastFootDiff = footage - (last?.footage ?? 0);
-                        var nextFootDiff = (next?.footage ?? 0) - footage;
-                        var drawFromLast = last.HasValue && lastFootDiff <= MaxDrawDistance;
-                        var drawToNext = next.HasValue && nextFootDiff <= MaxDrawDistance;
-                        if (drawFromLast)
-                        {
-                            pathBuilder.AddLine(transform.ToDrawArea(footage, value));
-                        }
-                        else if (drawToNext)
-                        {
-                            pathBuilder.EndFigure(CanvasFigureLoop.Open);
-                            pathBuilder.BeginFigure(transform.ToDrawArea(footage, value));
-                        }
-                        else
-                        {
-                            //TODO: Gotta draw the single stranded points.
-                            pathBuilder.EndFigure(CanvasFigureLoop.Open);
-                            var pretendOffset = Math.Round(MaxDrawDistance / 2, GraphicalReport.DIGITS_TO_ROUND); // Doesn't really fit, but why not.
-                            if (last.HasValue)
-                            {
-                                var lastValue = last.Value.value;
-                                var pretendFoot = footage - pretendOffset;
-                                var lastValueDiff = value - lastValue;
+            //for (int i = 0; i < Values.Count; ++i)
+            //{
+            //    var (footage, value) = Values[i];
+            //    if (i + 1 < Values.Count)
+            //        next = Values[i + 1];
+            //    if (footage < page.StartFootage)
+            //    {
+            //        last = (footage, value);
+            //        continue;
+            //    }
+            //    if (!hasBegun)
+            //    {
+            //        if (footage >= page.StartFootage)
+            //        {
+            //            if (last.HasValue)
+            //            {
+            //                pathBuilder.BeginFigure(transform.ToDrawArea(last.Value));
+            //            }
+            //            else
+            //            {
+            //                pathBuilder.BeginFigure(transform.ToDrawArea(footage, value));
+            //            }
+            //            hasBegun = true;
+            //        }
+            //    }
+            //    if (hasBegun)
+            //    {
+            //        var lastFootDiff = footage - (last?.footage ?? 0);
+            //        var nextFootDiff = (next?.footage ?? 0) - footage;
+            //        var drawFromLast = last.HasValue && lastFootDiff <= MaxDrawDistance;
+            //        var drawToNext = next.HasValue && nextFootDiff <= MaxDrawDistance;
+            //        if (drawFromLast)
+            //        {
+            //            pathBuilder.AddLine(transform.ToDrawArea(footage, value));
+            //        }
+            //        else if (drawToNext)
+            //        {
+            //            pathBuilder.EndFigure(CanvasFigureLoop.Open);
+            //            pathBuilder.BeginFigure(transform.ToDrawArea(footage, value));
+            //        }
+            //        else
+            //        {
+            //            //TODO: Gotta draw the single stranded points.
+            //            pathBuilder.EndFigure(CanvasFigureLoop.Open);
+            //            var pretendOffset = Math.Round(MaxDrawDistance / 2, GraphicalReport.DIGITS_TO_ROUND); // Doesn't really fit, but why not.
+            //            if (last.HasValue)
+            //            {
+            //                var lastValue = last.Value.value;
+            //                var pretendFoot = footage - pretendOffset;
+            //                var lastValueDiff = value - lastValue;
 
-                                var lastValueDiffPerFoot = lastValueDiff / lastFootDiff;
-                                var pretendFootDiff = lastFootDiff - pretendOffset;
+            //                var lastValueDiffPerFoot = lastValueDiff / lastFootDiff;
+            //                var pretendFootDiff = lastFootDiff - pretendOffset;
 
-                                var pretendValueOffset = Math.Round(lastValueDiffPerFoot * pretendFootDiff, GraphicalReport.DIGITS_TO_ROUND); // Again doesn't fit, but oh well.
-                                var pretendValue = lastValue + pretendValueOffset;
+            //                var pretendValueOffset = Math.Round(lastValueDiffPerFoot * pretendFootDiff, GraphicalReport.DIGITS_TO_ROUND); // Again doesn't fit, but oh well.
+            //                var pretendValue = lastValue + pretendValueOffset;
 
-                                pathBuilder.BeginFigure(transform.ToDrawArea(pretendFoot, pretendValue));
-                                pathBuilder.AddLine(transform.ToDrawArea(footage, value));
-                                pathBuilder.EndFigure(CanvasFigureLoop.Open);
-                            }
-                            if (next.HasValue)
-                            {
-                                var nextValue = next.Value.value;
-                                var pretendFoot = footage + pretendOffset;
-                                var nextValueDiff = value - nextValue;
+            //                pathBuilder.BeginFigure(transform.ToDrawArea(pretendFoot, pretendValue));
+            //                pathBuilder.AddLine(transform.ToDrawArea(footage, value));
+            //                pathBuilder.EndFigure(CanvasFigureLoop.Open);
+            //            }
+            //            if (next.HasValue)
+            //            {
+            //                var nextValue = next.Value.value;
+            //                var pretendFoot = footage + pretendOffset;
+            //                var nextValueDiff = value - nextValue;
 
-                                var nextValueDiffPerFoot = nextValueDiff / nextFootDiff;
-                                var pretendFootDiff = nextFootDiff - pretendOffset;
+            //                var nextValueDiffPerFoot = nextValueDiff / nextFootDiff;
+            //                var pretendFootDiff = nextFootDiff - pretendOffset;
 
-                                var pretendValueOffset = Math.Round(nextValueDiffPerFoot * pretendFootDiff, GraphicalReport.DIGITS_TO_ROUND); // Again doesn't fit, but oh well.
-                                var pretendValue = nextValue + pretendValueOffset;
+            //                var pretendValueOffset = Math.Round(nextValueDiffPerFoot * pretendFootDiff, GraphicalReport.DIGITS_TO_ROUND); // Again doesn't fit, but oh well.
+            //                var pretendValue = nextValue + pretendValueOffset;
 
-                                pathBuilder.BeginFigure(transform.ToDrawArea(pretendFoot, pretendValue));
-                                pathBuilder.AddLine(transform.ToDrawArea(footage, value));
-                                pathBuilder.EndFigure(CanvasFigureLoop.Open);
-                            }
-                            pathBuilder.BeginFigure(transform.ToDrawArea(footage, value));
-                        }
-                    }
-                    last = (footage, value);
-                }
-                pathBuilder.EndFigure(CanvasFigureLoop.Open);
-                using (var geometry = CanvasGeometry.CreatePath(pathBuilder))
-                {
-                    var style = new CanvasStrokeStyle
-                    {
-                        TransformBehavior = CanvasStrokeTransformBehavior.Fixed
-                    };
-                    session.DrawGeometry(geometry, LineColor, LineThickness, style);
-                }
-            }
+            //                pathBuilder.BeginFigure(transform.ToDrawArea(pretendFoot, pretendValue));
+            //                pathBuilder.AddLine(transform.ToDrawArea(footage, value));
+            //                pathBuilder.EndFigure(CanvasFigureLoop.Open);
+            //            }
+            //            pathBuilder.BeginFigure(transform.ToDrawArea(footage, value));
+            //        }
+            //    }
+            //    last = (footage, value);
+            //}
+            throw new NotImplementedException("Need to add logic to draw series lines.");
+
         }
 
-        protected void DrawPoints(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
+        protected void DrawPoints(AccurateDrawingDevice device, PageInformation page, TransformInformation2d transform)
         {
             if (Values == null || Values.Count == 0 || PointShape == Shape.None)
                 return;
@@ -194,17 +188,16 @@ namespace AccurateReportSystem
                 {
                     case Shape.Square:
                         var rect = new Rect() { X = x - ShapeRadius, Y = y - ShapeRadius, Height = ShapeRadius * 2, Width = ShapeRadius * 2 };
-                        session.FillRectangle(rect, PointColor);
-                        session.DrawRectangle(rect, PointColor);
+                        device.FillRectangle(rect, PointColor);
+                        device.DrawRectangle(rect, PointColor);
                         break;
                     case Shape.Circle:
-                        session.FillCircle(x, y, ShapeRadius, PointColor);
-                        session.DrawCircle(x, y, ShapeRadius, Colors.Black);
+                        device.FillCircle(x, y, ShapeRadius, PointColor);
+                        device.DrawCircle(x, y, ShapeRadius, Colors.Black);
                         break;
                     case Shape.Triangle:
-                        var geo = GetTriangleGeometry(session);
-                        session.FillGeometry(geo, x, y, PointColor);
-                        session.DrawGeometry(geo, x, y, Colors.Black);
+                        device.FillTriangle(x, y, ShapeRadius, PointColor);
+                        device.DrawTriangle(x, y, ShapeRadius, Colors.Black);
                         break;
                     case Shape.InvertedTriangle:
                         break;
@@ -213,23 +206,6 @@ namespace AccurateReportSystem
                     default:
                         break;
                 }
-            }
-        }
-
-        public CanvasGeometry GetTriangleGeometry(CanvasDrawingSession session)
-        {
-            return GetTriangleGeometry(session, ShapeRadius);
-        }
-
-        public CanvasGeometry GetTriangleGeometry(CanvasDrawingSession session, float radius)
-        {
-            using (var pathBuilder = new CanvasPathBuilder(session))
-            {
-                pathBuilder.BeginFigure(0, -radius);
-                pathBuilder.AddLine(radius, radius);
-                pathBuilder.AddLine(-radius, radius);
-                pathBuilder.EndFigure(CanvasFigureLoop.Closed);
-                return CanvasGeometry.CreatePath(pathBuilder);
             }
         }
 

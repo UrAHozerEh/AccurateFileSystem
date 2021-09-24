@@ -85,9 +85,9 @@ namespace AccurateReportSystem
 
 
             if (DrawTopBorder)
-                device.DrawLine((float)drawArea.Left, (float)drawArea.Top, (float)drawArea.Right, (float)drawArea.Top, 1, Colors.Black);
+                device.DrawLine((float)drawArea.Left, (float)drawArea.Top, (float)drawArea.Right, (float)drawArea.Top, Colors.Black, 1);
             if (DrawBottomBorder)
-                device.DrawLine((float)drawArea.Left, (float)drawArea.Bottom, (float)drawArea.Right, (float)drawArea.Bottom, 1, Colors.Black);
+                device.DrawLine((float)drawArea.Left, (float)drawArea.Bottom, (float)drawArea.Right, (float)drawArea.Bottom, Colors.Black, 1);
             DrawOverlapShadow(page, device, transform, gridlineDrawArea);
 
             var legendWidth = LegendInfo.Width + (YAxesInfo.Y1IsDrawn ? 0 : YAxesInfo.Y1TotalHeight);
