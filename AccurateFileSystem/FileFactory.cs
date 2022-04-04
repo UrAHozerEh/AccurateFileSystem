@@ -49,15 +49,17 @@ namespace AccurateFileSystem
                                 return new GeneralCsv(File.DisplayName, lines);
                             if (lines[0].StartsWith("Record Type"))
                                 return new Udl.UdlFile(File.DisplayName, lines);
+                            if (lines[0].Contains("Preliminary"))
+                                return new TidalCsvData(File.DisplayName, lines);
                             if (lines[1].Contains("Observations:"))
                                 return new VivaxPcm(File.DisplayName, lines);
-                            if (lines[0].IndexOf("ID") <= 1 && lines[0] != "Footage")
+                            if ((lines[0].IndexOf("ID") <= 1 || lines[0].IndexOf("Pipeline") <= 1) && lines[0] != "Footage")
                                 return new OtherPcm(File.DisplayName, lines);
                             return new GeneralCsv(File.DisplayName, lines);
                         }
                         catch
                         {
-                            return null;
+                            return new GeneralCsv(File.DisplayName, lines);
                         }
                         
                     }
@@ -359,7 +361,7 @@ namespace AccurateFileSystem
             {
                 lat = double.Parse(split[10]);
                 lon = double.Parse(split[11]);
-                alt = double.Parse(split[12]);
+                alt = string.IsNullOrWhiteSpace(split[12]) ? 0 : double.Parse(split[12]);
             }
             catch
             {

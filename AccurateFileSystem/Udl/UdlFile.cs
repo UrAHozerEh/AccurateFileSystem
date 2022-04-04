@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace AccurateFileSystem.Udl
@@ -9,15 +10,19 @@ namespace AccurateFileSystem.Udl
     public class UdlFile : GeneralCsv
     {
         public Dictionary<string, List<UdlRead>> Reads = new Dictionary<string, List<UdlRead>>();
+        public List<string> Notes = new List<string>();
+        private static Regex ShuntRegex = new Regex(@"(?i)shunt\s+?(\d+)(m?v)\s+?-?\s+?(\d+)(m?a)");
 
         public UdlFile(string name, List<string> lines) : base(name, lines, FileType.Udl)
         {
             ParseData();
-
             foreach (var reads in Reads.Values)
             {
                 reads.Sort((read1, read2) => read1.Time.CompareTo(read2.Time));
             }
+
+            GetNotes();
+            GetShuntValues();
         }
 
         public (double Min, double Max) GetMaxAndMinValues(string readType)
@@ -37,6 +42,69 @@ namespace AccurateFileSystem.Udl
             }
 
             return (min, max);
+        }
+
+        private void GetNotes()
+        {
+            for (var col = 0; col < Headers.Count; ++col)
+            {
+                if (Headers[col] == "Notes")
+                {
+                    for (var row = 0; row < Data.GetLength(0); ++row)
+                    {
+                        if (!string.IsNullOrWhiteSpace(Data[row, col]))
+                        {
+                            Notes.Add(Data[row, col]);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void GetShuntValues()
+        {
+            var ratio = CheckNotesForShuntRatio();
+            if (!ratio.HasValue)
+            {
+                return;
+            }
+            var ratioValue = ratio.Value;
+            var addedReads = new Dictionary<string, List<UdlRead>>();
+            foreach (var (readType, reads) in Reads)
+            {
+                var name = readType + " Shunt";
+                var convertedReads = reads.Select(read => new UdlRead(name, read.Value * ratioValue, "A", read.Time)).ToList();
+                var renamedReads = reads.Select(read => new UdlRead(name, read.Value, read.Unit, read.Time)).ToList();
+                addedReads.Add(name + " Amps", convertedReads);
+                addedReads.Add(name + " Volts", renamedReads);
+            }
+            foreach (var (newName, newValues) in addedReads)
+            {
+                Reads.Add(newName, newValues);
+            }
+        }
+
+        private double? CheckNotesForShuntRatio()
+        {
+            foreach (var note in Notes)
+            {
+                var match = ShuntRegex.Match(note);
+                if (match.Success)
+                {
+                    var volt = double.Parse(match.Groups[1].Value);
+                    if (match.Groups[2].Value.Contains("m", StringComparison.OrdinalIgnoreCase))
+                    {
+                        volt /= 1000;
+                    }
+                    var amp = double.Parse(match.Groups[3].Value);
+                    if (match.Groups[4].Value.Contains("m", StringComparison.OrdinalIgnoreCase))
+                    {
+                        amp /= 1000;
+                    }
+                    return amp / volt;
+                }
+            }
+            return null;
         }
 
         private int GetTimeColumn()
@@ -125,6 +193,7 @@ namespace AccurateFileSystem.Udl
             var startTime = reads[0].Time;
             var endTime = reads[reads.Count - 1].Time;
             var times = GetDayTimes(startTime, endTime, hours);
+            var unit = reads[0].Unit;
 
             for (var cur = 0; cur <= times.Count - 2; ++cur)
             {
@@ -138,7 +207,7 @@ namespace AccurateFileSystem.Udl
                 }
                 var pageName = $"{curStart.ToShortDateString().Replace("/", "-")}{section}";
                 var values = GetHourValuePair(filteredReads);
-                output.Add(pageName, new UdlDataSet(values, curStart, curEnd));
+                output.Add(pageName, new UdlDataSet(values, curStart, curEnd, unit));
             }
 
             return output;
@@ -204,7 +273,8 @@ namespace AccurateFileSystem.Udl
             var start = reads.First().Time;
             var end = reads.Last().Time;
             var values = GetHourValuePair(reads, start.Date);
-            return new UdlDataSet(values, start.Date, end);
+            var unit = reads[0].Unit;
+            return new UdlDataSet(values, start.Date, end, unit);
         }
 
         private List<UdlRead> GetFilteredReads(List<UdlRead> reads, DateTime startTime, DateTime endTime)

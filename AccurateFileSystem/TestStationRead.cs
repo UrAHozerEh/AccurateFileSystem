@@ -76,15 +76,8 @@ namespace AccurateFileSystem
             if (onOffMatch.Success)
             {
                 IsOnOff = true;
-                int count = onOffMatch.Groups.Count;
-                if (count == 5)
-                {
-                    Tag = onOffMatch.Groups[1].Value + "," + onOffMatch.Groups[2].Value;
-                }
-                else
-                {
-                    Tag = onOffMatch.Groups[1].Value;
-                }
+                var count = onOffMatch.Groups.Count;
+                Tag = count == 5 ? onOffMatch.Groups[1].Value + "," + onOffMatch.Groups[2].Value : onOffMatch.Groups[1].Value;
                 Title = onOffMatch.Groups[count - 3].Value.Trim();
                 On = double.Parse(onOffMatch.Groups[count - 2].Value);
                 Off = double.Parse(onOffMatch.Groups[count - 1].Value);

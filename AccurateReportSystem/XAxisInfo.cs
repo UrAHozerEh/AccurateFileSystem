@@ -333,14 +333,35 @@ namespace AccurateReportSystem
                 {
                     var endLocation = location;
                     var label = value.ToString();
-                    if (LabelFormat == "Hours")
+                    if(LabelFormat == "Empty")
+                    {
+                        return;
+                    }
+                    else if (LabelFormat == "Hours")
                     {
                         var time = new DateTime().Date.AddHours(value);
                         label = time.ToShortTimeString();
                     }
+                    else if(LabelFormat == "DateOnly")
+                    {
+                        var time = StartDate.AddHours(value);
+                        label = time.ToShortDateString();
+                    }
                     else if (LabelFormat.StartsWith("Date"))
                     {
                         label = ParseDateFormat(value);
+                    }
+                    else if(LabelFormat == "StartDateOtherHour")
+                    {
+                        var time = StartDate.AddHours(value);
+                        if(time.Hour == 0)
+                        {
+                            label = time.ToShortDateString();
+                        }
+                        else
+                        {
+                            label = time.ToShortTimeString();
+                        }
                     }
                     else
                     {
@@ -419,7 +440,6 @@ namespace AccurateReportSystem
                 default:
                     break;
             }
-
             return labelDate.ToString("g");
         }
     }

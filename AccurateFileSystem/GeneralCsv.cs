@@ -9,11 +9,12 @@ namespace AccurateFileSystem
     public class GeneralCsv : File
     {
         public List<string> Headers;
-        public string[,] Data;
+        public string[,] Data { get; set; }
 
         private string CurItem;
         private List<string> Output;
         private bool InString;
+        private bool InGps;
 
         public GeneralCsv(string name, List<string> lines) : base(name, FileType.Unknown)
         {
@@ -23,6 +24,16 @@ namespace AccurateFileSystem
         protected GeneralCsv(string name, List<string> lines, FileType type) : base(name, type)
         {
             ParseLines(lines);
+        }
+
+        public int GetColumn(string headerName)
+        {
+            for(int i = 0; i < Headers.Count; ++i)
+            {
+                if (Headers[i] == headerName)
+                    return i;
+            }
+            return -1;
         }
 
         private void ParseLines(List<string> lines)
@@ -43,13 +54,13 @@ namespace AccurateFileSystem
                 if (lineData.Count > Headers.Count)
                     continue;
                 dataRows.Add(lineData);
-                
+
             }
             Data = new string[dataRows.Count, Headers.Count];
-            for(int r = 0; r < dataRows.Count; ++r)
+            for (int r = 0; r < dataRows.Count; ++r)
             {
                 var row = dataRows[r];
-                for(int c = 0; c < row.Count; ++c)
+                for (int c = 0; c < row.Count; ++c)
                 {
                     Data[r, c] = row[c];
                 }
@@ -63,6 +74,7 @@ namespace AccurateFileSystem
 
             CurItem = "";
             InString = false;
+            InGps = false;
             nextIndex = index + 1;
             for (int i = 0; i < line.Length; ++i)
             {
@@ -88,6 +100,10 @@ namespace AccurateFileSystem
             skipNext = false;
             switch (curChar)
             {
+                case '°':
+                    //if (!InString)
+                    //    InGps = true;
+                    break;
                 case ',':
                     if (InString)
                     {
@@ -108,6 +124,11 @@ namespace AccurateFileSystem
                     else if (CurItem == "")
                     {
                         InString = true;
+                    }
+                    else if (InGps)
+                    {
+                        InGps = false;
+                        CurItem += curChar;
                     }
                     else if (InString)
                     {

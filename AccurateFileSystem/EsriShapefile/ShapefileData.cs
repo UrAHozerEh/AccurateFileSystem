@@ -106,7 +106,10 @@ namespace AccurateFileSystem.EsriShapefile
                     }
                     catch
                     {
-                        return;
+                        if (field.Name == "LATITUDE")
+                            lat = 0;
+                        else
+                            lon = 0;
                     }
                     if (field.Type == "D")
                     {

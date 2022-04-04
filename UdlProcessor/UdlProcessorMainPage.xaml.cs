@@ -44,12 +44,17 @@ namespace UdlProcessor
             {
                 return;
             }
-
-            var folders = await masterFolder.GetFoldersAsync();
             var masterOutputFolder = await masterFolder.CreateFolderAsync("0000 Processed Data", CreationCollisionOption.OpenIfExists);
-            folders = folders.OrderBy(folder => folder.DisplayName).ToList().AsReadOnly();
 
             var files = await masterFolder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
+            TidalCsvData tidalData = null;
+            var tidalStorage = files.SingleOrDefault(f => f.DisplayName.Contains("tidal", StringComparison.OrdinalIgnoreCase));
+            if (tidalStorage != null)
+            {
+                var tidalFileFactory = new FileFactory(tidalStorage);
+                tidalData = await tidalFileFactory.GetFile() as TidalCsvData;
+            }
+
             foreach (var storageFile in files)
             {
                 var fileFactory = new FileFactory(storageFile);
@@ -60,10 +65,10 @@ namespace UdlProcessor
                 }
 
                 var udl = file as UdlFile;
-                var udlData = udl.GetDayFullData(24);
+                var dailyUdlData = udl.GetDayFullData(24);
                 var fileName = file.Name.Replace(".csv", "");
                 var fileFolder = await masterOutputFolder.CreateFolderAsync(fileName, CreationCollisionOption.OpenIfExists);
-                foreach (var (readType, graphData) in udlData)
+                foreach (var (readType, dailyGraphData) in dailyUdlData)
                 {
                     if (readType == "Temperature")
                     {
@@ -75,14 +80,23 @@ namespace UdlProcessor
                     {
                         continue;
                     }
+                    if (tidalData != null)
+                    {
+                        var tidalReadFolder = await fileFolder.CreateFolderAsync(readType + " Weekly Tidal Graphs", CreationCollisionOption.OpenIfExists);
+                        var dataset = udl.GetFullData(readType);
+                        var timespan = dataset.EndTime - dataset.StartTime;
+                        await MakeTidalGraphs(dataset, tidalData, readType, $"{fileName}", tidalReadFolder, 72, 6, 1, 0, min, max);
+                        continue;
+                    }
                     var readFolder = await fileFolder.CreateFolderAsync(readType + " Daily Graphs", CreationCollisionOption.OpenIfExists);
-                    foreach (var (graphName, values) in graphData)
+                    foreach (var (graphName, values) in dailyGraphData)
                     {
                         if (values.Values.Count == 0)
                         {
                             continue;
                         }
-                        await MakeHourlyGraphs(values, readType, $"'{fileName}' on {graphName}", readFolder, 1, 0.25, 5.0 / 60.0, 5.0 / 60.0, min, max);
+                        if (tidalData == null)
+                            await MakeHourlyGraphs(values, readType, $"'{fileName}' on {graphName}", readFolder, 1, 0.25, 5.0 / 60.0, 5.0 / 60.0, min, max);
                     }
                     var fullDataSet = udl.GetFullData(readType);
                     if (fullDataSet.Values.Count == 0)
@@ -96,18 +110,50 @@ namespace UdlProcessor
             }
         }
 
-        private GraphicalReport CreateReport(UdlDataSet dataSet, string reportTitle, string readName, double min, double max, double minorTimeOffset, double majorTimeOffset)
+        private GraphicalReport CreateReport(UdlDataSet dataSet, string reportTitle, string readName, double min, double max, double minorTimeOffset, double majorTimeOffset, TidalCsvData tidalData = null)
         {
             var report = new GraphicalReport();
             var graph1 = new Graph(report);
             var values = dataSet.Values;
             var largest = Math.Max(Math.Abs(max), Math.Abs(min));
             var diff = max - min;
-            if (diff < .05)
+            var unit = dataSet.Unit;
+            var units = unit.Equals("v", StringComparison.OrdinalIgnoreCase) ? "Volts" : "Amps";
+            var type = unit.Equals("v", StringComparison.OrdinalIgnoreCase) ? "Potential" : "Current";
+            if (readName.Contains("shunt", StringComparison.OrdinalIgnoreCase))
+            {
+                if (units == "Volts")
+                {
+                    type = "Voltage";
+                    diff = 1;
+                    max = 15;
+                    min = -15;
+                    report.YAxesInfo.MinorGridlines.Offset = 1.0;
+                    report.YAxesInfo.MajorGridlines.Offset = 5.0;
+                    units = unit.Equals("v", StringComparison.OrdinalIgnoreCase) ? "Millivolts" : "Milliamps";
+                    values = values.Select(data => (data.Hour, data.Value * 1000)).ToList();
+                }
+                else
+                {
+                    type = "Current";
+                }
+            }
+            graph1.YAxesInfo.Y1Title = $"{type} ({units})";
+            graph1.YAxesInfo.Y1IsInverted = min < -1;
+            if (diff < .0001)
+            {
+                max = 0.1;
+                min = -0.1;
+                units = unit.Equals("v", StringComparison.OrdinalIgnoreCase) ? "Millivolts" : "Milliamps";
+                values = values.Select(data => (data.Hour, data.Value * 1000)).ToList();
+                report.YAxesInfo.MinorGridlines.Offset = 0.01;
+                report.YAxesInfo.MajorGridlines.Offset = 0.05;
+            }
+            else if (diff < .05)
             {
                 max = 50;
                 min = -50;
-                graph1.YAxesInfo.Y1Title = "Potentials (Millivolts)";
+                units = unit.Equals("v", StringComparison.OrdinalIgnoreCase) ? "Millivolts" : "Milliamps";
                 values = values.Select(data => (data.Hour, data.Value * 1000)).ToList();
                 report.YAxesInfo.MinorGridlines.Offset = 1.0;
                 report.YAxesInfo.MajorGridlines.Offset = 10.0;
@@ -116,18 +162,33 @@ namespace UdlProcessor
             {
                 max *= 1000;
                 min *= 1000;
-                graph1.YAxesInfo.Y1Title = "Potentials (Millivolts)";
+                units = unit.Equals("v", StringComparison.OrdinalIgnoreCase) ? "Millivolts" : "Milliamps";
                 values = values.Select(data => (data.Hour, data.Value * 1000)).ToList();
                 report.YAxesInfo.MinorGridlines.Offset = 10.0;
                 report.YAxesInfo.MajorGridlines.Offset = 100.0;
             }
-
+            graph1.YAxesInfo.Y1Title = $"{type} ({units})";
             var valueSeries = new GraphSeries(readName, values)
             {
                 LineColor = Colors.Blue
             };
-
             graph1.Series.Add(valueSeries);
+
+            if (tidalData != null)
+            {
+                var tidalSeries = new GraphSeries("Tidal Data", tidalData.GetGraphData(dataSet.StartTime))
+                {
+                    LineColor = Colors.Green,
+                    IsY1Axis = false
+                };
+                graph1.YAxesInfo.Y2Title = "Tidal Height (ft)";
+                graph1.YAxesInfo.Y2IsInverted = false;
+                graph1.YAxesInfo.Y2IsDrawn = true;
+                graph1.YAxesInfo.Y2MaximumValue = tidalData.MaxWithBuffer;
+                graph1.YAxesInfo.Y2MinimumValue = tidalData.MinWithBuffer;
+                graph1.Series.Add(tidalSeries);
+            }
+
             graph1.DrawTopBorder = false;
             graph1.DrawBottomBorder = false;
 
@@ -150,10 +211,11 @@ namespace UdlProcessor
 
             var topGlobalXAxis = new GlobalXAxis(report, true)
             {
-                Title = reportTitle
+                Title = reportTitle,
+                TitleFontSize = 20f
             };
 
-            report.XAxisInfo.Title = "Time (MST)";
+            report.XAxisInfo.Title = "Time (PST)";
             report.XAxisInfo.LabelFormat = "Hours";
 
             var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
@@ -165,8 +227,53 @@ namespace UdlProcessor
             report.PageSetup = PageSetup.HourPageSetup;
 
             report.LegendInfo.WidthInches = 0;
-
+            report.YAxesInfo.Y1IsInverted = false;
             return report;
+        }
+
+        private async Task MakeTidalGraphs(UdlDataSet dataSet, TidalCsvData tidalData, string readName, string graphName, StorageFolder outputFolder, double hoursPerPage, double majorOffset, double minorOffset, double overlap, double min, double max)
+        {
+            var reportName = $"{readName} {graphName}";
+            var report = CreateReport(dataSet, reportName, readName, min, max, minorOffset, majorOffset, tidalData);
+
+            var firstTime = dataSet.Values[0].Hour;
+            var lastTime = dataSet.Values[dataSet.Values.Count - 1].Hour;
+
+            report.XAxisInfo.StartDate = dataSet.StartTime;
+            report.XAxisInfo.LabelFormat = "StartDateOtherHour";
+            report.XAxisInfo.ExtraTitleHeight = report.XAxisInfo.TitleFontSize + 5;
+            report.PageSetup.FootagePerPage = hoursPerPage;
+            report.PageSetup.Overlap = overlap;
+
+            var timeSpan = dataSet.EndTime - dataSet.StartTime;
+            var pages = report.PageSetup.GetAllPages(dataSet.StartTime.Hour, timeSpan.TotalHours);
+
+            var imageFiles = new List<StorageFile>();
+            for (var i = 0; i < pages.Count; ++i)
+            {
+                var page = pages[i];
+                if (page.EndFootage < firstTime)
+                {
+                    continue;
+                }
+                if (page.StartFootage > lastTime)
+                {
+                    break;
+                }
+                var pageString = $"{i + 1}".PadLeft(3, '0');
+                var fileName = $"{reportName} Page {pageString}.png";
+                if (pages.Count == 1)
+                {
+                    fileName = $"{reportName} Graph.png";
+                }
+                var imageFile = await outputFolder.CreateFileAsync($"{fileName}", CreationCollisionOption.ReplaceExisting);
+                using (var image = report.GetImage(page, 300))
+                using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
+                {
+                    await image.SaveAsync(stream, CanvasBitmapFileFormat.Png);
+                }
+                imageFiles.Add(imageFile);
+            }
         }
 
         private async Task MakeHourlyGraphs(UdlDataSet dataSet, string readName, string graphName, StorageFolder outputFolder, double hoursPerPage, double majorOffset, double minorOffset, double overlap, double min, double max)

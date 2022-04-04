@@ -93,6 +93,9 @@ namespace AccurateReportSystem
         public Hca Hca { get; set; }
         public List<DataPoint> Data { get; set; }
         public List<DataPointUpdated> DataUpdated { get; set; }
+        public List<(double Footage, double Value)> Baselines { get; set; }
+        public List<(double Footage, double UsedBaselineFootage)> UsedBaselineFootages { get; set; } 
+        public List<(double Footage, double Value)> Averages { get; set; }
         public double SkipDistance { get; set; } = 20;
         public List<(double Footage, AllegroDataPoint Point)> RawData { get; set; }
         public List<(BasicGeoposition Start, BasicGeoposition End, string Region)> EcdaRegions { get; set; }
@@ -426,50 +429,53 @@ namespace AccurateReportSystem
                 }
                 return output;
             }
-            var curAverages = new List<double>(extrapolatedData.Count);
+            Averages = new List<(double Footage, double Value)>(extrapolatedData.Count);
             for (int i = 0; i < extrapolatedData.Count; ++i)
             {
                 curExtrapPoint = extrapolatedData[i];
                 foot = curExtrapPoint.Footage;
                 var within100 = extrapolatedData.Where(value => Within100(foot, value.Footage) && !value.IsSkipped);
                 var average = (within100.Count() != 0 ? within100.Average(value => value.Off) : curExtrapPoint.Off);
-                curAverages.Add(average);
+                Averages.Add((foot, average));
             }
-            var curBaselines = Enumerable.Repeat(double.NaN, extrapolatedData.Count).ToList();
+            Baselines = Enumerable.Repeat((double.NaN, double.NaN), extrapolatedData.Count).ToList();
+            UsedBaselineFootages = Enumerable.Repeat((double.NaN, double.NaN), extrapolatedData.Count).ToList();
             for (int center = 0; center < extrapolatedData.Count; ++center)
             {
                 var start = Math.Max(center - 105, 0);
                 var end = Math.Min(center + 105, extrapolatedData.Count - 1);
                 var centerExtrap = extrapolatedData[center];
-                var centerAverage = curAverages[center];
+                var centerAverage = Averages[center];
                 for (int i = start; i <= end; ++i)
                 {
                     var curFoot = extrapolatedData[i].Footage;
-                    var curAverage = curAverages[i];
+                    var curAverage = Averages[i];
                     if (Within100(centerExtrap.Footage, curFoot))
                     {
-                        var curBaseline = curBaselines[center];
-                        if (double.IsNaN(curBaseline))
+                        var curBaseline = Baselines[center];
+                        if (double.IsNaN(curBaseline.Value))
                         {
-                            curBaselines[center] = curAverage;
+                            Baselines[center] = (centerExtrap.Footage, curAverage.Value);
+                            UsedBaselineFootages[center] = (centerExtrap.Footage, curFoot);
                             continue;
                         }
-                        var diffFromBaseline = Math.Abs(centerExtrap.Off - curAverage);
-                        var diffFromCurBaseline = Math.Abs(centerExtrap.Off - curBaselines[center]);
+                        var diffFromBaseline = Math.Abs(centerExtrap.Off - curAverage.Value);
+                        var diffFromCurBaseline = Math.Abs(centerExtrap.Off - Baselines[center].Value);
                         if (diffFromBaseline > diffFromCurBaseline)
                         {
-                            curBaselines[center] = curAverage;
+                            Baselines[center] = (centerExtrap.Footage, curAverage.Value);
+                            UsedBaselineFootages[center] = (centerExtrap.Footage, curFoot);
                         }
                     }
                 }
-                var baseline = curBaselines[center];
-                var (severity, reason) = GetSeverity(centerExtrap.Off, baseline);
+                var baseline = Baselines[center];
+                var (severity, reason) = GetSeverity(centerExtrap.Off, baseline.Value);
                 if (centerExtrap.IsSkipped)
                 {
                     severity = PGESeverity.NRI;
                     reason = "SKIP";
                 }
-                curPoint = new DataPointUpdated(centerExtrap, baseline, severity, reason);
+                curPoint = new DataPointUpdated(centerExtrap, baseline.Value, severity, reason);
                 output.Add(curPoint);
             }
             return output;
@@ -489,7 +495,7 @@ namespace AccurateReportSystem
             if (off > -0.85)
                 return (PGESeverity.Minor, "Off is between -0.850V and -0.701V");
             if (changeInBaseline >= 0.2)
-                return (PGESeverity.Minor, "difference in baseline is greater than 0.200V");
+                return (PGESeverity.Minor, "Difference in baseline is greater than 0.200V");
             return (PGESeverity.NRI, "");
         }
 

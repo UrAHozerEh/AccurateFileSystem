@@ -34,6 +34,7 @@ namespace AccurateReportSystem
         {
             GraphType = Type.Point;
             Labels = labels;
+            Labels.Sort((value1, value2) => value1.Footage.CompareTo(value2.Footage));
             PointShape = Shape.Triangle;
         }
 
@@ -50,6 +51,8 @@ namespace AccurateReportSystem
             for (int i = 0; i < Labels.Count; ++i)
             {
                 var (foot, label) = Labels[i];
+                if (string.IsNullOrWhiteSpace(label))
+                    continue;
                 var (_, value) = Values[i];
                 if (foot < page.StartFootage)
                     continue;

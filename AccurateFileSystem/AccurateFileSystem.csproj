@@ -130,6 +130,7 @@
     <Compile Include="EsriShapefile\ProjectionFile.cs" />
     <Compile Include="EsriShapefile\ShapefileData.cs" />
     <Compile Include="Kmz\KmlFile.cs" />
+    <Compile Include="TidalCsvData.cs" />
     <Compile Include="Udl\UdlDataSet.cs" />
     <Compile Include="Udl\UdlFile.cs" />
     <Compile Include="Udl\UdlRead.cs" />

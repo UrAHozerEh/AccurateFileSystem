@@ -531,7 +531,7 @@ namespace AccurateFileSystem
             return output.ToString();
         }
 
-        public string GetTabularData(int readDecimals = 4)
+        public string GetTabularData(int readDecimals = 4, List<(string Name, List<(double Footage, double Value)>)> addedValues = null)
         {
             var output = new StringBuilder();
             var readFormat = $"F{readDecimals}";
@@ -566,11 +566,19 @@ namespace AccurateFileSystem
             curLine[27] = "Foreign Off";
             curLine[28] = "ACV";
             curLine[29] = "DoC";
-            output.AppendLine(string.Join("\t", curLine));
+            var header = string.Join("\t", curLine);
+            if (addedValues != null)
+            {
+                foreach (var (addedHeader, _) in addedValues)
+                {
+                    header = $"{header}\t{addedHeader}";
+                }
+            }
+            output.AppendLine(header);
 
             foreach (var (footage, isReverse, point, useMir, file) in Points)
             {
-                curLine = new string[31];
+                curLine = new string[30];
                 curLine[0] = footage.ToString("F0");
                 curLine[1] = point.MirOn.ToString(readFormat);
                 curLine[2] = point.MirOff.ToString(readFormat);
@@ -590,7 +598,7 @@ namespace AccurateFileSystem
                     curLine[6] = "N/A";
                     curLine[7] = "N/A";
                 }
-                curLine[8] = point.StrippedComment ?? "";
+                curLine[8] = point.OriginalComment ?? "";
                 if (point.TestStationReads.Count > 0)
                 {
                     foreach (TestStationRead read in point.TestStationReads)
@@ -676,7 +684,23 @@ namespace AccurateFileSystem
                     }
                 }
                 curLine[29] = point.Depth?.ToString("F0") ?? "";
-                output.AppendLine(string.Join("\t", curLine));
+                var lineString = string.Join("\t", curLine);
+
+                if (addedValues != null)
+                {
+                    foreach (var (_, values) in addedValues)
+                    {
+                        var curValues = values.Where(v => v.Footage == footage);
+                        var value = "";
+                        if (curValues.Count() == 1)
+                        {
+                            value = curValues.First().Value.ToString("F3");
+                        }
+                        lineString = $"{lineString}\t{value}";
+                    }
+                }
+
+                output.AppendLine(lineString);
             }
 
             return output.ToString();
@@ -1331,15 +1355,28 @@ namespace AccurateFileSystem
         public List<(double Footage, bool IsReverseRun, string Date)> GetDirectionWithDateData()
         {
             var output = new List<(double, bool, string)>();
+            var lastDate = Points[0].File.Header["date"];
+            var lastFile = Points[0].File;
             foreach (var point in Points)
             {
-                output.Add((point.Footage, point.IsReverse, point.File.Header["date"]));
+                if(lastFile != point.File)
+                {
+                    lastDate = point.File.Header["date"];
+                    lastFile = point.File;
+                }
+                var curDate = lastDate;
+                if(point.Point.OnTime.HasValue)
+                    curDate = point.Point.OnTime.Value.ToShortDateString();
+                lastDate = curDate;
+                output.Add((point.Footage, point.IsReverse, curDate));
             }
             return output;
         }
 
         public static CombinedAllegroCISFile CombineFiles(string name, List<AllegroCISFile> files, double maxGap = 1500)
         {
+            if (files.Count == 0)
+                return null;
             var first = files.First();
             var type = first.Type;
             for (int i = 0; i < files.Count; ++i)
@@ -1350,8 +1387,6 @@ namespace AccurateFileSystem
                     --i;
                 }
             }
-            if (files.Count == 0)
-                return null;
             var calc = new OrderCalculator(files, maxGap);
             calc.AsyncSolve();
             //TODO: Maybe look at TS MP to determine if we should reverse the new file.

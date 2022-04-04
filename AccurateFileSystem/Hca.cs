@@ -28,7 +28,7 @@ namespace AccurateFileSystem
             LineName = lineName;
             StartBuffer = null;
             EndBuffer = null;
-            lines = SortLines(lines);
+            //lines = SortLines(lines);
             ParseLines(lines);
         }
 

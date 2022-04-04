@@ -23,9 +23,11 @@ namespace AccurateReportSystem
         public GlobalXAxis(GraphicalReport report, bool isFlippedVertical = false)
         {
             Report = report;
-            XAxisInfo = new XAxisInfo(report.XAxisInfo);
-            XAxisInfo.IsFlippedVertical = isFlippedVertical;
-            XAxisInfo.IsEnabled = true;
+            XAxisInfo = new XAxisInfo(report.XAxisInfo)
+            {
+                IsFlippedVertical = isFlippedVertical,
+                IsEnabled = true
+            };
         }
 
         public override void Draw(PageInformation page, CanvasDrawingSession session, Rect drawArea)

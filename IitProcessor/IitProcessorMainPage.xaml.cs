@@ -55,7 +55,10 @@ namespace IitProcessor
             folderPicker.FileTypeFilter.Add(".");
             var folder = await folderPicker.PickSingleFolderAsync();
             if (folder == null)
+            {
                 return;
+            }
+
             var outputFolder = await folder.CreateFolderAsync("Processed Data", CreationCollisionOption.OpenIfExists);
             var curFolders = await folder.GetFoldersAsync();
             var masterFolders = new List<StorageFolder>();
@@ -74,23 +77,34 @@ namespace IitProcessor
             foreach (var masterFile in masterFiles)
             {
                 if (masterFile.DisplayName.Contains("regions", StringComparison.OrdinalIgnoreCase))
+                {
                     regionFile = masterFile;
+                }
+
                 if (masterFile.FileType.ToLower() == ".kml")
+                {
                     kmlFile = masterFile;
+                }
             }
             Dictionary<string, List<List<BasicGeoposition>>> lineData = null;
             IitRegionFile regions = null;
             if (kmlFile != null)
+            {
                 lineData = GetKmlLineData(await GeneralXmlFile.GetGeneralXml(kmlFile));
+            }
+
             if (regionFile != null)
+            {
                 regions = await IitRegionFile.GetIitRegion(regionFile);
+            }
+
             var globalAlignData = new List<(double, double, double, double)>();
             foreach (var masterFolder in masterFolders)
             {
                 await ParseIitMasterFolder(masterFolder, regions, outputFolder, lineData);
             }
             var dialog = new MessageDialog($"Finished making IIT Stuff");
-            await dialog.ShowAsync();
+            _ = await dialog.ShowAsync();
         }
 
         private async Task ParseIitMasterFolder(StorageFolder masterFolder, IitRegionFile regions, StorageFolder outputFolder, Dictionary<string, List<List<BasicGeoposition>>> lineData)
@@ -161,7 +175,9 @@ namespace IitProcessor
                 {
                     var allegroFile = newFile as AllegroCISFile;
                     if (allegroFile.Type == FileType.OnOff)
+                    {
                         cisFiles.Add(allegroFile);
+                    }
                     if (allegroFile.Type == FileType.DCVG)
                         dcvgFiles.Add(allegroFile);
                     continue;
@@ -186,13 +202,19 @@ namespace IitProcessor
             cisFiles = GetUniqueFiles(cisFiles);
             dcvgFiles = GetUniqueFiles(dcvgFiles);
             var combinedCisFile = CombinedAllegroCISFile.CombineFiles("Combined", cisFiles, 1500);
-            var curLineData = lineData.GetValueOrDefault(hca.LineName);
+            combinedCisFile.FixGps();
+            List<List<BasicGeoposition>> curLineData = null;
+            if (lineData != null)
+            {
+                curLineData = lineData.GetValueOrDefault(hca.LineName);
+            }
 
             combinedCisFile.ReverseBasedOnHca(hca);
             var (startHcaFootage, endHcaFootage) = AddHcaComments(combinedCisFile, hca);
             combinedCisFile.StraightenGps();
             combinedCisFile.RemoveComments("+");
-            combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
+            if (curLineData != null)
+                combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
 
             var hcaStartPoint = combinedCisFile.GetClosesetPoint(startHcaFootage);
             hca.Regions[0].StartGps = hcaStartPoint.Point.GPS;
@@ -430,6 +452,14 @@ namespace IitProcessor
             surveyDirectionChart.LegendInfo.NameFontSize = 14f;
             var cisClass = new Chart(report, "CIS Severity");
             var cisIndication = new PGECISIndicationChartSeries(file.GetPoints(), cisClass, hca);
+            var cisIndicationExcelData = file.GetTabularData(4, new List<(string Name, List<(double Footage, double Value)>)>
+            {
+                ("200 (100 US & 100 DS) Foot Average", cisIndication.Averages),
+                ("Used Averge for Baseline Footage", cisIndication.UsedBaselineFootages),
+                ("Used Baseline", cisIndication.Baselines)
+            });
+            await CreateExcelFile($"{folderName} CIS Baseline Data", new List<(string Name, string Data)>() { ("Baseline Data", cisIndicationExcelData) }, outputFolder);
+
             cisClass.Series.Add(cisIndication);
 
             var dcvgClass = new Chart(report, "DCVG Severity");
@@ -751,6 +781,25 @@ namespace IitProcessor
             //        wbPart.Workbook.Save();
             //    }
             //}
+        }
+
+        public async Task CreateExcelFile(string fileName, List<(string Name, string Data)> sheets, StorageFolder outputFolder)
+        {
+            var outputFile = await outputFolder.CreateFileAsync(fileName + ".xlsx", CreationCollisionOption.ReplaceExisting);
+            using (var outStream = await outputFile.OpenStreamForWriteAsync())
+            using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+            {
+                var wbPart = spreadDoc.AddWorkbookPart();
+                wbPart.Workbook = new Workbook();
+                wbPart.Workbook.AppendChild(new Sheets());
+                var id = 1;
+                foreach (var (name, data) in sheets)
+                {
+                    AddData(wbPart, data, id, name, new List<string>());
+                    ++id;
+                }
+                wbPart.Workbook.Save();
+            }
         }
 
         private string ToStationing(double footage)

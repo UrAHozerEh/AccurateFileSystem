@@ -67,10 +67,14 @@ namespace AccurateReportSystem
                 return;
             using (var _ = session.CreateLayer(Opcaity))
             {
-                if (GraphType == Type.Line)
-                    DrawLineGeometry(session, page, transform);
-                if (PointShape != Shape.None)
-                    DrawPoints(session, page, transform);
+                try
+                {
+                    if (GraphType == Type.Line)
+                        DrawLineGeometry(session, page, transform);
+                    if (PointShape != Shape.None)
+                        DrawPoints(session, page, transform);
+                }
+                catch (Exception) { }
             }
         }
 
