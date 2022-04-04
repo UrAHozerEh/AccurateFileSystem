@@ -31,21 +31,56 @@ namespace AccurateFileSystem
             {
                 case ".svy":
                 case ".aci":
-                case ".dcv":
-                case ".csv":
+                case ".dvg":
                 case ".bak":
                     if (await IsAllegroFile())
                         return await GetAllegroFile();
                     else
-                        throw new Exception();
+                        throw new Exception("File is corrupted Allegro File.");
+                case ".csv":
+                    if (await IsAllegroFile())
+                        return await GetAllegroFile();
+                    else
+                    {
+                        var lines = await File.GetLines();
+                        try
+                        {
+                            if (lines[0].StartsWith("Footage"))
+                                return new GeneralCsv(File.DisplayName, lines);
+                            if (lines[0].StartsWith("Record Type"))
+                                return new Udl.UdlFile(File.DisplayName, lines);
+                            if (lines[0].Contains("Preliminary"))
+                                return new TidalCsvData(File.DisplayName, lines);
+                            if (lines[1].Contains("Observations:"))
+                                return new VivaxPcm(File.DisplayName, lines);
+                            if ((lines[0].IndexOf("ID") <= 1 || lines[0].IndexOf("Pipeline") <= 1) && lines[0] != "Footage")
+                                return new OtherPcm(File.DisplayName, lines);
+                            return new GeneralCsv(File.DisplayName, lines);
+                        }
+                        catch
+                        {
+                            return new GeneralCsv(File.DisplayName, lines);
+                        }
+                        
+                    }
                 case ".txt":
                     return await GetAllegroWaveform();
+                case ".regions2":
+                    return await IitRegionFile.GetIitRegion(File);
                 case ".xlsx":
                 case ".xls":
                 case ".zip":
+                case ".pdf":
+                case ".acvg":
+                case ".png":
+                case ".regions":
+                case ".kmz":
+                case ".cor":
+                case ".inf":
+                case ".jpg":
                     return null;
                 default:
-                    throw new Exception();
+                    return null;
             }
         }
 
@@ -72,13 +107,15 @@ namespace AccurateFileSystem
                 while (!string.IsNullOrEmpty(line))
                 {
                     if (!line.Contains(':'))
-                        throw new Exception();
+                        return null; //TODO: Handle this exception. There was a bad file in 4914
+                    //throw new Exception($"Expected header labels in waveform file. Got '{line}' instead. Filename: '{FileName}'");
                     string label = line.Substring(0, line.IndexOf(':')).Trim();
                     string value = line.Substring(line.IndexOf(':') + 1).Trim();
 
                     switch (label)
                     {
                         case "Time":
+                            value = value.Replace(", No GPS", "");
                             time = DateTime.Parse(value);
                             break;
                         case "Range":
@@ -91,7 +128,8 @@ namespace AccurateFileSystem
                             sampleRate = int.Parse(value);
                             break;
                         default:
-                            throw new Exception();
+                            return null;
+                            //throw new Exception($"Unexpected label in Waveform header. Filename: '{FileName}' Label: '{label}'");
                     }
 
                     line = reader.ReadLine().Trim();
@@ -131,11 +169,12 @@ namespace AccurateFileSystem
             string extension = File.FileType.ToLower();
             string headerDelimiter;
             int pointId = 0;
+            bool noGaps = false;
             switch (extension)
             {
                 case ".svy":
                 case ".aci":
-                case ".dcv":
+                case ".dvg":
                 case ".bak":
                     headerDelimiter = "=";
                     break;
@@ -145,6 +184,7 @@ namespace AccurateFileSystem
                 default:
                     throw new Exception();
             }
+            FileType type = FileType.Unknown;
             using (var stream = await File.OpenStreamForReadAsync())
             using (var reader = new StreamReader(stream))
             {
@@ -153,8 +193,11 @@ namespace AccurateFileSystem
                 string line = reader.ReadLine();
                 ++lineCount;
                 if (!line.Contains("Start survey:")) throw new Exception();
-                Match extraCommasMatch = Regex.Match(line, ",+");
+                Match extraCommasMatch = Regex.Match(line, ",,+");
                 string extraCommasShort = extraCommasMatch.Success ? extraCommasMatch.Value.Substring(1) : "";
+                double? startFoot = null;
+                AllegroDataPoint lastPoint = null;
+
                 while (!reader.EndOfStream)
                 {
                     line = reader.ReadLine().Trim();
@@ -172,6 +215,23 @@ namespace AccurateFileSystem
                         {
                             value = value.Replace(":", "");
                             isHeader = false;
+                            if (header.ContainsKey("survey_type"))
+                            {
+                                if (header["survey_type"] == "DC Survey")
+                                {
+                                    if (header.ContainsKey("onoff"))
+                                    {
+                                        if (header["onoff"] == "T")
+                                            type = FileType.OnOff;
+                                        else
+                                            type = FileType.Native;
+                                    }
+                                }
+                                else if (header["survey_type"] == "DCVG Survey")
+                                {
+                                    type = FileType.DCVG;
+                                }
+                            }
                         }
                         (key, value) = FixHeaderKeyValue(key, value);
                         header.Add(key, value);
@@ -187,17 +247,31 @@ namespace AccurateFileSystem
                             point = ParseAllegroLineFromACI(pointId, line);
                         else
                             point = ParseAllegroLineFromCSV(pointId, line);
+                        if (startFoot == null)
+                            startFoot = point.Footage;
 
-                        points.Add(pointId, point);
+                        if (extension != ".dvg")
+                            point.Footage -= startFoot ?? 0;
+                        if (noGaps && lastPoint != null && point.Footage - lastPoint.Footage > 20)
+                        {
+                            startFoot += point.Footage - lastPoint.Footage - 10;
+                            point.Footage -= point.Footage - lastPoint.Footage - 10;
+                        }
+                        if (noGaps && lastPoint != null && type == FileType.OnOff && lastPoint.Footage + 20 == point.Footage)
+                        {
+                            var extrapolatedOn = (lastPoint.On + point.On) / 2;
+                            var extrapolatedOff = (lastPoint.Off + point.Off) / 2;
+                            var curGps = point.HasGPS ? point.GPS : lastPoint.GPS;
+                            var extrapolatedPoint = new AllegroDataPoint(point.Id, lastPoint.Footage + 10, extrapolatedOn, extrapolatedOff, curGps, point.Times, point.IndicationValue, "", false);
+                            point.Id += 1;
+                            points.Add(extrapolatedPoint.Id, extrapolatedPoint);
+                            ++pointId;
+                        }
+                        points.Add(point.Id, point);
+                        lastPoint = point;
                         ++pointId;
                     }
                 }
-            }
-            FileType type = FileType.Unknown;
-            if (header.ContainsKey("onoff"))
-            {
-                if (header["onoff"] == "T")
-                    type = FileType.OnOff;
             }
             var output = new AllegroCISFile(FileName, extension, header, points, type);
             return output;
@@ -225,19 +299,53 @@ namespace AccurateFileSystem
 
         private AllegroDataPoint ParseAllegroLineFromCSV(int id, string line)
         {
+            var indicationMatch = Regex.Match(line, ",\"?[^\",]*\"?,\"?UN\"?,0,(\\d+\\.?\\d*),0");
+            double indicationValue = double.NaN;
+            if (indicationMatch.Success)
+            {
+                var commentIndicationMatch = Regex.Match(line, "\\(Indication [^;]*; [^\\)]+\\)");
+                line = line.Replace(indicationMatch.Value, "").Replace(commentIndicationMatch.Value, "");
+                indicationValue = double.Parse(indicationMatch.Groups[1].Value);
+            }
             var split = line.Split(',');
             if (split.Length < 16)
                 return null;
             var comment = split[15];
+            double realDoC = double.NaN;
             if (split.Length > 16)
             {
+                // Weird 111A stuff
+                //if (split.Last().Contains("\""))
+                //{
+                //    for (int i = 15; i < split.Length; i++)
+                //    {
+                //        if (split[i].Contains("\""))
+                //        {
+                //            var sublistt = split.Skip(i);
+                //            comment = string.Join(",", sublistt);
+                //            if (!string.IsNullOrEmpty(split[i - 1]))
+                //                realDoC = double.Parse(split[i - 1]);
+                //            break;
+                //        }
+                //    }
+                //}
+                //else
+                //{
+                //    comment = split.Last();
+                //    if (!string.IsNullOrEmpty(split[split.Length - 2]))
+                //        realDoC = double.Parse(split[split.Length - 2]);
+                //}
+                // End Weird Stuff
+                // Start Normal Stuff
                 var sublist = split.Skip(15);
                 comment = string.Join(",", sublist);
+                // End Normal Stuff
             }
             if (comment == "\"\"")
                 comment = "";
             if (comment.Contains('"'))
                 comment = Regex.Replace(comment, "^\"(.*)\"$", "$1");
+            comment = Regex.Replace(comment, "\"\"", "\"");
 
             double footage = double.Parse(split[0]);
             double on = double.Parse(split[2]);
@@ -248,10 +356,18 @@ namespace AccurateFileSystem
                 times.Add(JoinAndParseDateTime(split, 4));
             if (IsValidTime(split, 7))
                 times.Add(JoinAndParseDateTime(split, 7));
+            double lat = 0, lon = 0, alt = 0;
+            try
+            {
+                lat = double.Parse(split[10]);
+                lon = double.Parse(split[11]);
+                alt = string.IsNullOrWhiteSpace(split[12]) ? 0 : double.Parse(split[12]);
+            }
+            catch
+            {
 
-            double lat = double.Parse(split[10]);
-            double lon = double.Parse(split[11]);
-            double alt = double.Parse(split[12]);
+            }
+            var dColumn = split[14].Trim();
             BasicGeoposition gps = new BasicGeoposition();
             if (lat != 0 && lon != 0)
             {
@@ -263,7 +379,11 @@ namespace AccurateFileSystem
                 };
             }
 
-            var output = new AllegroDataPoint(id, footage, on, off, gps, times, comment.Trim());
+            var output = new AllegroDataPoint(id, footage, on, off, gps, times, indicationValue, comment.Trim(), dColumn.ToLower().Contains("d"));
+            // Weird 111A Stuff
+            //if (!double.IsNaN(realDoC))
+            //    output.Depth = realDoC;
+            // End Weird 111A Stuff
             return output;
         }
 
@@ -288,8 +408,16 @@ namespace AccurateFileSystem
         private AllegroDataPoint ParseAllegroLineFromACI(int id, string line)
         {
             string firstPattern = @"^([^\s]+) M?\s+([^\s]+)\s+([^\s]+)";
-            string gpsPattern = @"\{GD?E? ([^\}]+)\}";
+            string gpsPattern = @"\{(GD?E?) ([^\}]+)\}";
             string timePattern = @"\{T ([^g\}]+)g?\}";
+            var indicationMatch = Regex.Match(line, "\\{Indication [^,]*, UN, 0, (\\d+\\.?\\d*), 0\\}");
+            double indicationValue = double.NaN;
+            if (indicationMatch.Success)
+            {
+                var commentIndicationMatch = Regex.Match(line, "\\(Indication [^;]*; [^\\)]+\\)");
+                line = line.Replace(indicationMatch.Value, "").Replace(commentIndicationMatch.Value, "");
+                indicationValue = double.Parse(indicationMatch.Groups[1].Value);
+            }
             var match = Regex.Match(line, firstPattern);
             if (!match.Success)
                 throw new Exception();
@@ -299,21 +427,28 @@ namespace AccurateFileSystem
             line = Regex.Replace(line, match.Value, "").Trim();
             match = Regex.Match(line, gpsPattern);
             BasicGeoposition gps = new BasicGeoposition();
+            var isCorrected = false;
             if (match.Success)
             {
-                var split = match.Groups[1].Value.Split(',');
-                if (split.Length != 4)
-                    throw new Exception();
-                double lat = double.Parse(split[0]);
-                double lon = double.Parse(split[1]);
-                double alt = double.Parse(split[2]);
-                gps = new BasicGeoposition
+                var gpsLabel = match.Groups[1].Value.ToLower();
+                isCorrected = gpsLabel.Contains("d");
+                if (!line.Contains("{g no gps}", StringComparison.OrdinalIgnoreCase))
                 {
-                    Altitude = alt,
-                    Longitude = lon,
-                    Latitude = lat
-                };
+                    var split = match.Groups[2].Value.Split(',');
+                    if (split.Length != 4)
+                        throw new Exception();
+                    double lat = double.Parse(split[0]);
+                    double lon = double.Parse(split[1]);
+                    double alt = double.Parse(split[2]);
+                    gps = new BasicGeoposition
+                    {
+                        Altitude = alt,
+                        Longitude = lon,
+                        Latitude = lat
+                    };
+                }
                 line = line = Regex.Replace(line, match.Value, "").Trim();
+
             }
             var timeMatches = Regex.Matches(line, timePattern);
             List<DateTime> times = new List<DateTime>();
@@ -324,7 +459,7 @@ namespace AccurateFileSystem
                 times.Add(time);
                 line = line = Regex.Replace(line, timeMatch.Value, "").Trim();
             }
-            var output = new AllegroDataPoint(id, footage, on, off, gps, times, line);
+            var output = new AllegroDataPoint(id, footage, on, off, gps, times, indicationValue, line, isCorrected);
             return output;
         }
 

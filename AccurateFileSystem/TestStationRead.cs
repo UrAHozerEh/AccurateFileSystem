@@ -76,9 +76,8 @@ namespace AccurateFileSystem
             if (onOffMatch.Success)
             {
                 IsOnOff = true;
-                int count = onOffMatch.Groups.Count;
-                if (count == 5)
-                    Tag = onOffMatch.Groups[1].Value;
+                var count = onOffMatch.Groups.Count;
+                Tag = count == 5 ? onOffMatch.Groups[1].Value + "," + onOffMatch.Groups[2].Value : onOffMatch.Groups[1].Value;
                 Title = onOffMatch.Groups[count - 3].Value.Trim();
                 On = double.Parse(onOffMatch.Groups[count - 2].Value);
                 Off = double.Parse(onOffMatch.Groups[count - 1].Value);
@@ -86,6 +85,10 @@ namespace AccurateFileSystem
             else if (onMatch.Success)
             {
                 IsOnOff = false;
+                int count = onMatch.Groups.Count;
+                if (count == 3)
+                    Tag = onMatch.Groups[1].Value;
+                On = double.Parse(onMatch.Groups[count - 1].Value);
             }
             else
                 throw new Exception();
@@ -106,7 +109,7 @@ namespace AccurateFileSystem
         public double RightOn { get; }
         public double RightOff { get; }
 
-        public SideDrainTestStationRead(string original, string replaceId) : base (original, replaceId)
+        public SideDrainTestStationRead(string original, string replaceId) : base(original, replaceId)
         {
             Match onOffMatch = Regex.Match(original, OnOffRegexPattern);
             Match onMatch = Regex.Match(original, OnRegexPattern);
@@ -125,6 +128,12 @@ namespace AccurateFileSystem
             else if (onMatch.Success)
             {
                 IsOnOff = false;
+                int count = onMatch.Groups.Count;
+                if (count == 4)
+                    Tag = onMatch.Groups[1].Value;
+                LeftOn = double.Parse(onMatch.Groups[count - 2].Value);
+
+                RightOn = double.Parse(onMatch.Groups[count - 1].Value);
             }
             else
                 throw new Exception();
@@ -143,10 +152,15 @@ namespace AccurateFileSystem
         public bool IsOnOff { get; }
         public double FGOn { get; }
         public double FGOff { get; }
-        public double MIROn { get; }
-        public double MIROff { get; }
+        public double MirOn { get; }
+        public double MirOff { get; }
         public double NGOn { get; }
         public double NGOff { get; }
+        public double ReconnectDistance => Math.Abs(EndPoint.Footage - StartPoint.Footage);
+        public double MirOnPerFoot => MirOn / ReconnectDistance;
+        public double MirOffPerFoot => MirOff / ReconnectDistance;
+        public AllegroDataPoint StartPoint { get; set; }
+        public AllegroDataPoint EndPoint { get; set; }
 
         public ReconnectTestStationRead(string original, string replaceId) : base(original, replaceId)
         {
@@ -161,8 +175,8 @@ namespace AccurateFileSystem
                 FGOn = double.Parse(onOffMatch.Groups[count - 6].Value);
                 FGOff = double.Parse(onOffMatch.Groups[count - 5].Value);
 
-                MIROn = double.Parse(onOffMatch.Groups[count - 4].Value);
-                MIROff = double.Parse(onOffMatch.Groups[count - 3].Value);
+                MirOn = double.Parse(onOffMatch.Groups[count - 4].Value);
+                MirOff = double.Parse(onOffMatch.Groups[count - 3].Value);
 
                 NGOn = double.Parse(onOffMatch.Groups[count - 2].Value);
                 NGOff = double.Parse(onOffMatch.Groups[count - 1].Value);
@@ -170,6 +184,15 @@ namespace AccurateFileSystem
             else if (onMatch.Success)
             {
                 IsOnOff = false;
+                int count = onMatch.Groups.Count;
+                if (count == 5)
+                    Tag = onMatch.Groups[1].Value;
+                FGOn = double.Parse(onMatch.Groups[count - 3].Value);
+
+                MirOn = double.Parse(onMatch.Groups[count - 2].Value);
+
+                NGOn = double.Parse(onMatch.Groups[count - 1].Value);
+
             }
             else
                 throw new Exception();
@@ -223,8 +246,8 @@ namespace AccurateFileSystem
 
     public class CrossingTestStationRead : TestStationRead
     {
-        public static string OnOffRegexPattern => @"\(Crossing without bond([^:]+)?: Struct P/S ([^V]+)V IRF ([^V]+)V, Forgn P/S ([^V]+)V IRF ([^V]+)V\)";
-        public static string OnRegexPattern => @"\(Crossing without bond([^:]+)?: Struct P/S ([^V]+)V, Forgn P/S ([^V]+)V\)";
+        public static string OnOffRegexPattern => @"\(Crossing with(?:out)? bond([^:]+)?: Struct P/S ([^V]+)V IRF ([^V]+)V,(?:[^\)]+)P/S ([^V]+)V IRF ([^V]+)V\)";
+        public static string OnRegexPattern => @"\(Crossing with(?:out)? bond([^:]+)?: Struct P/S ([^V]+)V,(?:[^\)]+)P/S ([^V]+)V\)";
         public bool IsOnOff { get; }
         public double StructOn { get; }
         public double StructOff { get; }

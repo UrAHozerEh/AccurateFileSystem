@@ -5,11 +5,71 @@
     xmlns:local="using:AFSTester"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:Maps="using:Windows.UI.Xaml.Controls.Maps"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
     <Grid>
-        <Button Content="Button" Click="Button_Click"/>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1*"/>
+            <ColumnDefinition Width="100"/>
+            <ColumnDefinition Width="0.25*"/>
+        </Grid.ColumnDefinitions>
+        <Grid HorizontalAlignment="Center" Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+                <RowDefinition Height="1*"/>
+            </Grid.RowDefinitions>
+            <Button Content="Import" Click="ImportButtonClick" Grid.Row="0" HorizontalAlignment="Center"/>
+            <Button Content="Do Map" Click="DoMapButtonClick" Grid.Row="1" HorizontalAlignment="Center"/>
+            <Button Content="Hide Map" Click="Button_Click_2" Grid.Row="2" HorizontalAlignment="Center"/>
+            <Button Content="Zoom Map" Click="Button_Click_3" Grid.Row="3" HorizontalAlignment="Center"/>
+            <Grid Grid.Row="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="1*"/>
+                    <RowDefinition Height="1*"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*"/>
+                </Grid.ColumnDefinitions>
+                <Button Content="Combine" Click="CombineButtonClick" Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
+                <TextBox x:Name="CombineMaxGap" Text="1500" VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Row="1" InputScope="Number"/>
+            </Grid>
+            <Button Content="Hide" Click="HideButtonClick" Grid.Row="5" HorizontalAlignment="Center"/>
+            <Button Content="IIT" Click="IITClick"  Grid.Row="6" HorizontalAlignment="Center"/>
+            <Button Content="NuStar" Click="MakeNustarGraphs"  Grid.Row="8" HorizontalAlignment="Center"/>
+            <Button Content="Combine All" Grid.Row="9" HorizontalAlignment="Center" Click="Button_Click_4"/>
+            <Button Content="Import Order" Grid.Row="10" HorizontalAlignment="Center" Click="ImportFilesOrder"/>
+            <Button Content="Aerial" Click="ToggleAerial"  Grid.Row="11" HorizontalAlignment="Center"/>
+            <CheckBox Content="MIR Filter" Grid.Row="12" x:Name="MirFilter"/>
+            <CheckBox Content="Sempra" Grid.Row="13" x:Name="IsSempra"/>
+            <CheckBox Content="Combine" Grid.Row="14" x:Name="CombineFilter"/>
+            <TextBox Text="" x:Name="OutputFolderTextBox" Grid.Row="15"/>
+            <Button Content="Quick Graph" Grid.Row="16" HorizontalAlignment="Center" Click="Button_Click_5"/>
+            <Button Content="CIS and Depol" Grid.Row="17" HorizontalAlignment="Center" Click="OnOffDepolButtonClick"/>
+            <Button Content="Converter" Grid.Row="18" HorizontalAlignment="Center" Click="ConvertSvyToCsv"/>
+        </Grid>
 
+        <Maps:MapControl x:Name="MapControl" Grid.Column="0"/>
+        <ScrollViewer VerticalScrollMode="Enabled" HorizontalScrollMode="Enabled" Grid.Column="2">
+            <TreeView Name="FileTreeView" DoubleTapped="FileTreeView_DoubleTapped" SelectionMode="Multiple"/>
+        </ScrollViewer>
     </Grid>
 </Page>

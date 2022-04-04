@@ -10,18 +10,26 @@ namespace AccurateFileSystem
 {
     public class AllegroDataPoint
     {
-        public int Id { get; }
-        public double Footage { get; private set; }
-        public double On { get; private set; }
-        public double MIROn { get; private set; }
-        public double Off { get; private set; }
-        public double MIROff { get; private set; }
-        public string OriginalComment { get; private set; }
+        public int Id { get; set; }
+        public double Footage { get; set; }
+        public double On { get; set; }
+        public double MirOnOffset { get; set; }
+        public double MirOn => On - MirOnOffset;
+        public double? MirOnPerFoot { get; set; } = null;
+        public double Off { get; set; }
+        public double MirOffOffset { get; set; }
+        public double MirOff => Off - MirOffOffset;
+        public double? MirOffPerFoot { get; set; } = null;
+        public double? Depth { get; set; }
+        public string OriginalComment { get; set; }
         public string CommentTemplate { get; private set; }
-        public BasicGeoposition GPS { get; private set; }
-        public bool HasGPS => GPS.Equals(new BasicGeoposition());
+        public string StrippedComment { get; set; }
+        public BasicGeoposition GPS { get; set; }
+        public bool HasGPS => !GPS.Equals(new BasicGeoposition());
         public List<DateTime> Times { get; private set; }
         public bool HasTime => Times.Count != 0;
+        public ReconnectTestStationRead NextReconnect { get; set; }
+        public bool IsReverseRun { get; set; } = false;
         public DateTime? OnTime
         {
             get
@@ -40,32 +48,99 @@ namespace AccurateFileSystem
                 return Times[Times.Count - 1];
             }
         }
+        public double IndicationValue { get; set; } = double.NaN;
+        public bool HasIndication => !double.IsNaN(IndicationValue);
+        public double IndicationPercent { get; set; } = double.NaN;
         public bool IsHiLo { get; private set; } = false;
         public List<TestStationRead> TestStationReads = new List<TestStationRead>();
-        public AllegroDataPoint(int id, double footage, double on, double off, BasicGeoposition gps, List<DateTime> times, string comment)
+        public bool HasReconnect { get; private set; } = false;
+        public bool IsCorrected { get; set; }
+
+        public AllegroDataPoint(int id, double footage, double on, double off, BasicGeoposition gps, List<DateTime> times, double indicationValue, string comment, bool isCorrected)
         {
             Id = id;
             Footage = footage;
             On = on;
+            MirOnOffset = 0;
             Off = off;
-            OriginalComment = comment;
+            MirOffOffset = 0;
+            OriginalComment = comment.Replace("(250V Range)", "").Replace("250V Range","");
             GPS = gps;
             Times = times;
-            ParseComment();
+            IndicationValue = indicationValue;
+            IsCorrected = isCorrected;
+            ParseComment(true);
         }
 
-        private void ParseComment()
+        private void ParseComment(bool removeDoc)
         {
-            if (string.IsNullOrEmpty(OriginalComment))
+            if (string.IsNullOrWhiteSpace(OriginalComment))
+                return;
+            string docPattern = "(?i)DOC:?\\s?(\\d+)\\s?(in)?c?(\")?";
+            string docFootPattern = @"(?i)DOC:?\s?(\d+)\s?ft";
+            string docFootInchPattern = "(?i)DOC:?\\s?(\\d+)'(\\d*)\\s?(in)?(\")?";
+            //string offsetPattern = "(?i)(begin)?(start)?(end)? ?offset";
+            //var offset = Regex.Match(OriginalComment, offsetPattern);
+            //if (offset.Success)
+            //{
+            //    if (offset.Groups.Count(g => g.Length > 0) == 1)
+            //        OriginalComment = OriginalComment.Replace(offset.Value, "");
+            //}
+            var doc = Regex.Match(OriginalComment, docPattern);
+            var docFoot = Regex.Match(OriginalComment, docFootPattern);
+            var docFootInch = Regex.Match(OriginalComment, docFootInchPattern);
+            if (docFootInch.Success)
+            {
+                var feet = double.Parse(docFootInch.Groups[1].Value);
+                double inches = 0;
+                double.TryParse(docFootInch.Groups[2].Value, out inches);
+                Depth = feet * 12 + inches;
+                if (removeDoc)
+                {
+                    OriginalComment = OriginalComment.Replace(docFootInch.Value, "");
+
+                    OriginalComment = Regex.Replace(OriginalComment, "^\\s*,\\s*", "");
+                    OriginalComment = Regex.Replace(OriginalComment, "\\s*,\\s*$", "");
+                }
+            }
+            else if (docFoot.Success)
+            {
+                Depth = double.Parse(docFoot.Groups[1].Value) * 12;
+                if (removeDoc)
+                {
+                    OriginalComment = OriginalComment.Replace(docFoot.Value, "");
+
+                    OriginalComment = Regex.Replace(OriginalComment, "^\\s*,\\s*", "");
+                    OriginalComment = Regex.Replace(OriginalComment, "\\s*,\\s*$", "");
+                }
+            }
+            else if (doc.Success)
+            {
+                Depth = double.Parse(doc.Groups[1].Value);
+                if (removeDoc)
+                {
+                    OriginalComment = OriginalComment.Replace(doc.Value, "");
+
+                    OriginalComment = Regex.Replace(OriginalComment, "^\\s*,\\s*", "");
+                    OriginalComment = Regex.Replace(OriginalComment, "\\s*,\\s*$", "");
+                }
+            }
+            var vaultMatch = Regex.Match(OriginalComment, "(?i)valt");
+            if (vaultMatch.Success)
+                OriginalComment = Regex.Replace(OriginalComment, vaultMatch.Value, "Vault");
+
+            if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
             string testStationPattern = @"\([^\)]+\)";
+
             var matches = Regex.Matches(OriginalComment, testStationPattern);
             CommentTemplate = OriginalComment;
+
             int count = 0;
             foreach (Match match in matches)
             {
                 string tsString = match.Value;
-                if(tsString == "(HILO)")
+                if (tsString == "(HILO)")
                 {
                     IsHiLo = true;
                     continue;
@@ -77,10 +152,17 @@ namespace AccurateFileSystem
                     CommentTemplate = CommentTemplate.Replace(tsId, tsString);
                 else
                 {
+                    if (read is ReconnectTestStationRead reconnect)
+                    {
+                        HasReconnect = true;
+                        On = reconnect.NGOn;
+                        Off = reconnect.NGOff;
+                    }
                     TestStationReads.Add(read);
                     ++count;
                 }
             }
+            StrippedComment = Regex.Replace(CommentTemplate, @"\$\$\d*\$\$", "");
         }
 
         public bool Equals(AllegroDataPoint other)
@@ -97,6 +179,9 @@ namespace AccurateFileSystem
                 return false;
             if (!GPS.Equals(other.GPS) && !CloseEnough(GPS, other.GPS))
                 return false;
+            if (!double.IsNaN(IndicationPercent) || !double.IsNaN(other.IndicationPercent))
+                if (IndicationPercent != other.IndicationPercent)
+                    return false;
             if (Times.Count != other.Times.Count)
                 return false;
             for (int i = 0; i < Times.Count; ++i)
@@ -117,6 +202,41 @@ namespace AccurateFileSystem
             if (diff > 0.0000001)
                 return false;
             return true;
+        }
+
+        public ReconnectTestStationRead GetReconnect()
+        {
+            foreach (var read in TestStationReads)
+                if (read is ReconnectTestStationRead)
+                    return read as ReconnectTestStationRead;
+            return null;
+        }
+
+        public string ToStringCsv()
+        {
+            var output = new StringBuilder();
+
+            output.Append($"{Footage:F3},  ,");
+            var onString = $"{On:F4}".PadLeft(8, ' ');
+            var offString = $"{Off:F4}".PadLeft(8, ' ');
+            output.Append(onString + ',' + offString + ',');
+            if (OnTime != null)
+            {
+                var onTimeString = " " + OnTime?.ToString("MM/dd/yyyy, HH:mm:ss.fff") + ",g,";
+                output.Append(onTimeString);
+            }
+            if (OffTime != null)
+            {
+                var offTimeString = " " + OffTime?.ToString("MM/dd/yyyy, HH:mm:ss.fff") + ",g,";
+                output.Append(offTimeString);
+            }
+            var latString = $"{GPS.Latitude:F8}".PadLeft(14, ' ');
+            var lonString = $"{GPS.Longitude:F8}".PadLeft(14, ' ');
+            var altString = $"{GPS.Longitude:F1}".PadLeft(6, ' ');
+            output.Append($"{latString},{lonString},{altString}, 1.200, D,");
+            output.Append($"\"{OriginalComment}\"");
+
+            return output.ToString();
         }
     }
 }

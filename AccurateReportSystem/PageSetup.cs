@@ -8,11 +8,17 @@ namespace AccurateReportSystem
 {
     public class PageSetup
     {
+        public static PageSetup HourPageSetup = new PageSetup(12, 0);
         public double FootagePerPage { get; set; }
-        public PageSetup(double footagePerPage = 1320)
+        public double Overlap { get; set; }
+        //TODO: Remove default here. doesnt make sense.
+        public PageSetup(double footagePerPage = 1000, double overlap = 100)
         {
             FootagePerPage = footagePerPage;
+            Overlap = overlap;
         }
+
+        
 
         public List<PageInformation> GetAllPages(double startFootage, double totalFootage)
         {
@@ -25,8 +31,9 @@ namespace AccurateReportSystem
                 {
                     TotalPages = numPages,
                     PageNumber = i + 1,
-                    StartFootage = i * FootagePerPage + startFootage,
-                    EndFootage = (i + 1) * FootagePerPage + startFootage
+                    StartFootage = i * FootagePerPage + startFootage - Overlap,
+                    EndFootage = (i + 1) * FootagePerPage + startFootage + Overlap,
+                    Overlap = Overlap
                 });
             }
             return list;
