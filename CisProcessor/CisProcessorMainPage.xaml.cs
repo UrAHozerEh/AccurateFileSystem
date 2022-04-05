@@ -38,6 +38,7 @@ namespace CisProcessor
     /// </summary>
     public sealed partial class MainPage : Page
     {
+        private readonly double MaxDepth = 180;
         public MainPage()
         {
             this.InitializeComponent();
@@ -252,7 +253,7 @@ namespace CisProcessor
 
             onOffGraph.YAxesInfo.Y1Title = "Pipe-to-Soil Potential (Volts)";
             onOffGraph.YAxesInfo.Y2IsDrawn = true;
-            onOffGraph.YAxesInfo.Y2MaximumValue = 150;
+            onOffGraph.YAxesInfo.Y2MaximumValue = MaxDepth;
             onOffGraph.YAxesInfo.Y2Title = "Depth (inches)";
             report.XAxisInfo.IsEnabled = false;
             report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
@@ -424,6 +425,7 @@ namespace CisProcessor
                 var cisFiles = new List<AllegroCISFile>();
                 var docFiles = new List<CsvPcm>();
                 var fileNames = new HashSet<string>();
+                
                 foreach (var storageFile in files)
                 {
                     var fileFactory = new FileFactory(storageFile);
@@ -480,8 +482,23 @@ namespace CisProcessor
 
                 var combinedOnOffFiles = CombinedAllegroCISFile.CombineFiles(folder.DisplayName + " On Off CIS", onOffFiles, maxGap);
                 var combinedStaticFiles = CombinedAllegroCISFile.CombineFiles(folder.DisplayName + " Static CIS", staticFiles, maxGap);
-                combinedStaticFiles?.AddPcmDepthData(docFiles);
-                combinedOnOffFiles?.AddPcmDepthData(docFiles);
+                combinedStaticFiles?.AddPcmDepthData(docFiles, MaxDepth);
+                combinedOnOffFiles?.AddPcmDepthData(docFiles, MaxDepth);
+                var pcmReads = new List<(double Footage, double Read)>();
+                if(docFiles.Count != 0)
+                {
+                    foreach(var docFile in docFiles)
+                    {
+                        foreach(var (gps, read) in docFile.AmpData)
+                        {
+                            if(read != 0)
+                            {
+                                var (footage, dist) = combinedOnOffFiles.GetClosestFootage(gps);
+                                pcmReads.Add((footage, read));
+                            }
+                        }
+                    }
+                }
                 combinedOnOffFiles.FixContactSpikes();
                 combinedOnOffFiles.FixGps();
 
@@ -500,21 +517,15 @@ namespace CisProcessor
                     combinedStaticFiles.AlignTo(combinedOnOffFiles);
                 }
                 var finishedFinalName = finishedFileNames.GetValueOrDefault(folder.DisplayName, null);
-                combinedOnOffFiles.FixContactSpikes();
-                combinedOnOffFiles.FixGps();
-
-                combinedOnOffFiles.StraightenGps();
-                combinedOnOffFiles.RemoveComments("+");
                 if (combinedStaticFiles != null && combinedOnOffFiles != null)
                 {
-
-                    var name = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, outputFolder, finishedFinalName);
+                    var name = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, outputFolder, pcmReads, finishedFinalName);
                     await CreateExcelFile($"{folder.DisplayName}+{name.Text}+{(name.IsReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedOnOffFiles.FileInfos.GetExcelData(0)) }, fileOrder);
                 }
                 else
                 {
                     var file = combinedOnOffFiles ?? combinedStaticFiles;
-                    var name = await MakeOnOffGraphs(file, outputFolder, finishedFinalName);
+                    var name = await MakeOnOffGraphs(file, pcmReads, outputFolder, finishedFinalName);
                     await CreateExcelFile($"{folder.DisplayName}+{name.Text}+{(name.IsReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", file.FileInfos.GetExcelData(0)) }, fileOrder);
                 }
             }
@@ -535,7 +546,7 @@ namespace CisProcessor
             }
             return output;
         }
-        private async Task<(string Text, bool IsReversed)> MakeOnOffStaticGraphs(CombinedAllegroCISFile onOffFile, CombinedAllegroCISFile staticFile, StorageFolder outputFolder, (string Text, bool IsReversed)? exact = null)
+        private async Task<(string Text, bool IsReversed)> MakeOnOffStaticGraphs(CombinedAllegroCISFile onOffFile, CombinedAllegroCISFile staticFile, StorageFolder outputFolder, List<(double Footage, double Read)> pcmReads, (string Text, bool IsReversed)? exact = null)
         {
             var testStationInitial = onOffFile.GetTestStationData();
             var firstPoint = onOffFile.Points.First();
@@ -634,6 +645,7 @@ namespace CisProcessor
             graph1.YAxesInfo.Y1MinimumValue = -1;
             graph1.YAxesInfo.MajorGridlines.Offset = 0.125;
             graph1.YAxesInfo.MinorGridlines.Offset = 0.025;
+            graph1.YAxesInfo.Y2MaximumValue = MaxDepth;
 
             graph1.Series.Add(on);
             if (onOffFile.Type == FileType.OnOff)
@@ -650,6 +662,15 @@ namespace CisProcessor
             else
                 on.Name = "Static";
             //graph1.XAxisInfo.IsEnabled = false;
+            if(pcmReads.Count != 0)
+            {
+                var pcmSeriesLabels = pcmReads.Select(values => (values.Footage, -0.2, values.Read.ToString("F0"))).ToList();
+                var pcmSeries = new PointWithLabelGraphSeries("PCM (Amps)", pcmSeriesLabels)
+                {
+                    FillColor = Colors.Navy
+                };
+                graph1.Series.Add(pcmSeries);
+            }
             graph1.DrawTopBorder = false;
 
 
@@ -776,7 +797,7 @@ namespace CisProcessor
             //await dialog.ShowAsync();
         }
 
-        private async Task<(string Text, bool IsReversed)> MakeOnOffGraphs(CombinedAllegroCISFile allegroFile, StorageFolder outputFolder, (string Text, bool IsReversed)? exact = null)
+        private async Task<(string Text, bool IsReversed)> MakeOnOffGraphs(CombinedAllegroCISFile allegroFile, List<(double Footage, double Read)> pcmReads, StorageFolder outputFolder, (string Text, bool IsReversed)? exact = null)
         {
             var testStationInitial = allegroFile.GetTestStationData();
             var firstPoint = allegroFile.Points.First();
@@ -861,6 +882,7 @@ namespace CisProcessor
                 graph1.YAxesInfo.MajorGridlines.Offset = 0.125;
                 graph1.YAxesInfo.MinorGridlines.Offset = 0.025;
             }
+            graph1.YAxesInfo.Y2MaximumValue = MaxDepth;
             graph1.YAxesInfo.Y1MinimumValue = -3;
             graph1.YAxesInfo.MajorGridlines.Offset = 0.5;
             graph1.YAxesInfo.MinorGridlines.Offset = 0.1;
@@ -880,7 +902,15 @@ namespace CisProcessor
                 on.Name = "Static";
             //graph1.XAxisInfo.IsEnabled = false;
             graph1.DrawTopBorder = false;
-
+            if (pcmReads.Count != 0)
+            {
+                var pcmSeriesLabels = pcmReads.Select(values => (values.Footage, -0.2, values.Read.ToString("F0"))).ToList();
+                var pcmSeries = new PointWithLabelGraphSeries("PCM (Amps)", pcmSeriesLabels)
+                {
+                    FillColor = Colors.Navy
+                };
+                graph1.Series.Add(pcmSeries);
+            }
 
             graph2.Series.Add(depth);
             graph2.YAxesInfo.Y2IsDrawn = true;

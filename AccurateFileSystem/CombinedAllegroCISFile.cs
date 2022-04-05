@@ -126,14 +126,21 @@ namespace AccurateFileSystem
             }
         }
 
-        public void AddPcmDepthData(List<CsvPcm> pcms)
+        public void AddPcmDepthData(List<CsvPcm> pcms, double maxGraphDepth = double.MaxValue)
         {
             foreach (var pcm in pcms)
                 foreach (var (gps, depth) in pcm.DepthData)
                 {
                     var (Point, distance) = GetClosestPoint(gps);
                     if (distance < 20)
+                    {
                         Point.Point.Depth = depth;
+                        if(depth > maxGraphDepth)
+                        {
+                            Point.Point.OriginalComment += $" Depth: {depth:F0}in";
+                            Point.Point.StrippedComment += $" Depth: {depth:F0}in";
+                        }
+                    }
                 }
         }
 
