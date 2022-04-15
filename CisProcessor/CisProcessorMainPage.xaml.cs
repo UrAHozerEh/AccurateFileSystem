@@ -907,7 +907,7 @@ namespace CisProcessor
                 var pcmSeriesLabels = pcmReads.Select(values => (values.Footage, -0.2, values.Read.ToString("F0"))).ToList();
                 var pcmSeries = new PointWithLabelGraphSeries("PCM (Amps)", pcmSeriesLabels)
                 {
-                    FillColor = Colors.Navy
+                    PointColor = Colors.Navy
                 };
                 graph1.Series.Add(pcmSeries);
             }
