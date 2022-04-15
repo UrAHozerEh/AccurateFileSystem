@@ -38,15 +38,16 @@ namespace CisProcessor
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        private readonly double MaxDepth = 180;
+        private const double MaxDepth = 180;
+
         public MainPage()
         {
             this.InitializeComponent();
         }
 
-        private async Task<(string, bool)?> InputTextDialogAsync(string title, string testStationData, string firstComment, string lastComment)
+        private static async Task<(string, bool)?> InputTextDialogAsync(string title, string testStationData, string firstComment, string lastComment)
         {
-            StackPanel panel = new StackPanel()
+            var panel = new StackPanel()
             {
                 Orientation = Orientation.Vertical
             };
@@ -89,9 +90,7 @@ namespace CisProcessor
 
             if (isReversed)
             {
-                var temp = endMpString;
-                endMpString = startMpString;
-                startMpString = temp;
+                (endMpString, startMpString) = (startMpString, endMpString);
             }
 
             title = title.Replace("START", startMpString);
@@ -105,40 +104,45 @@ namespace CisProcessor
             };
 
             var lineSplit = testStationData.Split('\n');
-            ListBox testStationList = new ListBox();
-            testStationList.Items.Add(new ListBoxItem() { Content = firstComment });
-
-            for (int i = 1; i < lineSplit.Length; ++i)
+            var testStationList = new ListBox();
+            if (testStationList.Items != null)
             {
-                var curSplit = lineSplit[i].Split('\t');
-                if (curSplit.Length < 7)
-                    continue;
-                var footage = curSplit[0];
-                var line = curSplit[4];
-                var item = new ListBoxItem()
-                {
-                    Content = footage + " -> " + line
-                };
-                if (lineSplit.Length < 5)
-                {
-                    testStationList.Items.Add(item);
-                    continue;
-                }
-                if (i > 2 && i < lineSplit.Length - 3)
-                    continue;
-                testStationList.Items.Add(item);
-                if (i == 2)
-                {
-                    item = new ListBoxItem()
-                    {
-                        Content = "..."
-                    };
-                    testStationList.Items.Add(item);
-                }
-            }
-            testStationList.Items.Add(new ListBoxItem() { Content = lastComment });
+                testStationList.Items.Add(new ListBoxItem {Content = firstComment});
 
-            CheckBox isReverse = new CheckBox()
+                for (var i = 1; i < lineSplit.Length; ++i)
+                {
+                    var curSplit = lineSplit[i].Split('\t');
+                    if (curSplit.Length < 7)
+                        continue;
+                    var footage = curSplit[0];
+                    var line = curSplit[4];
+                    var item = new ListBoxItem()
+                    {
+                        Content = footage + " -> " + line
+                    };
+                    if (lineSplit.Length < 5)
+                    {
+                        testStationList.Items.Add(item);
+                        continue;
+                    }
+
+                    if (i > 2 && i < lineSplit.Length - 3)
+                        continue;
+                    testStationList.Items.Add(item);
+                    if (i == 2)
+                    {
+                        item = new ListBoxItem()
+                        {
+                            Content = "..."
+                        };
+                        testStationList.Items.Add(item);
+                    }
+                }
+
+                testStationList.Items.Add(new ListBoxItem() {Content = lastComment});
+            }
+
+            var isReverse = new CheckBox
             {
                 Content = "Is Reverse?",
                 IsChecked = isReversed
@@ -147,7 +151,7 @@ namespace CisProcessor
             panel.Children.Add(testStationList);
             panel.Children.Add(inputTextBox);
             panel.Children.Add(isReverse);
-            ContentDialog dialog = new ContentDialog
+            var dialog = new ContentDialog
             {
                 Content = panel,
                 Title = title,
@@ -182,7 +186,7 @@ namespace CisProcessor
             }
         }
 
-        private async Task<List<CsvPcm>> GetPcm(StorageFolder folder)
+        private static async Task<List<CsvPcm>> GetPcm(IStorageFolder folder)
         {
             var output = new List<CsvPcm>();
             if (folder == null)
@@ -198,7 +202,7 @@ namespace CisProcessor
             return output;
         }
 
-        private async Task<List<GeneralCsv>> GetDcvg(StorageFolder folder)
+        private static async Task<List<GeneralCsv>> GetDcvg(IStorageFolder folder)
         {
             var output = new List<GeneralCsv>();
             if (folder == null)
@@ -214,7 +218,7 @@ namespace CisProcessor
             return output;
         }
 
-        private async Task<List<AllegroCISFile>> GetCis(StorageFolder folder)
+        private static async Task<List<AllegroCISFile>> GetCis(IStorageFolder folder)
         {
             var output = new List<AllegroCISFile>();
             if (folder == null)
@@ -235,8 +239,8 @@ namespace CisProcessor
 
             var folders = await folder.GetFoldersAsync();
             var cisFolders = folders.Where(f => f.Name != "PCM" && f.Name != "DCVG");
-            var pcmFolder = folders.Where(f => f.Name == "PCM").FirstOrDefault();
-            var dcvgFolder = folders.Where(f => f.Name == "DCVG").FirstOrDefault();
+            var pcmFolder = folders.FirstOrDefault(f => f.Name == "PCM");
+            var dcvgFolder = folders.FirstOrDefault(f => f.Name == "DCVG");
             var pcm = await GetPcm(pcmFolder);
             var dcvg = await GetDcvg(dcvgFolder);
             var lineName = folder.DisplayName;
@@ -249,12 +253,17 @@ namespace CisProcessor
         private async Task ParseCisFolder(string lineName, StorageFolder cisFolder, List<GeneralCsv> dcvgData, List<CsvPcm> pcmData, StorageFolder outputFolder)
         {
             var report = new GraphicalReport();
-            var onOffGraph = new Graph(report);
+            var onOffGraph = new Graph(report)
+            {
+                YAxesInfo =
+                {
+                    Y1Title = "Pipe-to-Soil Potential (Volts)",
+                    Y2IsDrawn = true,
+                    Y2MaximumValue = MaxDepth,
+                    Y2Title = "Depth (inches)"
+                }
+            };
 
-            onOffGraph.YAxesInfo.Y1Title = "Pipe-to-Soil Potential (Volts)";
-            onOffGraph.YAxesInfo.Y2IsDrawn = true;
-            onOffGraph.YAxesInfo.Y2MaximumValue = MaxDepth;
-            onOffGraph.YAxesInfo.Y2Title = "Depth (inches)";
             report.XAxisInfo.IsEnabled = false;
             report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
             report.LegendInfo.SeriesNameFontSize = report.YAxesInfo.Y1LabelFontSize;
@@ -336,7 +345,7 @@ namespace CisProcessor
                 onOffGraph.Series.Add(dcvgIndication);
             }
 
-            if (pcmValues != null && pcmValues.Count != 0)
+            if (pcmValues.Count != 0)
             {
                 var ampSeries = new PointWithLabelGraphSeries("PCM (mA)", -0.4, pcmValues.Select((value) => (value.Footage, value.Value.ToString("F0"))).ToList())
                 {
@@ -350,8 +359,13 @@ namespace CisProcessor
 
             var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
 
-            var surveyDirectionChart = new Chart(report, "Survey Direction With Survey Date");
-            surveyDirectionChart.LegendInfo.NameFontSize = 14f;
+            var surveyDirectionChart = new Chart(report, "Survey Direction With Survey Date")
+            {
+                LegendInfo =
+                {
+                    NameFontSize = 14f
+                }
+            };
             var surveyDirectionSeries = new SurveyDirectionWithDateSeries(combined.GetDirectionWithDateData());
             surveyDirectionChart.Series.Add(surveyDirectionSeries);
 
@@ -363,11 +377,11 @@ namespace CisProcessor
             var surveyLength = combined.Points.Last().Footage;
             var pages = report.PageSetup.GetAllPages(0, surveyLength);
 
-            for (int i = 0; i < pages.Count; ++i)
+            for (var i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
-                var image = report.GetImage(page, 300);
+                var image = report.GetImage(page);
                 var imageFileName = $"{combinedName} Page {pageString}.png";
                 if (pages.Count == 1)
                     imageFileName = $"{combinedName} Graph.png";
@@ -387,7 +401,7 @@ namespace CisProcessor
                 var lonCol = dcvgFile.GetColumn("Longitude");
                 var latCol = dcvgFile.GetColumn("Latitude");
                 var commentCol = dcvgFile.GetColumn("Comments");
-                for (int row = 0; row < dcvgFile.Data.GetLength(0); ++row)
+                for (var row = 0; row < dcvgFile.Data.GetLength(0); ++row)
                 {
                     var lat = double.Parse(dcvgFile.Data[row, latCol]);
                     var lon = double.Parse(dcvgFile.Data[row, lonCol]);
@@ -421,7 +435,7 @@ namespace CisProcessor
                 if (folder == outputFolder || folder == fileOrder)
                     continue;
                 var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
-                var maxGap = 3000;
+                const int maxGap = 3000;
                 var cisFiles = new List<AllegroCISFile>();
                 var docFiles = new List<CsvPcm>();
                 var fileNames = new HashSet<string>();
@@ -434,9 +448,8 @@ namespace CisProcessor
                     {
                         docFiles.Add(docFile);
                     }
-                    if (!(file is AllegroCISFile))
+                    if (!(file is AllegroCISFile allegroFile))
                         continue;
-                    var allegroFile = file as AllegroCISFile;
                     if (!fileNames.Contains(allegroFile.Name))
                     {
                         cisFiles.Add(allegroFile);
@@ -463,7 +476,7 @@ namespace CisProcessor
                 {
                     continue;
                 }
-                cisFiles.Sort((file1, file2) => file1.Name.CompareTo(file2.Name));
+                cisFiles.Sort((file1, file2) => string.Compare(file1.Name, file2.Name, StringComparison.Ordinal));
 
                 var onOffFiles = new List<AllegroCISFile>();
                 var staticFiles = new List<AllegroCISFile>();
@@ -491,11 +504,9 @@ namespace CisProcessor
                     {
                         foreach(var (gps, read) in docFile.AmpData)
                         {
-                            if(read != 0)
-                            {
-                                var (footage, dist) = combinedOnOffFiles.GetClosestFootage(gps);
-                                pcmReads.Add((footage, read));
-                            }
+                            if (read == 0) continue;
+                            var (footage, dist) = combinedOnOffFiles.GetClosestFootage(gps);
+                            pcmReads.Add((footage, read));
                         }
                     }
                 }
@@ -519,14 +530,14 @@ namespace CisProcessor
                 var finishedFinalName = finishedFileNames.GetValueOrDefault(folder.DisplayName, null);
                 if (combinedStaticFiles != null && combinedOnOffFiles != null)
                 {
-                    var name = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, outputFolder, pcmReads, finishedFinalName);
-                    await CreateExcelFile($"{folder.DisplayName}+{name.Text}+{(name.IsReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedOnOffFiles.FileInfos.GetExcelData(0)) }, fileOrder);
+                    var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, outputFolder, pcmReads, finishedFinalName);
+                    await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedOnOffFiles.FileInfos.GetExcelData(0)) }, fileOrder);
                 }
                 else
                 {
                     var file = combinedOnOffFiles ?? combinedStaticFiles;
-                    var name = await MakeOnOffGraphs(file, pcmReads, outputFolder, finishedFinalName);
-                    await CreateExcelFile($"{folder.DisplayName}+{name.Text}+{(name.IsReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", file.FileInfos.GetExcelData(0)) }, fileOrder);
+                    var (text, isReversed) = await MakeOnOffGraphs(file, pcmReads, outputFolder, finishedFinalName);
+                    await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", file.FileInfos.GetExcelData(0)) }, fileOrder);
                 }
             }
         }
@@ -606,13 +617,6 @@ namespace CisProcessor
                 IsDrawnInLegend = false
             };
             var commentSeries = new CommentSeries { Values = onOffFile.GetCommentData(), PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs };
-            var seperateComment = false;
-            if (seperateComment)
-            {
-                commentSeries.PercentOfGraph = 1f;
-                commentSeries.IsFlippedVertical = true;
-                commentSeries.BorderType = BorderType.Full;
-            }
 
             commentGraph.CommentSeries = commentSeries;
             commentGraph.LegendInfo.Name = "CIS Comments";
@@ -627,8 +631,7 @@ namespace CisProcessor
                 graph1.Series.Add(depth);
                 graph1.YAxesInfo.Y2IsDrawn = true;
             }
-            if (!seperateComment)
-                graph1.CommentSeries = commentSeries;
+            graph1.CommentSeries = commentSeries;
             /*
             graph1.YAxesInfo.Y1MaximumValue = 150;
             graph1.YAxesInfo.Y1MinimumValue = 0;
@@ -732,14 +735,6 @@ namespace CisProcessor
             chart1.Series.Add(chart1Series);
 
             splitContainer.AddSelfSizedContainer(topGlobalXAxis);
-            if (seperateComment)
-            {
-                var commentGraphMeasurement = new SplitContainerMeasurement(commentGraph)
-                {
-                    FixedInchSize = 1f
-                };
-                splitContainer.AddContainer(commentGraphMeasurement);
-            }
             splitContainer.AddContainer(graph1);
             if (onOffFile.Type != FileType.Native)
             {
