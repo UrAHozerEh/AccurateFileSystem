@@ -100,10 +100,6 @@ namespace AccurateFileSystem
             skipNext = false;
             switch (curChar)
             {
-                case '°':
-                    //if (!InString)
-                    //    InGps = true;
-                    break;
                 case ',':
                     if (InString)
                     {
@@ -116,14 +112,14 @@ namespace AccurateFileSystem
                     }
                     break;
                 case '"':
-                    if (nextIsQuote)
+                    if (CurItem == "" && !InString)
+                    {
+                        InString = true;
+                    }
+                    else if (nextIsQuote)
                     {
                         CurItem += curChar;
                         skipNext = true;
-                    }
-                    else if (CurItem == "")
-                    {
-                        InString = true;
                     }
                     else if (InGps)
                     {
@@ -139,7 +135,11 @@ namespace AccurateFileSystem
                         CurItem += curChar;
                     }
                     break;
-                default:
+                case '°':
+                    if (!InString)
+                        InGps = true;
+                    goto default;
+            default:
                     CurItem += curChar;
                     break;
             }

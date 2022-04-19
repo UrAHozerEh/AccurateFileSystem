@@ -33,6 +33,9 @@ namespace AccurateFileSystem
                     case "Depth":
                         depthColumn = i;
                         break;
+                    case "Depth(in)":
+                        depthColumn = i;
+                        break;
                     case "Signal_Cur":
                         ampColumn = i;
                         break;

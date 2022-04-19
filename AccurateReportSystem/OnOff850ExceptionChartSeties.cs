@@ -124,6 +124,11 @@ namespace AccurateReportSystem
                     colors.Add((prevStart, prevStart + (MaxDistance / 2), prevColor));
             }
 
+            if(colors.Count == 0)
+            {
+                colors.Add((page.StartFootage, page.EndFootage, NoDataColor));
+            }
+
             return colors;
         }
 

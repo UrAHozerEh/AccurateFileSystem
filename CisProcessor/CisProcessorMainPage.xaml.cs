@@ -435,7 +435,7 @@ namespace CisProcessor
                 if (folder == outputFolder || folder == fileOrder)
                     continue;
                 var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
-                const int maxGap = 3000;
+                const int maxGap = 3600;
                 var cisFiles = new List<AllegroCISFile>();
                 var docFiles = new List<CsvPcm>();
                 var fileNames = new HashSet<string>();
@@ -502,6 +502,7 @@ namespace CisProcessor
                 {
                     foreach(var docFile in docFiles)
                     {
+
                         foreach(var (gps, read) in docFile.AmpData)
                         {
                             if (read == 0) continue;

@@ -9,8 +9,8 @@ namespace AccurateFileSystem
 {
     public abstract class CsvPcm : GeneralCsv
     {
-        public List<(BasicGeoposition Gps, double Depth)> DepthData { get; set; }
-        public List<(BasicGeoposition Gps, double Amps)> AmpData { get; set; }
+        public List<(BasicGeoposition Gps, double Depth)> DepthData { get; set; } = new List<(BasicGeoposition Gps, double Depth)>();
+        public List<(BasicGeoposition Gps, double Amps)> AmpData { get; set; } = new List<(BasicGeoposition Gps, double Amps)>();
 
         protected CsvPcm(string name, List<string> lines) : base(name, lines, FileType.PCM)
         {
@@ -20,6 +20,8 @@ namespace AccurateFileSystem
         protected void GetDepthData(int latColumn, int lonColumn, int depthColumn)
         {
             DepthData = new List<(BasicGeoposition Gps, double Depth)>();
+            if (Data.GetLength(0) == 0)
+                Data = Data;
             for (int r = 0; r < Data.GetLength(0); ++r)
             {
                 var lat = GetDecimalDegree(Data[r, latColumn]);
