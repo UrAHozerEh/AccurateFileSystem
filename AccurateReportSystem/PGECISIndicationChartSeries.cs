@@ -409,6 +409,10 @@ namespace AccurateReportSystem
             extrapolatedData.Add(curExtrapPoint);
             var output = new List<DataPointUpdated>(extrapolatedData.Count);
             DataPointUpdated curPoint;
+
+            Averages = new List<(double Footage, double Value)>(extrapolatedData.Count);
+            Baselines = Enumerable.Repeat((double.NaN, double.NaN), extrapolatedData.Count).ToList();
+            UsedBaselineFootages = Enumerable.Repeat((double.NaN, double.NaN), extrapolatedData.Count).ToList();
             if (foot <= 200)
             {
                 var average = extrapolatedData.Average(value => value.Off);
@@ -416,6 +420,9 @@ namespace AccurateReportSystem
                 {
                     curExtrapPoint = extrapolatedData[i];
                     foot = curExtrapPoint.Footage;
+                    Averages.Add((foot, average));
+                    Baselines[i] = (foot, average);
+                    UsedBaselineFootages[i] = (foot, foot);
                     curRegion = curExtrapPoint.Region;
                     var changeInBaseline = Math.Abs(curExtrapPoint.Off - average);
                     var (severity, reason) = GetSeverity(curExtrapPoint.Off, average);
@@ -429,7 +436,6 @@ namespace AccurateReportSystem
                 }
                 return output;
             }
-            Averages = new List<(double Footage, double Value)>(extrapolatedData.Count);
             for (int i = 0; i < extrapolatedData.Count; ++i)
             {
                 curExtrapPoint = extrapolatedData[i];

@@ -72,6 +72,21 @@ namespace AccurateFileSystem
             ParseComment(true);
         }
 
+        public AllegroDataPoint(AllegroDataPoint point, BasicGeoposition gps, string comment)
+        {
+            Id = point.Id;
+            Footage = point.Footage;
+            On = point.On;
+            MirOnOffset = 0;
+            Off = point.Off;
+            MirOffOffset = 0;
+            OriginalComment = comment;
+            GPS = gps;
+            Times = point.Times;
+            IsCorrected = point.IsCorrected;
+            ParseComment(true);
+        }
+
         private void ParseComment(bool removeDoc)
         {
             if (string.IsNullOrWhiteSpace(OriginalComment))

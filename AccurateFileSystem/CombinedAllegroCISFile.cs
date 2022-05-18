@@ -697,9 +697,11 @@ namespace AccurateFileSystem
                 {
                     foreach (var (_, values) in addedValues)
                     {
+                        if (values == null)
+                            addedValues = addedValues;
                         var curValues = values.Where(v => v.Footage == footage);
                         var value = "";
-                        if (curValues.Count() == 1)
+                        if (curValues != null && curValues.Count() == 1)
                         {
                             value = curValues.First().Value.ToString("F3");
                         }
@@ -898,7 +900,7 @@ namespace AccurateFileSystem
             return output;
         }
 
-        public string GetShapeFile(int readDecimals = 4, bool globalUseMir = false)
+        public string GetShapeFile(int readDecimals = 4, bool globalUseMir = false, List<(double Footage, double Value)> pcmValues = null)
         {
             var output = GetShapefileStringBuilder();
             var readFormat = $"F{readDecimals}";
@@ -936,6 +938,12 @@ namespace AccurateFileSystem
                 curLine[19] = on.ToString(readFormat);
                 curLine[20] = off.ToString(readFormat);
                 curLine[25] = "CECIS";
+                var curPcmValues = pcmValues?.Where(value => value.Footage == footage).ToList();
+                if (curPcmValues != null && curPcmValues.Count != 0)
+                {
+                    curLine[28] = curPcmValues[0].Value.ToString();
+                }
+
                 output.AppendLine(string.Join("\t", curLine));
             }
             return output.ToString().TrimEnd('\n');
@@ -1434,6 +1442,10 @@ namespace AccurateFileSystem
             var type = first.Type;
 
             var allSolution = new FileInfoLinkedList(new FileInfo(first));
+            if(first.Name.Contains("rev", StringComparison.OrdinalIgnoreCase))
+            {
+                allSolution = new FileInfoLinkedList(new FileInfo(first, first.Points.Count - 1, 0));
+            }
             for (int i = 1; i < files.Count; ++i)
             {
                 var curFile = files[i];
@@ -1456,7 +1468,7 @@ namespace AccurateFileSystem
                     allSolution.AddToEnd(new FileInfo(curFile, curFile.Points.Count - 1, 0) { Offset = offset });
                 }
             }
-            //allSolution.CalculateOffset(offset);
+            allSolution.CalculateOffset(offset);
             var solString = allSolution.ToString();
             var combined = new CombinedAllegroCISFile(name, type, allSolution);
             return combined;
@@ -1512,6 +1524,55 @@ namespace AccurateFileSystem
                 }
             }
             return (closestFootage, closestDist);
+        }
+
+        public CombinedDataPoint AddExtrapolatedPoint(BasicGeoposition gps, string comment = "")
+        {
+            var (closestPoint, closestDist) = GetClosestPoint(gps);
+            var foundIndex = -1;
+            for(int i = 1; i < Points.Count - 2; ++i)
+            {
+                if(Points[i].Equals(closestPoint))
+                {
+                    foundIndex = i;
+                }
+            }
+            if(foundIndex == -1 || closestDist <= 2.5)
+            {
+                closestPoint.Point.OriginalComment += $" {comment}";
+                return closestPoint;
+            }
+            var prevDistToSeg = double.MaxValue;
+            var prevSegGps = gps;
+            var prev = Points[foundIndex - 1];
+
+            var nextDistToSeg = double.MaxValue;
+            var nextSegGps = gps;
+            var next = Points[foundIndex + 1];
+
+            if (prev.Point.HasGPS)
+            {
+                (prevDistToSeg, prevSegGps) = gps.DistanceToSegment(closestPoint.Point.GPS, prev.Point.GPS);
+            }
+            if (next.Point.HasGPS)
+            {
+                (nextDistToSeg, nextSegGps) = gps.DistanceToSegment(closestPoint.Point.GPS, next.Point.GPS);
+            }
+
+            if(nextDistToSeg < prevDistToSeg)
+            {
+                var nextDist = closestPoint.Point.GPS.Distance(nextSegGps);
+                var nextAllegroPoint = new AllegroDataPoint(closestPoint.Point, nextSegGps, comment);
+                var nextPoint = new CombinedDataPoint(closestPoint.Footage + nextDist, closestPoint.IsReverse, nextAllegroPoint, closestPoint.UseMir, closestPoint.File);
+                Points.Insert(foundIndex + 1, nextPoint);
+                return nextPoint;
+            }
+
+            var prevDist = closestPoint.Point.GPS.Distance(prevSegGps);
+            var prevAllegroPoint = new AllegroDataPoint(closestPoint.Point, nextSegGps, comment);
+            var prevPoint = new CombinedDataPoint(closestPoint.Footage + prevDist, closestPoint.IsReverse, prevAllegroPoint, closestPoint.UseMir, closestPoint.File);
+            Points.Insert(foundIndex, prevPoint);
+            return prevPoint;
         }
 
         public (CombinedDataPoint Point, double Distance) GetClosestPoint(BasicGeoposition gps)

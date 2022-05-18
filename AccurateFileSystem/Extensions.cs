@@ -13,6 +13,55 @@ namespace AccurateFileSystem
 {
     public static class Extensions
     {
+        public static string GetPcmShapefileData(this List<(double Footage, double Value)> values)
+        {
+            var output = GetShapefileStringBuilder();
+
+            return output.ToString();
+        }
+
+        private static StringBuilder GetShapefileStringBuilder()
+        {
+            var output = new StringBuilder();
+            var curLine = new string[34];
+            curLine[0] = "LABEL";
+            curLine[1] = "STATION";
+            curLine[2] = "DATEOFCIS";
+            curLine[3] = "PRIMARYDES";
+            curLine[4] = "SECONDDESC";
+            curLine[5] = "TOPO";
+            curLine[6] = "DCVGREMOTE";
+            curLine[7] = "DEPTH";
+            curLine[8] = "ECDAREGION";
+            curLine[9] = "SEGMENT";
+            curLine[10] = "NORTHING";
+            curLine[11] = "EASTING";
+            curLine[12] = "LATITUDE";
+            curLine[13] = "LONGITUDE";
+            curLine[14] = "ECDACAT";
+            curLine[15] = "ILICAT";
+            curLine[16] = "PCMCAT";
+            curLine[17] = "DCVGCAT";
+            curLine[18] = "CISCAT";
+            curLine[19] = "ONREAD";
+            curLine[20] = "OFFREAD";
+            curLine[21] = "STATICREAD";
+            curLine[22] = "ELEVATION";
+            curLine[23] = "LINE_NUM";
+            curLine[24] = "NSEG";
+            curLine[25] = "PROCESS";
+            curLine[26] = "ROUTE";
+            curLine[27] = "IMA";
+            curLine[28] = "PCM";
+            curLine[29] = "META";
+            curLine[30] = "PRIMARYGPS";
+            curLine[31] = "SECONDGPS";
+            curLine[32] = "ACVG";
+            curLine[33] = "ACVGCAT";
+            output.AppendLine(string.Join("\t", curLine));
+            return output;
+        }
+
         public static Dbf.DbfFile.Record GetRecord(this List<Dbf.DbfFile.FieldDescriptor> fieldDescriptors, byte[] data)
         {
             var values = new Dictionary<string, string>();

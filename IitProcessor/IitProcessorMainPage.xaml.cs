@@ -211,10 +211,20 @@ namespace IitProcessor
 
             combinedCisFile.ReverseBasedOnHca(hca);
             var (startHcaFootage, endHcaFootage) = AddHcaComments(combinedCisFile, hca);
-            combinedCisFile.StraightenGps();
-            combinedCisFile.RemoveComments("+");
+
+            //combinedCisFile.StraightenGps();
+            
             if (curLineData != null)
+            {
                 combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
+                combinedCisFile.StraightenGps();
+                combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
+            }
+            else
+            {
+                combinedCisFile.StraightenGps();
+            }
+            combinedCisFile.RemoveComments("+");
 
             var hcaStartPoint = combinedCisFile.GetClosesetPoint(startHcaFootage);
             hca.Regions[0].StartGps = hcaStartPoint.Point.GPS;
@@ -828,6 +838,8 @@ namespace IitProcessor
             }
 
 
+            //var  hcaStartComment = (hasStartBuffer ? " END OF BUFFER" : "") + " START OF HCA";
+            //hcaStartPoint = file.AddExtrapolatedPoint(hcaStartGps, hcaStartComment);
             hcaStartPoint.Point.OriginalComment += (hasStartBuffer ? " END OF BUFFER" : "") + " START OF HCA";
             hcaStartPoint.Point.GPS = hcaStartGps;
 
@@ -843,6 +855,8 @@ namespace IitProcessor
 
             hcaEndPoint.Point.GPS = hcaEndGps;
             hcaEndPoint.Point.OriginalComment += " END OF HCA" + (hasEndBuffer ? " START OF BUFFER" : "");
+            //var hcaEndComment = " END OF HCA" + (hasEndBuffer ? " START OF BUFFER" : "");
+            //hcaEndPoint = file.AddExtrapolatedPoint(hcaEndGps, hcaEndComment);
             return (hcaStartPoint.Footage, hcaEndPoint.Footage);
         }
 
@@ -1027,6 +1041,8 @@ namespace IitProcessor
                 foreach (var coordsObj in coordsObjs)
                 {
                     var gps = new List<BasicGeoposition>();
+                    if (string.IsNullOrWhiteSpace(coordsObj.Value.Trim()))
+                        continue;
                     var coords = coordsObj.Value.Trim().Split(' ');
                     foreach (var coord in coords)
                     {

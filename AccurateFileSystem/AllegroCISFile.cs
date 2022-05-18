@@ -220,8 +220,8 @@ namespace AccurateFileSystem
 
                 if (cur.HasIndication)
                 {
-                    var curIrDrop = startIrDrop + irDropFactor * cur.Footage;
-                    cur.IndicationPercent = (cur.IndicationValue / curIrDrop) * 100;
+                    var curIrDrop = startIrDrop + (irDropFactor * cur.Footage);
+                    cur.IndicationPercent = cur.IndicationValue / curIrDrop * 100;
                 }
                 prevOn = cur.On;
                 prevOff = cur.Off;

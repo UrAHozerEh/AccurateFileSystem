@@ -514,7 +514,7 @@ namespace CisProcessor
                 combinedOnOffFiles.FixContactSpikes();
                 combinedOnOffFiles.FixGps();
 
-                combinedOnOffFiles.StraightenGps();
+                //combinedOnOffFiles.StraightenGps();
                 combinedOnOffFiles.RemoveComments("+");
                 if (staticFiles.Count > 0 && onOffFiles.Count > 0)
                 {
@@ -669,9 +669,9 @@ namespace CisProcessor
             if(pcmReads.Count != 0)
             {
                 var pcmSeriesLabels = pcmReads.Select(values => (values.Footage, -0.2, values.Read.ToString("F0"))).ToList();
-                var pcmSeries = new PointWithLabelGraphSeries("PCM (Amps)", pcmSeriesLabels)
+                var pcmSeries = new PointWithLabelGraphSeries("PCM (Milliamps)", pcmSeriesLabels)
                 {
-                    FillColor = Colors.Navy
+                    PointColor = Colors.Navy
                 };
                 graph1.Series.Add(pcmSeries);
             }
@@ -748,7 +748,11 @@ namespace CisProcessor
             report.Container = splitContainer;
             var pages = report.PageSetup.GetAllPages(0, onOffFile.Points.Last().Footage);
             var curFileName = $"{response.Value.Item1}\\{topGlobalXAxis.Title}";
-            await CreateStandardFiles(curFileName, onOffFile, outputFolder);
+            var addedPcmValues = new List<(string, List<(double, double)>)>()
+            {
+                ("PCM Values", pcmReads)
+            };
+            await CreateStandardFiles(curFileName, onOffFile, outputFolder, addedPcmValues);
 
             var shapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
             var cisShapeFile = new ShapefileData($"{response.Value.Text}", onOffFile.GetShapeFile());
@@ -802,7 +806,7 @@ namespace CisProcessor
             var endComment = lastPoint.Footage + " -> " + lastPoint.Point.StrippedComment;
             (string Text, bool IsReversed)? response;
             if (!exact.HasValue)
-                response = await InputTextDialogAsync($"PG&E LS {allegroFile.Name.Replace("ls", "", StringComparison.OrdinalIgnoreCase).Replace("line", "", StringComparison.OrdinalIgnoreCase).Trim()} MP START to MP END", testStationInitial, startComment, endComment);
+                response = await InputTextDialogAsync($"SoCal Gas LS {allegroFile.Name.Replace("ls", "", StringComparison.OrdinalIgnoreCase).Replace("line", "", StringComparison.OrdinalIgnoreCase).Trim()} MP START to MP END", testStationInitial, startComment, endComment);
             else
                 response = (exact.Value.Text, exact.Value.IsReversed);//await InputTextDialogAsync(exact, testStationInitial, startComment, endComment);
 
@@ -901,7 +905,7 @@ namespace CisProcessor
             if (pcmReads.Count != 0)
             {
                 var pcmSeriesLabels = pcmReads.Select(values => (values.Footage, -0.2, values.Read.ToString("F0"))).ToList();
-                var pcmSeries = new PointWithLabelGraphSeries("PCM (Amps)", pcmSeriesLabels)
+                var pcmSeries = new PointWithLabelGraphSeries("PCM (Milliamps)", pcmSeriesLabels)
                 {
                     PointColor = Colors.Navy
                 };
@@ -985,10 +989,14 @@ namespace CisProcessor
             report.Container = splitContainer;
             var pages = report.PageSetup.GetAllPages(0, allegroFile.Points.Last().Footage);
             var curFileName = $"{response.Value.Item1}\\{topGlobalXAxis.Title}";
-            await CreateStandardFiles(curFileName, allegroFile, outputFolder);
+            var addedPcmValues = new List<(string, List<(double, double)>)>()
+            {
+                ("PCM Values", pcmReads)
+            };
+            await CreateStandardFiles(curFileName, allegroFile, outputFolder, addedPcmValues);
 
             var shapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
-            var cisShapeFile = new ShapefileData($"{response.Value.Text}", allegroFile.GetShapeFile());
+            var cisShapeFile = new ShapefileData($"{response.Value.Text}", allegroFile.GetShapeFile(pcmValues: pcmReads));
             await cisShapeFile.WriteToFolder(shapefileFolder);
 
             var passShapefileFolder = await outputFolder.CreateFolderAsync("Passing Shapefiles", CreationCollisionOption.OpenIfExists);
@@ -1030,9 +1038,9 @@ namespace CisProcessor
             //await dialog.ShowAsync();
         }
 
-        private async Task CreateStandardFiles(string fileName, CombinedAllegroCISFile allegroFile, StorageFolder outputFolder)
+        private async Task CreateStandardFiles(string fileName, CombinedAllegroCISFile allegroFile, StorageFolder outputFolder, List<(string, List<(double, double)>)> addedValues = null)
         {
-            var tabular = allegroFile.GetTabularData();
+            var tabular = allegroFile.GetTabularData(addedValues: addedValues);
             await CreateExcelFile($"{fileName} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) }, outputFolder);
             var dataMetrics = new DataMetrics(allegroFile.GetPoints());
             await CreateExcelFile($"{fileName} Data Metrics", dataMetrics.GetSheets(), outputFolder);
