@@ -442,8 +442,8 @@ namespace AccurateReportSystem
         private void ExtrapolateCisData()
         {
             var startGps = HcaInfo.Regions[0].Start;
-            int start = 0;
-            int end = CisFile.Points.Count - 1;
+            var start = 0;
+            var end = CisFile.Points.Count - 1;
             var startPoint = CisFile.Points[start];
             while (!startPoint.Point.HasGPS)
             {
@@ -470,7 +470,7 @@ namespace AccurateReportSystem
                     StraightenGps(CisFile, GpsInfo.Value);
                 CisFile.SetFootageFromGps();
             }
-            double lastFootage = double.NaN;
+            var lastFootage = double.NaN;
             AllegroDataPoint lastPoint = null;
             EcdaData = new List<PgeEcdaDataPoint>();
             double? lastDepth = null;
@@ -511,11 +511,11 @@ namespace AccurateReportSystem
                 var latFactor = (curGps.Latitude - lastGps.Latitude) / footDist;
                 var lonFactor = (curGps.Longitude - lastGps.Longitude) / footDist;
                 var onFactor = (curOn - lastOn) / footDist;
-                double? depthFactor = curDepth.HasValue ? ((curDepth.Value - lastDepth.Value) / footDist) : (double?)null;
+                var depthFactor = curDepth.HasValue ? ((curDepth.Value - lastDepth.Value) / footDist) : (double?)null;
                 var offFactor = (curOff - lastOff) / footDist;
                 var isSkipped = footDist > MaxSpacing;
 
-                for (int j = 1; j < footDist; ++j)
+                for (var j = 1; j < footDist; ++j)
                 {
                     var fakeGps = new BasicGeoposition()
                     {
@@ -596,11 +596,11 @@ namespace AccurateReportSystem
 
         private void ExtrapolateCisDataUpdated()
         {
-            int start = CisFile.HasStartSkip ? 1 : 0;
-            int end = CisFile.Points.Count - (CisFile.HasEndSkip ? 2 : 1);
+            var start = CisFile.HasStartSkip ? 1 : 0;
+            var end = CisFile.Points.Count - (CisFile.HasEndSkip ? 2 : 1);
             var startFootage = CisFile.Points[start].Footage;
             var endFootage = CisFile.Points[end].Footage;
-            double lastFootage = double.NaN;
+            var lastFootage = double.NaN;
             AllegroDataPoint lastPoint = null;
             EcdaData = new List<PgeEcdaDataPoint>();
             double? lastDepth = null;
@@ -646,11 +646,11 @@ namespace AccurateReportSystem
                 var latFactor = (curGps.Latitude - lastGps.Latitude) / footDist;
                 var lonFactor = (curGps.Longitude - lastGps.Longitude) / footDist;
                 var onFactor = (curOn - lastOn) / footDist;
-                double? depthFactor = curDepth.HasValue ? ((curDepth.Value - lastDepth.Value) / footDist) : (double?)null;
+                var depthFactor = curDepth.HasValue ? ((curDepth.Value - lastDepth.Value) / footDist) : (double?)null;
                 var offFactor = (curOff - lastOff) / footDist;
                 var isSkipped = footDist > MaxSpacing || closeRegion.ShouldSkip;
 
-                for (int j = 1; j < footDist; ++j)
+                for (var j = 1; j < footDist; ++j)
                 {
                     var fakeGps = new BasicGeoposition()
                     {
@@ -683,7 +683,7 @@ namespace AccurateReportSystem
         private void CalcualteBaselines()
         {
             var curAverages = new List<double>(EcdaData.Count);
-            for (int i = 0; i < EcdaData.Count; ++i)
+            for (var i = 0; i < EcdaData.Count; ++i)
             {
                 var point = EcdaData[i];
                 var within100 = EcdaData.Where(value => Within100(point.Footage, value.Footage) && !value.IsCisSkipped);
@@ -691,13 +691,13 @@ namespace AccurateReportSystem
                 curAverages.Add(average);
             }
             var curBaselines = Enumerable.Repeat(double.NaN, EcdaData.Count).ToList();
-            for (int center = 0; center < EcdaData.Count; ++center)
+            for (var center = 0; center < EcdaData.Count; ++center)
             {
                 var start = Math.Max(center - 105, 0);
                 var end = Math.Min(center + 105, EcdaData.Count - 1);
                 var centerPoint = EcdaData[center];
                 var centerAverage = curAverages[center];
-                for (int i = start; i <= end; ++i)
+                for (var i = start; i <= end; ++i)
                 {
                     var curPoint = EcdaData[i];
                     var curAverage = curAverages[i];
@@ -727,7 +727,7 @@ namespace AccurateReportSystem
 
             var areas = new List<ReportQArea>();
             var curArea = new ReportQArea(EcdaData.First());
-            for (int i = 1; i < EcdaData.Count; ++i)
+            for (var i = 1; i < EcdaData.Count; ++i)
             {
                 var curPoint = EcdaData[i];
                 curArea.End = curPoint;
@@ -768,8 +768,8 @@ namespace AccurateReportSystem
 
         private string ToStationing(double footage)
         {
-            int hundred = (int)footage / 100;
-            int tens = (int)footage % 100;
+            var hundred = (int)footage / 100;
+            var tens = (int)footage % 100;
             return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
         }
 
@@ -861,7 +861,7 @@ namespace AccurateReportSystem
             var buffer = await FileIO.ReadBufferAsync(file);
             using (var dataReader = Windows.Storage.Streams.DataReader.FromBuffer(buffer))
             {
-                string text = dataReader.ReadString(buffer.Length);
+                var text = dataReader.ReadString(buffer.Length);
                 var xml = new XmlDocument();
                 try
                 {
@@ -964,7 +964,7 @@ namespace AccurateReportSystem
         {
             var distance = double.NaN;
             var newPoint = new BasicGeoposition();
-            for (int i = 1; i < Points.Count; ++i)
+            for (var i = 1; i < Points.Count; ++i)
             {
                 var start = Points[i - 1];
                 var end = Points[i];

@@ -53,7 +53,7 @@ namespace AccurateFileSystem.Xml
 
         private string GetSafeValue()
         {
-            string output = Value.Replace("&", "&amp;");
+            var output = Value.Replace("&", "&amp;");
             return output;
         }
 

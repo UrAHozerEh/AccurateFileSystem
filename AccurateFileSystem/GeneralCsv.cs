@@ -28,7 +28,7 @@ namespace AccurateFileSystem
 
         public int GetColumn(string headerName)
         {
-            for(int i = 0; i < Headers.Count; ++i)
+            for(var i = 0; i < Headers.Count; ++i)
             {
                 if (Headers[i] == headerName)
                     return i;
@@ -40,7 +40,7 @@ namespace AccurateFileSystem
         {
             var firstLine = ParseLine(lines, 0, out var nextIndex);
             Headers = new List<string>();
-            for (int i = 0; i < firstLine.Count; ++i)
+            for (var i = 0; i < firstLine.Count; ++i)
             {
                 var text = firstLine[i];
                 Headers.Add(text);
@@ -57,10 +57,10 @@ namespace AccurateFileSystem
 
             }
             Data = new string[dataRows.Count, Headers.Count];
-            for (int r = 0; r < dataRows.Count; ++r)
+            for (var r = 0; r < dataRows.Count; ++r)
             {
                 var row = dataRows[r];
-                for (int c = 0; c < row.Count; ++c)
+                for (var c = 0; c < row.Count; ++c)
                 {
                     Data[r, c] = row[c];
                 }
@@ -76,12 +76,12 @@ namespace AccurateFileSystem
             InString = false;
             InGps = false;
             nextIndex = index + 1;
-            for (int i = 0; i < line.Length; ++i)
+            for (var i = 0; i < line.Length; ++i)
             {
                 var curChar = line[i];
                 var nextI = i + 1;
                 var nextIsQuote = (nextI < line.Length) && (line[nextI] == '"');
-                ParseCharacter(curChar, nextIsQuote, out bool skipNext);
+                ParseCharacter(curChar, nextIsQuote, out var skipNext);
                 if (i == line.Length - 1 && InString)
                 {
                     line += " " + lines[nextIndex];

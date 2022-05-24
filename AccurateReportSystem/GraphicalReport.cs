@@ -38,12 +38,12 @@ namespace AccurateReportSystem
 
             var totalFootage = endFootage - startFootage;
             var pages = PageSetup.GetAllPages(startFootage, totalFootage);
-            CanvasDevice device = CanvasDevice.GetSharedDevice();
+            var device = CanvasDevice.GetSharedDevice();
             var list = new List<CanvasRenderTarget>();
             foreach (var page in pages)
             {
-                CanvasRenderTarget offscreen = new CanvasRenderTarget(device, (float)pageArea.Width, (float)pageArea.Height, dpi);
-                using (CanvasDrawingSession session = offscreen.CreateDrawingSession())
+                var offscreen = new CanvasRenderTarget(device, (float)pageArea.Width, (float)pageArea.Height, dpi);
+                using (var session = offscreen.CreateDrawingSession())
                 {
                     session.Clear(Colors.White);
                     session.TextRenderingParameters = new CanvasTextRenderingParameters(CanvasTextRenderingMode.NaturalSymmetric, CanvasTextGridFit.Default);
@@ -63,9 +63,9 @@ namespace AccurateReportSystem
             var pageArea = new Rect(0, 0, pageAreaWidth, pageAreaHeight);
             var drawArea = new Rect(MarginInfo.LeftDip, MarginInfo.TopDip, pageAreaWidth - MarginInfo.MarginWidthDip, pageAreaHeight - MarginInfo.MarginHeightDip);
 
-            CanvasDevice device = CanvasDevice.GetSharedDevice();
-            CanvasRenderTarget offscreen = new CanvasRenderTarget(device, (float)pageArea.Width, (float)pageArea.Height, dpi);
-            using (CanvasDrawingSession session = offscreen.CreateDrawingSession())
+            var device = CanvasDevice.GetSharedDevice();
+            var offscreen = new CanvasRenderTarget(device, (float)pageArea.Width, (float)pageArea.Height, dpi);
+            using (var session = offscreen.CreateDrawingSession())
             {
                 session.Clear(Colors.White);
                 if (Logo != null)

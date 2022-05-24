@@ -88,7 +88,7 @@ namespace AccurateReportSystem
 
             using (var pathBuilder = new CanvasPathBuilder(session))
             {
-                for (int i = 0; i < Values.Count; ++i)
+                for (var i = 0; i < Values.Count; ++i)
                 {
                     var (footage, value) = Values[i];
                     if (i + 1 < Values.Count)
@@ -186,7 +186,7 @@ namespace AccurateReportSystem
         {
             if (Values == null || Values.Count == 0 || PointShape == Shape.None)
                 return;
-            for (int i = 0; i < Values.Count; ++i)
+            for (var i = 0; i < Values.Count; ++i)
             {
                 var (footage, value) = Values[i];
                 if (footage < page.StartFootage)

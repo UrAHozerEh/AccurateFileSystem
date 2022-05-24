@@ -89,7 +89,7 @@ namespace AccurateFileSystem
             using (var stream = await File.OpenStreamForReadAsync())
             using (var reader = new StreamReader(stream))
             {
-                string line = reader.ReadLine();
+                var line = reader.ReadLine();
                 return line.Contains("Start survey:");
             }
         }
@@ -99,18 +99,18 @@ namespace AccurateFileSystem
             using (var stream = await File.OpenStreamForReadAsync())
             using (var reader = new StreamReader(stream))
             {
-                string line = reader.ReadLine().Trim();
-                DateTime time = new DateTime(0);
-                int sampleRate = 0;
-                string remark = "";
-                string range = "";
+                var line = reader.ReadLine().Trim();
+                var time = new DateTime(0);
+                var sampleRate = 0;
+                var remark = "";
+                var range = "";
                 while (!string.IsNullOrEmpty(line))
                 {
                     if (!line.Contains(':'))
                         return null; //TODO: Handle this exception. There was a bad file in 4914
                     //throw new Exception($"Expected header labels in waveform file. Got '{line}' instead. Filename: '{FileName}'");
-                    string label = line.Substring(0, line.IndexOf(':')).Trim();
-                    string value = line.Substring(line.IndexOf(':') + 1).Trim();
+                    var label = line.Substring(0, line.IndexOf(':')).Trim();
+                    var value = line.Substring(line.IndexOf(':') + 1).Trim();
 
                     switch (label)
                     {
@@ -139,19 +139,19 @@ namespace AccurateFileSystem
                 {
                     line = reader.ReadLine().Trim();
                     if (string.IsNullOrEmpty(line)) continue;
-                    string[] split = line.Split(' ');
+                    var split = line.Split(' ');
                     if (split.Length != 4 && split.Length != 1)
                         throw new Exception();
-                    double value = double.Parse(split[0]);
+                    var value = double.Parse(split[0]);
                     if (split.Length == 1)
                     {
                         points.Add(new AllegroWaveformPoint(value));
                     }
                     else
                     {
-                        bool on = split[1] == "1";
-                        bool second = split[2] == "1";
-                        bool third = split[3] == "1";
+                        var on = split[1] == "1";
+                        var second = split[2] == "1";
+                        var third = split[3] == "1";
                         points.Add(new AllegroWaveformPoint(value, on, second, third));
                     }
                 }
@@ -164,12 +164,12 @@ namespace AccurateFileSystem
 
         private async Task<File> GetAllegroFile()
         {
-            Dictionary<string, string> header = new Dictionary<string, string>();
-            Dictionary<int, AllegroDataPoint> points = new Dictionary<int, AllegroDataPoint>();
-            string extension = File.FileType.ToLower();
+            var header = new Dictionary<string, string>();
+            var points = new Dictionary<int, AllegroDataPoint>();
+            var extension = File.FileType.ToLower();
             string headerDelimiter;
-            int pointId = 0;
-            bool noGaps = false;
+            var pointId = 0;
+            var noGaps = false;
             switch (extension)
             {
                 case ".svy":
@@ -184,17 +184,17 @@ namespace AccurateFileSystem
                 default:
                     throw new Exception();
             }
-            FileType type = FileType.Unknown;
+            var type = FileType.Unknown;
             using (var stream = await File.OpenStreamForReadAsync())
             using (var reader = new StreamReader(stream))
             {
-                int lineCount = 0;
-                bool isHeader = true;
-                string line = reader.ReadLine();
+                var lineCount = 0;
+                var isHeader = true;
+                var line = reader.ReadLine();
                 ++lineCount;
                 if (!line.Contains("Start survey:")) throw new Exception();
-                Match extraCommasMatch = Regex.Match(line, ",,+");
-                string extraCommasShort = extraCommasMatch.Success ? extraCommasMatch.Value.Substring(1) : "";
+                var extraCommasMatch = Regex.Match(line, ",,+");
+                var extraCommasShort = extraCommasMatch.Success ? extraCommasMatch.Value.Substring(1) : "";
                 double? startFoot = null;
                 AllegroDataPoint lastPoint = null;
 
@@ -206,11 +206,11 @@ namespace AccurateFileSystem
                     {
                         if (extraCommasMatch.Success)
                             line = line.Replace(extraCommasShort, "");
-                        int firstDelimiter = line.IndexOf(headerDelimiter);
+                        var firstDelimiter = line.IndexOf(headerDelimiter);
                         if (firstDelimiter == -1)
                             throw new Exception();
-                        string key = line.Substring(0, firstDelimiter).Trim();
-                        string value = line.Substring(firstDelimiter + 1).Trim();
+                        var key = line.Substring(0, firstDelimiter).Trim();
+                        var value = line.Substring(firstDelimiter + 1).Trim();
                         if (key == "Records")
                         {
                             value = value.Replace(":", "");
@@ -300,7 +300,7 @@ namespace AccurateFileSystem
         private AllegroDataPoint ParseAllegroLineFromCSV(int id, string line)
         {
             var indicationMatch = Regex.Match(line, ",\"?[^\",]*\"?,\"?UN\"?,0,(\\d+\\.?\\d*),0");
-            double indicationValue = double.NaN;
+            var indicationValue = double.NaN;
             if (indicationMatch.Success)
             {
                 var commentIndicationMatch = Regex.Match(line, "\\(Indication [^;]*; [^\\)]+\\)");
@@ -311,7 +311,7 @@ namespace AccurateFileSystem
             if (split.Length < 16)
                 return null;
             var comment = split[15];
-            double realDoC = double.NaN;
+            var realDoC = double.NaN;
             if (split.Length > 16)
             {
                 // Weird 111A stuff
@@ -347,11 +347,11 @@ namespace AccurateFileSystem
                 comment = Regex.Replace(comment, "^\"(.*)\"$", "$1");
             comment = Regex.Replace(comment, "\"\"", "\"");
 
-            double footage = double.Parse(split[0]);
-            double on = double.Parse(split[2]);
-            double off = double.Parse(split[3]);
+            var footage = double.Parse(split[0]);
+            var on = double.Parse(split[2]);
+            var off = double.Parse(split[3]);
 
-            List<DateTime> times = new List<DateTime>();
+            var times = new List<DateTime>();
             if (IsValidTime(split, 4))
                 times.Add(JoinAndParseDateTime(split, 4));
             if (IsValidTime(split, 7))
@@ -368,7 +368,7 @@ namespace AccurateFileSystem
 
             }
             var dColumn = split[14].Trim();
-            BasicGeoposition gps = new BasicGeoposition();
+            var gps = new BasicGeoposition();
             if (lat != 0 && lon != 0)
             {
                 gps = new BasicGeoposition
@@ -389,7 +389,7 @@ namespace AccurateFileSystem
 
         private bool IsValidTime(string[] split, int start)
         {
-            string date = split[start].Trim();
+            var date = split[start].Trim();
             if (date == "00/00/0000")
                 return false;
             if (date == "01/01/1980")
@@ -407,11 +407,11 @@ namespace AccurateFileSystem
 
         private AllegroDataPoint ParseAllegroLineFromACI(int id, string line)
         {
-            string firstPattern = @"^([^\s]+) M?\s+([^\s]+)\s+([^\s]+)";
-            string gpsPattern = @"\{(GD?E?) ([^\}]+)\}";
-            string timePattern = @"\{T ([^g\}]+)g?\}";
+            var firstPattern = @"^([^\s]+) M?\s+([^\s]+)\s+([^\s]+)";
+            var gpsPattern = @"\{(GD?E?) ([^\}]+)\}";
+            var timePattern = @"\{T ([^g\}]+)g?\}";
             var indicationMatch = Regex.Match(line, "\\{Indication [^,]*, UN, 0, (\\d+\\.?\\d*), 0\\}");
-            double indicationValue = double.NaN;
+            var indicationValue = double.NaN;
             if (indicationMatch.Success)
             {
                 var commentIndicationMatch = Regex.Match(line, "\\(Indication [^;]*; [^\\)]+\\)");
@@ -421,12 +421,12 @@ namespace AccurateFileSystem
             var match = Regex.Match(line, firstPattern);
             if (!match.Success)
                 throw new Exception();
-            double footage = double.Parse(match.Groups[1].Value);
-            double on = double.Parse(match.Groups[2].Value);
-            double off = double.Parse(match.Groups[3].Value);
+            var footage = double.Parse(match.Groups[1].Value);
+            var on = double.Parse(match.Groups[2].Value);
+            var off = double.Parse(match.Groups[3].Value);
             line = Regex.Replace(line, match.Value, "").Trim();
             match = Regex.Match(line, gpsPattern);
-            BasicGeoposition gps = new BasicGeoposition();
+            var gps = new BasicGeoposition();
             var isCorrected = false;
             if (match.Success)
             {
@@ -437,9 +437,9 @@ namespace AccurateFileSystem
                     var split = match.Groups[2].Value.Split(',');
                     if (split.Length != 4)
                         throw new Exception();
-                    double lat = double.Parse(split[0]);
-                    double lon = double.Parse(split[1]);
-                    double alt = double.Parse(split[2]);
+                    var lat = double.Parse(split[0]);
+                    var lon = double.Parse(split[1]);
+                    var alt = double.Parse(split[2]);
                     gps = new BasicGeoposition
                     {
                         Altitude = alt,
@@ -451,11 +451,11 @@ namespace AccurateFileSystem
 
             }
             var timeMatches = Regex.Matches(line, timePattern);
-            List<DateTime> times = new List<DateTime>();
+            var times = new List<DateTime>();
             foreach (Match timeMatch in timeMatches)
             {
                 var timeString = timeMatch.Groups[1].Value;
-                DateTime time = ParseDateTime(timeString);
+                var time = ParseDateTime(timeString);
                 times.Add(time);
                 line = line = Regex.Replace(line, timeMatch.Value, "").Trim();
             }

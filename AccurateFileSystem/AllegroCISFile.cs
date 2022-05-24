@@ -37,10 +37,10 @@ namespace AccurateFileSystem
         {
             var testStations = new List<int> { 0 };
             var lastFoot = Points[0].Footage;
-            for (int i = 1; i < Points.Count - 1; ++i)
+            for (var i = 1; i < Points.Count - 1; ++i)
             {
                 var curPoint = Points[i];
-                AllegroDataPoint nextPoint = Points[i + 1];
+                var nextPoint = Points[i + 1];
                 if (curPoint.TestStationReads.Count != 0 && !Name.ToLower().Contains("redo"))
                 {
                     if (i == 1 && curPoint.Footage - lastFoot <= 10)
@@ -114,7 +114,7 @@ namespace AccurateFileSystem
         public BasicGeoposition GetLastGps()
         {
             var lastGps = new BasicGeoposition();
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 if (Points[i].HasGPS)
                     lastGps = Points[i].GPS;
@@ -124,7 +124,7 @@ namespace AccurateFileSystem
 
         public BasicGeoposition GetFirstGps()
         {
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 if (Points[i].HasGPS)
                     return Points[i].GPS;
@@ -154,7 +154,7 @@ namespace AccurateFileSystem
                 var endIrDrop = endOff - endOn;
                 irDropFactor = (endIrDrop - startIrDrop) / TotalFootage;
             }
-            int startIndex = 0;
+            var startIndex = 0;
             double? prevOn = null;
             double? prevOff = null;
             if (Points[0].HasReconnect)
@@ -163,11 +163,11 @@ namespace AccurateFileSystem
                 recon.StartPoint = Points[0];
                 recon.EndPoint = Points[0];
             }
-            int lastUniqueGps = 0;
-            int duplicateGpsCount = 0;
-            int emptyGpsCount = 0;
+            var lastUniqueGps = 0;
+            var duplicateGpsCount = 0;
+            var emptyGpsCount = 0;
             var prevGps = Points[0].GPS;
-            for (int i = 1; i < Points.Count; ++i)
+            for (var i = 1; i < Points.Count; ++i)
             {
                 var cur = Points[i];
                 if (cur.On == 0 || (cur.Off == 0 && IsOnOff))
@@ -239,13 +239,13 @@ namespace AccurateFileSystem
                 var endPoint = Points[end];
                 var footDist = endPoint.Footage - startPoint.Footage;
 
-                ReconnectTestStationRead reconnect = endPoint.GetReconnect();
+                var reconnect = endPoint.GetReconnect();
                 reconnect.StartPoint = startPoint;
                 reconnect.EndPoint = endPoint;
 
                 var mirOnPerFoot = reconnect.MirOn / footDist;
                 var mirOffPerFoot = reconnect.MirOff / footDist;
-                for (int i = start; i < end; ++i)
+                for (var i = start; i < end; ++i)
                 {
                     var curPoint = Points[i];
                     curPoint.NextReconnect = reconnect;
@@ -281,7 +281,7 @@ namespace AccurateFileSystem
             var slopeLat = diffLat / distance;
             var slopeLon = diffLon / distance;
 
-            for (int i = from + 1; i < to; ++i)
+            for (var i = from + 1; i < to; ++i)
             {
                 var curPoint = Points[i];
                 var curFootage = curPoint.Footage;
@@ -326,12 +326,12 @@ namespace AccurateFileSystem
                 return false;
 
             // Checking to make sure header key and values match. Since they have the same count you need only check one way.
-            foreach (string key in Header.Keys)
+            foreach (var key in Header.Keys)
                 if (!other.Header.ContainsKey(key) || other.Header[key] != Header[key])
                     return false;
 
             // Checking to make sure point key and values match. Since they have the same count you need only check one way.
-            foreach (int key in Points.Keys)
+            foreach (var key in Points.Keys)
                 if (!other.Points.ContainsKey(key) || !Points[key].Equals(other.Points[key]))
                     return false;
 
@@ -398,7 +398,7 @@ namespace AccurateFileSystem
             {
                 output.AppendLine($"{key},{value}");
             }
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 output.AppendLine(Points[i].ToStringCsv());
             }
@@ -460,7 +460,7 @@ namespace AccurateFileSystem
         private List<(double footage, double value)> GetOnData()
         {
             var list = new List<(double, double)>();
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 list.Add((Points[i].Footage, Points[i].On));
             }
@@ -470,7 +470,7 @@ namespace AccurateFileSystem
         private List<(double footage, double value)> GetOffData()
         {
             var list = new List<(double, double)>();
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 list.Add((Points[i].Footage, Points[i].Off));
             }
@@ -480,7 +480,7 @@ namespace AccurateFileSystem
         private List<(double footage, double value)> GetDepthData()
         {
             var list = new List<(double, double)>();
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 if (Points[i].Depth.HasValue)
                     list.Add((Points[i].Footage, Points[i].Depth.Value));
@@ -505,7 +505,7 @@ namespace AccurateFileSystem
         public List<(double footage, string value)> GetStringData(string fieldName)
         {
             var list = new List<(double, string)>();
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 list.Add((Points[i].Footage, Points[i].OriginalComment));
             }
@@ -519,10 +519,10 @@ namespace AccurateFileSystem
 
         public GeoboundingBox GetGpsArea()
         {
-            double minLat = double.MaxValue;
-            double minLong = double.MaxValue;
-            double maxLat = double.MinValue;
-            double maxLong = double.MinValue;
+            var minLat = double.MaxValue;
+            var minLong = double.MaxValue;
+            var maxLat = double.MinValue;
+            var maxLong = double.MinValue;
 
             foreach (var point in Points.Values)
             {
@@ -556,7 +556,7 @@ namespace AccurateFileSystem
         public double OffsetDistance(int myIndex, AllegroCISFile otherFile, int otherIndex, double roundTo)
         {
             var prevPoint = otherFile.Points[otherIndex];
-            int prevOffset = 1;
+            var prevOffset = 1;
             double offsetShift = 0;
             while (!otherFile.Points[otherIndex].HasGPS)
             {
@@ -586,7 +586,7 @@ namespace AccurateFileSystem
             var prevGps = otherFile.Points[otherIndex].GPS;
 
             var myPoint = Points[myIndex];
-            int myOffset = 1;
+            var myOffset = 1;
             double myOffsetShift = 0;
             while (!Points[myIndex].HasGPS)
             {
@@ -616,7 +616,7 @@ namespace AccurateFileSystem
             var myGps = Points[myIndex].GPS;
 
             var dist = myGps.Distance(prevGps) + offsetShift + myOffsetShift;
-            int mult = (int)(dist / roundTo);
+            var mult = (int)(dist / roundTo);
 
             var floor = mult * roundTo;
             var floorDist = Math.Abs(floor - dist);

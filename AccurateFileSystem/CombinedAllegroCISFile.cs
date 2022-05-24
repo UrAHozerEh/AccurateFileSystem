@@ -149,7 +149,7 @@ namespace AccurateFileSystem
             var depthException = new StringBuilder();
             depthException.AppendLine("Start Station\tEnd Station\tLength (Feet)\tShallowest Depth (Inches)\tStart Latitude\tStart Longitude\tEnd Latitude\tEnd Longitude");
             var depthData = new List<(double Footage, BasicGeoposition Gps, double Depth)>();
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 var point = Points[i];
                 var curFoot = point.Footage;
@@ -159,7 +159,7 @@ namespace AccurateFileSystem
                 var curGps = point.Point.GPS;
                 depthData.Add((curFoot, curGps, curDepth));
             }
-            for (int i = 0; i < depthData.Count; ++i)
+            for (var i = 0; i < depthData.Count; ++i)
             {
                 var (curFoot, curGps, curDepth) = depthData[i];
                 if (curDepth < minimum)
@@ -210,8 +210,8 @@ namespace AccurateFileSystem
 
         private string ToStationing(double footage)
         {
-            int hundred = (int)footage / 100;
-            int tens = (int)footage % 100;
+            var hundred = (int)footage / 100;
+            var tens = (int)footage % 100;
             return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
         }
 
@@ -224,7 +224,7 @@ namespace AccurateFileSystem
                 var data = file.AmpData;
                 if (data == null)
                     continue;
-                for (int i = 0; i < data.Count; ++i)
+                for (var i = 0; i < data.Count; ++i)
                 {
                     var (curGps, curAmps) = data[i];
 
@@ -265,7 +265,7 @@ namespace AccurateFileSystem
         {
             var testStations = new List<int> { 0 };
             var lastFoot = Points[0].Footage;
-            for (int i = 1; i < Points.Count - 1; ++i)
+            for (var i = 1; i < Points.Count - 1; ++i)
             {
                 var curPoint = Points[i];
                 var nextPoint = Points[i + 1];
@@ -353,12 +353,12 @@ namespace AccurateFileSystem
             {
                 var startFootage = Points[firstAnchor].Footage;
                 var startDiff = firstFootage - startFootage;
-                for (int i = 0; i < firstAnchor; ++i)
+                for (var i = 0; i < firstAnchor; ++i)
                 {
                     Points[i].Footage += startDiff;
                 }
             }
-            for (int cur = 0; cur < anchors.Count - 1; ++cur)
+            for (var cur = 0; cur < anchors.Count - 1; ++cur)
             {
                 var (curAnchor, curFootage) = anchors[cur];
                 var (nextAnchor, nextFootage) = anchors[cur + 1];
@@ -371,7 +371,7 @@ namespace AccurateFileSystem
                 var factor = tarLen / curLen;
 
                 Points[curAnchor].Footage = curFootage;
-                for (int i = curAnchor + 1; i < nextAnchor; ++i)
+                for (var i = curAnchor + 1; i < nextAnchor; ++i)
                 {
                     var footage = Points[i].Footage;
                     var distance = footage - curStart;
@@ -383,7 +383,7 @@ namespace AccurateFileSystem
             {
                 var endFootage = Points[lastAnchor].Footage;
                 var endDiff = lastFootage - endFootage;
-                for (int i = lastAnchor + 1; i < Points.Count; ++i)
+                for (var i = lastAnchor + 1; i < Points.Count; ++i)
                 {
                     Points[i].Footage += endDiff;
                 }
@@ -393,9 +393,9 @@ namespace AccurateFileSystem
 
         public void StraightenGps()
         {
-            CombinedDataPoint lastData = Points[0];
+            var lastData = Points[0];
             var lastPointIndex = 0;
-            for (int index = 1; index < Points.Count; ++index)
+            for (var index = 1; index < Points.Count; ++index)
             {
                 var curData = Points[index];
                 var curPoint = curData.Point;
@@ -412,7 +412,7 @@ namespace AccurateFileSystem
                         var latFactor = (endGps.Latitude - startGps.Latitude) / distance;
                         var lonFactor = (endGps.Longitude - startGps.Longitude) / distance;
 
-                        for (int curIndex = lastPointIndex + 1; curIndex < index; ++curIndex)
+                        for (var curIndex = lastPointIndex + 1; curIndex < index; ++curIndex)
                         {
                             var curExtrapolatedData = Points[curIndex];
                             var curExtrapolatedPoint = curExtrapolatedData.Point;
@@ -432,7 +432,7 @@ namespace AccurateFileSystem
         public void SetFootageFromGps(int roundDecimals = 0, int startIndex = 0)
         {
             var distances = new List<double>();
-            for (int index = startIndex - 1; index >= 0; --index)
+            for (var index = startIndex - 1; index >= 0; --index)
             {
                 var nextData = Points[index + 1];
                 var curData = Points[index];
@@ -442,7 +442,7 @@ namespace AccurateFileSystem
                 curData.Footage = nextData.Footage - distance;
                 Points[index] = curData;
             }
-            for (int index = startIndex + 1; index < Points.Count; ++index)
+            for (var index = startIndex + 1; index < Points.Count; ++index)
             {
                 var lastData = Points[index - 1];
                 var curData = Points[index];
@@ -457,10 +457,10 @@ namespace AccurateFileSystem
         public void ReverseBasedOnHca(Hca hca)
         {
             var startGps = hca.GetStartGps();
-            int start = HasStartSkip ? 1 : 0;
-            int end = Points.Count - (HasEndSkip ? 2 : 1);
-            int startGpsIndex = start;
-            int endGpsIndex = end;
+            var start = HasStartSkip ? 1 : 0;
+            var end = Points.Count - (HasEndSkip ? 2 : 1);
+            var startGpsIndex = start;
+            var endGpsIndex = end;
             var startPoint = Points[startGpsIndex];
             while (!startPoint.Point.HasGPS)
             {
@@ -507,7 +507,7 @@ namespace AccurateFileSystem
 
             output.AppendLine(string.Join("\t", curLine));
 
-            CombinedDataPoint lastPoint = Points.First();
+            var lastPoint = Points.First();
 
             foreach (var curPoint in Points)
             {
@@ -608,7 +608,7 @@ namespace AccurateFileSystem
                 curLine[8] = point.OriginalComment ?? "";
                 if (point.TestStationReads.Count > 0)
                 {
-                    foreach (TestStationRead read in point.TestStationReads)
+                    foreach (var read in point.TestStationReads)
                     {
                         if (read is ReconnectTestStationRead reconnect)
                         {
@@ -684,7 +684,7 @@ namespace AccurateFileSystem
                             curLine[28] = ac.Value.ToString(readFormat);
                         }
                     }
-                    for (int i = 9; i <= 28; ++i)
+                    for (var i = 9; i <= 28; ++i)
                     {
                         if (string.IsNullOrEmpty(curLine[i]))
                             curLine[i] = "N/A";
@@ -770,7 +770,7 @@ namespace AccurateFileSystem
                         curLine[3] = "N/A";
                     }
                     curLine[4] = point.StrippedComment ?? "";
-                    foreach (TestStationRead read in point.TestStationReads)
+                    foreach (var read in point.TestStationReads)
                     {
                         if (read is ReconnectTestStationRead reconnect)
                         {
@@ -847,7 +847,7 @@ namespace AccurateFileSystem
                             curLine[25] = ac.Value.ToString(readFormat);
                         }
                     }
-                    for (int i = 5; i <= 25; ++i)
+                    for (var i = 5; i <= 25; ++i)
                     {
                         if (string.IsNullOrEmpty(curLine[i]))
                             curLine[i] = "N/A";
@@ -1051,12 +1051,12 @@ namespace AccurateFileSystem
             if (!Points.First().Point.HasGPS || !Points.Last().Point.HasGPS)
                 return;
             var (firstFoot, _, firstPoint, _, _) = Points.First();
-            for (int i = 1; i < Points.Count; ++i)
+            for (var i = 1; i < Points.Count; ++i)
             {
                 var (_, _, point, _, _) = Points[i];
                 if (!point.HasGPS)
                 {
-                    for (int j = i + 1; j < Points.Count; ++j)
+                    for (var j = i + 1; j < Points.Count; ++j)
                     {
                         var (nextFoot, _, nextPoint, _, _) = Points[j];
                         if (!nextPoint.HasGPS)
@@ -1064,7 +1064,7 @@ namespace AccurateFileSystem
                         var dist = nextFoot - firstFoot;
                         var latFactor = (nextPoint.GPS.Latitude - firstPoint.GPS.Latitude) / dist;
                         var lonFactor = (nextPoint.GPS.Longitude - firstPoint.GPS.Longitude) / dist;
-                        for (int k = i; k < j; ++k)
+                        for (var k = i; k < j; ++k)
                         {
                             var (curFoot, _, curPoint, _, _) = Points[k];
                             if (curPoint.HasGPS)
@@ -1086,7 +1086,7 @@ namespace AccurateFileSystem
 
         public void FixContactSpikes()
         {
-            for (int curIndex = 1; curIndex < Points.Count - 1; ++curIndex)
+            for (var curIndex = 1; curIndex < Points.Count - 1; ++curIndex)
             {
                 var prevIndex = curIndex - 1;
                 var nextIndex = curIndex + 1;
@@ -1123,9 +1123,9 @@ namespace AccurateFileSystem
 
         public string FilterMir(List<string> blacklist)
         {
-            StringBuilder output = new StringBuilder();
+            var output = new StringBuilder();
             var alreadyFound = new Dictionary<ReconnectTestStationRead, (bool UseMir, CombinedDataPoint Start, CombinedDataPoint End, string Reason)>();
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 var combinedPoint = Points[i];
                 if (combinedPoint.Point.NextReconnect != null)
@@ -1134,7 +1134,7 @@ namespace AccurateFileSystem
                     if (!alreadyFound.ContainsKey(recon))
                     {
                         alreadyFound.Add(recon, (true, combinedPoint, combinedPoint, null));
-                        for (int j = recon.StartPoint.Id; j <= recon.EndPoint.Id; ++j)
+                        for (var j = recon.StartPoint.Id; j <= recon.EndPoint.Id; ++j)
                         {
                             var curPoint = combinedPoint.File.Points[j];
                             var (contains, rea) = ContainsFromList(curPoint.OriginalComment, blacklist);
@@ -1169,7 +1169,7 @@ namespace AccurateFileSystem
         private (bool, string) ContainsFromList(string comment, List<string> list)
         {
             var commentToLower = comment.ToLower();
-            foreach (string s in list)
+            foreach (var s in list)
             {
                 if (commentToLower.Contains(s.ToLower()))
                 {
@@ -1211,7 +1211,7 @@ namespace AccurateFileSystem
                 var fileOffset = info.StartFootage;
                 var indexOffset = info.Start > info.End ? -1 : 1;
                 var isReverse = info.Start > info.End;
-                for (int i = info.Start; i != info.End + indexOffset; i += indexOffset)
+                for (var i = info.Start; i != info.End + indexOffset; i += indexOffset)
                 {
                     var curPoint = file.Points[i];
                     var footage = Math.Abs(curPoint.Footage - fileOffset) + offset;
@@ -1227,7 +1227,7 @@ namespace AccurateFileSystem
         public List<(double Footage, double On, double Off)> GetCombinedMirData()
         {
             var list = new List<(double, double, double)>();
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 var (footage, _, point, useMir, _) = Points[i];
                 if (useMir)
@@ -1241,7 +1241,7 @@ namespace AccurateFileSystem
         public List<(double Footage, double On, double Off)> GetCombinedData()
         {
             var list = new List<(double, double, double)>();
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 var (footage, _, point, _, _) = Points[i];
                 list.Add((footage, point.On, point.Off));
@@ -1253,7 +1253,7 @@ namespace AccurateFileSystem
         {
             var list = new List<(double, double)>();
             var (start, end) = GetActualStartEnd();
-            for (int i = start; i <= end; ++i)
+            for (var i = start; i <= end; ++i)
             {
                 list.Add((Points[i].Footage, Points[i].Point.On));
             }
@@ -1271,7 +1271,7 @@ namespace AccurateFileSystem
         {
             var list = new List<(double, AllegroDataPoint)>();
             var (start, end) = GetActualStartEnd();
-            for (int i = start; i <= end; ++i)
+            for (var i = start; i <= end; ++i)
             {
                 list.Add((Points[i].Footage, Points[i].Point));
             }
@@ -1281,7 +1281,7 @@ namespace AccurateFileSystem
         private List<(double footage, double value)> GetOnCompensatedData()
         {
             var list = new List<(double, double)>();
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 var (footage, _, point, useMir, _) = Points[i];
                 if (useMir)
@@ -1296,7 +1296,7 @@ namespace AccurateFileSystem
         {
             var list = new List<(double, double)>();
             var (start, end) = GetActualStartEnd();
-            for (int i = start; i <= end; ++i)
+            for (var i = start; i <= end; ++i)
             {
                 list.Add((Points[i].Footage, Points[i].Point.Off));
             }
@@ -1306,7 +1306,7 @@ namespace AccurateFileSystem
         private List<(double footage, double value)> GetOffCompensatedData()
         {
             var list = new List<(double, double)>();
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 var (footage, _, point, useMir, _) = Points[i];
                 if (useMir)
@@ -1321,7 +1321,7 @@ namespace AccurateFileSystem
         {
             var list = new List<(double, double)>();
             var (start, end) = GetActualStartEnd();
-            for (int i = start; i <= end; ++i)
+            for (var i = start; i <= end; ++i)
             {
                 if (Points[i].Point.Depth.HasValue)
                     list.Add((Points[i].Footage, Points[i].Point.Depth.Value));
@@ -1332,7 +1332,7 @@ namespace AccurateFileSystem
         public List<(double Footage, double OnMirPerFoot, double OffMirPerFoot, bool IsReverse)> GetReconnects()
         {
             var list = new List<(double, double, double, bool)>();
-            for (int i = 0; i < Points.Count; ++i)
+            for (var i = 0; i < Points.Count; ++i)
             {
                 var point = Points[i].Point;
                 if (Points[i].Point.MirOnPerFoot.HasValue)
@@ -1345,7 +1345,7 @@ namespace AccurateFileSystem
         {
             var list = new List<(double, string)>();
             var (start, end) = GetActualStartEnd();
-            for (int i = start; i <= end; ++i)
+            for (var i = start; i <= end; ++i)
             {
                 var comment = Points[i].Point.OriginalComment;
                 if (filters != null)
@@ -1394,7 +1394,7 @@ namespace AccurateFileSystem
                 return null;
             var first = files.First();
             var type = first.Type;
-            for (int i = 0; i < files.Count; ++i)
+            for (var i = 0; i < files.Count; ++i)
             {
                 if (files[i].Points.Count == 0)
                 {
@@ -1446,7 +1446,7 @@ namespace AccurateFileSystem
             {
                 allSolution = new FileInfoLinkedList(new FileInfo(first, first.Points.Count - 1, 0));
             }
-            for (int i = 1; i < files.Count; ++i)
+            for (var i = 1; i < files.Count; ++i)
             {
                 var curFile = files[i];
                 var isLastReversed = allSolution.Last.Info.IsReversed;
@@ -1530,7 +1530,7 @@ namespace AccurateFileSystem
         {
             var (closestPoint, closestDist) = GetClosestPoint(gps);
             var foundIndex = -1;
-            for(int i = 1; i < Points.Count - 2; ++i)
+            for(var i = 1; i < Points.Count - 2; ++i)
             {
                 if(Points[i].Equals(closestPoint))
                 {
@@ -1781,10 +1781,10 @@ namespace AccurateFileSystem
                 {
                     var testStations = new List<int> { 0 };
                     var lastFoot = file.Points[0].Footage;
-                    for (int i = 1; i < file.Points.Count - 1; ++i)
+                    for (var i = 1; i < file.Points.Count - 1; ++i)
                     {
                         var curPoint = file.Points[i];
-                        AllegroDataPoint nextPoint = file.Points[i + 1];
+                        var nextPoint = file.Points[i + 1];
                         if (curPoint.TestStationReads.Count != 0 && !file.Name.ToLower().Contains("redo"))
                         {
                             if (i == 1 && curPoint.Footage - lastFoot <= 10)
@@ -1826,7 +1826,7 @@ namespace AccurateFileSystem
                 }
                 var tasks = new List<Task>();
                 var startTime = DateTime.Now;
-                for (int i = 0; i < BaseUsings.Length; ++i)
+                for (var i = 0; i < BaseUsings.Length; ++i)
                 {
                     var curRequired = i;
                     var task = Task.Run(() => Solve(required: curRequired));
@@ -1885,15 +1885,15 @@ namespace AccurateFileSystem
                 var lastFile = Index != -1 ? Files[Index].File : null;
                 var indexStart = required ?? 0;
                 var indexLength = required ?? (currentActive.Length - 1);
-                for (int i = indexStart; i <= indexLength; ++i)
+                for (var i = indexStart; i <= indexLength; ++i)
                 {
                     if (currentActive[i] == '1')
                         continue;
                     var file = Files[i];
-                    for (int s = 0; s < file.Indicies.Count; ++s)
+                    for (var s = 0; s < file.Indicies.Count; ++s)
                     {
                         var start = file.Indicies[s];
-                        for (int e = file.Indicies.Count - 1; e >= 0; --e)
+                        for (var e = file.Indicies.Count - 1; e >= 0; --e)
                         {
                             var end = file.Indicies[e];
                             if (start == end)
@@ -1921,7 +1921,7 @@ namespace AccurateFileSystem
                         }
                     }
                 }
-                for (int i = indexStart; i <= indexLength; ++i)
+                for (var i = indexStart; i <= indexLength; ++i)
                 {
                     if (currentActive[i] == '0' || i == Index)
                         continue;
@@ -1963,10 +1963,10 @@ namespace AccurateFileSystem
                         usedPoints.Add((start, end));
                 }
                 var file = Files[index];
-                for (int s = 0; s < file.Indicies.Count; ++s)
+                for (var s = 0; s < file.Indicies.Count; ++s)
                 {
                     var start = file.Indicies[s];
-                    for (int e = file.Indicies.Count - 1; e >= 0; --e)
+                    for (var e = file.Indicies.Count - 1; e >= 0; --e)
                     {
                         var end = file.Indicies[e];
                         if (start == end)
@@ -2021,7 +2021,7 @@ namespace AccurateFileSystem
                     }
                 }
                 string chosenSolution = null;
-                for (int i = AllUsed.Length; i >= 0; --i)
+                for (var i = AllUsed.Length; i >= 0; --i)
                 {
                     var (key, _) = bestSolutions[i];
                     if (string.IsNullOrWhiteSpace(key))
@@ -2039,10 +2039,10 @@ namespace AccurateFileSystem
                     firstInfo = new FileInfo(firstFile, firstIndicies[0], End);
                 else
                     firstInfo = new FileInfo(firstFile, firstIndicies[firstIndicies.Count - 1], End);
-                FileInfoLinkedList output = new FileInfoLinkedList(firstInfo);
+                var output = new FileInfoLinkedList(firstInfo);
                 if (list.Count == 1)
                     return output;
-                for (int i = 1; i < list.Count - 1; ++i)
+                for (var i = 1; i < list.Count - 1; ++i)
                 {
                     var cur = list[i];
                     var info = new FileInfo(Files[cur.Index].File, cur.Start, cur.End);

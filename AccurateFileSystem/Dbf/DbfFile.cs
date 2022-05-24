@@ -169,7 +169,7 @@ namespace AccurateFileSystem.Dbf
         public static async Task<DbfFile> GetDbfFile(StorageFile file)
         {
             byte[] result;
-            using (Stream stream = await file.OpenStreamForReadAsync())
+            using (var stream = await file.OpenStreamForReadAsync())
             using (var memoryStream = new MemoryStream())
             {
 

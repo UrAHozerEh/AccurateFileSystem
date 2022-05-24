@@ -453,7 +453,7 @@ namespace AccurateReportSystem
                     if (footInt > page.EndFootage)
                         break;
                     var (severity, _) = GetAmpSeverity(percent);
-                    for(int i = -2; i <= 2; ++i)
+                    for(var i = -2; i <= 2; ++i)
                     {
                         pcmSeverities.Add(footInt + i, (severity, footInt));
                     }
@@ -466,7 +466,7 @@ namespace AccurateReportSystem
             (double Footage, int Prio)? lastData = null;
             for (var curFoot = (int)page.StartFootage; curFoot <= page.EndFootage; ++curFoot)
             {
-                var cis = cisSeverities.TryGetValue(curFoot, out PGESeverity curSeverity) ? curSeverity : PGESeverity.NRI;
+                var cis = cisSeverities.TryGetValue(curFoot, out var curSeverity) ? curSeverity : PGESeverity.NRI;
 
                 (PGESeverity, int) curDcvgSeverity;
                 (PGESeverity, int) curPcmSeverity;

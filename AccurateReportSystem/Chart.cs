@@ -51,7 +51,7 @@ namespace AccurateReportSystem
             var gridlineDrawArea = new Rect(bodyDrawArea.Left, drawArea.Top, bodyDrawArea.Width, drawArea.Height);
             session.DrawRectangle(gridlineDrawArea, Colors.Black);
             XAxisInfo.DrawGridlines(session, page, gridlineDrawArea, transform);
-            foreach (ChartSeries series in Series)
+            foreach (var series in Series)
             {
                 var curDrawArea = new Rect(bodyDrawArea.Left, bodyDrawArea.Top + offset, bodyDrawArea.Width, series.Height);
                 //session.DrawRectangle(curDrawArea, Colors.Blue);

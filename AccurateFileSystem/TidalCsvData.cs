@@ -27,7 +27,7 @@ namespace AccurateFileSystem
             var dateCol = -1;
             var timeCol = -1;
             var heightCol = -1;
-            for(int i = 0; i < Headers.Count; ++i)
+            for(var i = 0; i < Headers.Count; ++i)
             {
                 var header = Headers[i];
                 switch (header)
@@ -46,7 +46,7 @@ namespace AccurateFileSystem
                 }
             }
             TidalData = new List<(DateTime Time, double Height)>();
-            for (int r = 0; r < Data.GetLength(0); ++r)
+            for (var r = 0; r < Data.GetLength(0); ++r)
             {
                 var curDate = Data[r, dateCol];
                 var curTime = Data[r, timeCol];

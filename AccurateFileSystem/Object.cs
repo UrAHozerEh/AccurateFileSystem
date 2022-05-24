@@ -25,7 +25,7 @@ namespace AccurateFileSystem
         {
             if(obj is Object)
             {
-                Object other = obj as Object;
+                var other = obj as Object;
                 return Guid.Equals(other.Guid);
             }
             return false;

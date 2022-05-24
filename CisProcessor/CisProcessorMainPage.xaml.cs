@@ -96,7 +96,7 @@ namespace CisProcessor
             title = title.Replace("START", startMpString);
             title = title.Replace("END", endMpString);
 
-            TextBox inputTextBox = new TextBox
+            var inputTextBox = new TextBox
             {
                 AcceptsReturn = false,
                 Height = 32,
@@ -393,7 +393,7 @@ namespace CisProcessor
             }
         }
 
-        private List<(double Footage, string Comment)> GetAlignedDcvgData(List<GeneralCsv> dcvgFiles, CombinedAllegroCISFile cisCombinedData)
+        private static List<(double Footage, string Comment)> GetAlignedDcvgData(List<GeneralCsv> dcvgFiles, CombinedAllegroCISFile cisCombinedData)
         {
             var output = new List<(double Footage, string Comment)>();
             foreach (var dcvgFile in dcvgFiles)
@@ -457,25 +457,19 @@ namespace CisProcessor
                     }
                     else
                     {
-                        if (allegroFile.Extension == ".csv")
+                        if (allegroFile.Extension != ".csv") continue;
+                        for (var i = 0; i < cisFiles.Count; ++i)
                         {
-                            for (int i = 0; i < cisFiles.Count; ++i)
-                            {
-                                if (cisFiles[i].Name == allegroFile.Name)
-                                {
-                                    cisFiles.RemoveAt(i);
-                                    cisFiles.Add(allegroFile);
-                                    break;
-                                }
-                            }
+                            if (cisFiles[i].Name != allegroFile.Name) continue;
+                            cisFiles.RemoveAt(i);
+                            cisFiles.Add(allegroFile);
+                            break;
                         }
                     }
                 }
 
-                if (cisFiles.Count == 0)
-                {
-                    continue;
-                }
+                if (cisFiles.Count == 0) continue;
+                
                 cisFiles.Sort((file1, file2) => string.Compare(file1.Name, file2.Name, StringComparison.Ordinal));
 
                 var onOffFiles = new List<AllegroCISFile>();
@@ -708,11 +702,21 @@ namespace CisProcessor
             //{
             //    RequestedPercent = 0.5
             //};
-            var chart1 = new Chart(report, "Survey Direction and Survey Date");
-            chart1.LegendInfo.NameFontSize = 14f;
-            var chart2 = new Chart(report, "850 Data");
-            chart2.LegendInfo.SeriesNameFontSize = 8f;
-            chart2.LegendInfo.NameFontSize = 16f;
+            var chart1 = new Chart(report, "Survey Direction and Survey Date")
+            {
+                LegendInfo =
+                {
+                    NameFontSize = 14f
+                }
+            };
+            var chart2 = new Chart(report, "850 Data")
+            {
+                LegendInfo =
+                {
+                    SeriesNameFontSize = 8f,
+                    NameFontSize = 16f
+                }
+            };
 
             var mirSeries = new MirDirection(onOffFile.GetReconnects());
             ExceptionsChartSeries exceptions = new OnOff850ExceptionChartSeries(onOffFile.GetCombinedMirData(), chart2.LegendInfo, chart2.YAxesInfo)
@@ -748,7 +752,7 @@ namespace CisProcessor
             report.Container = splitContainer;
             var pages = report.PageSetup.GetAllPages(0, onOffFile.Points.Last().Footage);
             var curFileName = $"{response.Value.Item1}\\{topGlobalXAxis.Title}";
-            var addedPcmValues = new List<(string, List<(double, double)>)>()
+            var addedPcmValues = new List<(string, List<(double, double)>)>
             {
                 ("PCM Values", pcmReads)
             };
@@ -777,7 +781,7 @@ namespace CisProcessor
             //if (MirFilter.IsChecked ?? false)
             //    await CreateExcelFile($"{curFileName} MIR Skips", new List<(string Name, string Data)>() { ("MIR Skips", mirFilterData) });
             var imageFiles = new List<StorageFile>();
-            for (int i = 0; i < pages.Count; ++i)
+            for (var i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
@@ -852,8 +856,8 @@ namespace CisProcessor
                 IsDrawnInLegend = false
             };
             var commentSeries = new CommentSeries { Values = allegroFile.GetCommentData(), PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs };
-            var seperateComment = false;
-            if (seperateComment)
+            var separateComment = false;
+            if (separateComment)
             {
                 commentSeries.PercentOfGraph = 1f;
                 commentSeries.IsFlippedVertical = true;
@@ -873,7 +877,7 @@ namespace CisProcessor
                 graph1.Series.Add(depth);
                 graph1.YAxesInfo.Y2IsDrawn = true;
             }
-            if (!seperateComment)
+            if (!separateComment)
                 graph1.CommentSeries = commentSeries;
 
             if (allegroFile.Type != FileType.OnOff)
@@ -970,7 +974,7 @@ namespace CisProcessor
             chart1.Series.Add(chart1Series);
 
             splitContainer.AddSelfSizedContainer(topGlobalXAxis);
-            if (seperateComment)
+            if (separateComment)
             {
                 var commentGraphMeasurement = new SplitContainerMeasurement(commentGraph)
                 {
@@ -1018,7 +1022,7 @@ namespace CisProcessor
             //if (MirFilter.IsChecked ?? false)
             //    await CreateExcelFile($"{curFileName} MIR Skips", new List<(string Name, string Data)>() { ("MIR Skips", mirFilterData) });
             var imageFiles = new List<StorageFile>();
-            for (int i = 0; i < pages.Count; ++i)
+            for (var i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');

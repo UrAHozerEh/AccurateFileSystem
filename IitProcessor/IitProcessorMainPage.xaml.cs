@@ -309,7 +309,7 @@ namespace IitProcessor
                 var data = file.AmpData;
                 if (data == null)
                     return output;
-                for (int i = 0; i < data.Count; ++i)
+                for (var i = 0; i < data.Count; ++i)
                 {
                     var (curGps, curAmps) = data[i];
 
@@ -493,7 +493,7 @@ namespace IitProcessor
             var surveyLength = onData.Last().Footage;
             var pages = report.PageSetup.GetAllPages(0, surveyLength);
 
-            for (int i = 0; i < pages.Count; ++i)
+            for (var i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
@@ -515,7 +515,7 @@ namespace IitProcessor
             var extrapolatedDepth = new List<(double, double)>();
             double curFoot;
             double curExtrapolatedFoot = 0;
-            for (int i = 0; i < depthData.Count; ++i)
+            for (var i = 0; i < depthData.Count; ++i)
             {
                 (curFoot, curDepth) = depthData[i];
                 while (curExtrapolatedFoot <= curFoot)
@@ -637,7 +637,7 @@ namespace IitProcessor
             var skipReportString = skipReport.ToString();
             var testStation = file.GetTestStationData();
             var depthException = new StringBuilder();
-            for (int i = 0; i < extrapolatedDepth.Count; ++i)
+            for (var i = 0; i < extrapolatedDepth.Count; ++i)
             {
                 (curFoot, curDepth) = extrapolatedDepth[i];
                 if (curDepth < 36)
@@ -694,7 +694,7 @@ namespace IitProcessor
             var reportLLengthsToolThree = GetActualThirdToolFootage(areas);
             var reportLString = $"Indirect Inspection:\tCIS\t{indicationLabel}\t{uniqueRegionsString}\t{hcaStartMp}\t{hcaEndMp}\t{hca.LineName}\t{"HCA " + hca.Name}\nLength (feet)\t{reportLLengths2[0]}\t{reportLLengths2[0]}\t{reportLLengthsToolThree[0]}\n\t";
             var reportLNext = "Length (feet)\t";
-            for (int i = 1; i <= 4; ++i)
+            for (var i = 1; i <= 4; ++i)
             {
                 reportLString += $"{PriorityDisplayName(i)}\t";
                 reportLNext += $"{reportLLengths2[i]}\t";
@@ -814,8 +814,8 @@ namespace IitProcessor
 
         private string ToStationing(double footage)
         {
-            int hundred = (int)footage / 100;
-            int tens = (int)footage % 100;
+            var hundred = (int)footage / 100;
+            var tens = (int)footage % 100;
             return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
         }
 
@@ -823,10 +823,10 @@ namespace IitProcessor
         {
             var startGap = hca.GetStartFootageGap();
             file.ShiftPoints(startGap);
-            BasicGeoposition hcaStartGps = hca.GetFirstNonSkipGps();
-            BasicGeoposition hcaEndGps = hca.GetLastNonSkipGps();
-            bool hasStartBuffer = hca.StartBuffer != null;
-            bool hasEndBuffer = hca.EndBuffer != null;
+            var hcaStartGps = hca.GetFirstNonSkipGps();
+            var hcaEndGps = hca.GetLastNonSkipGps();
+            var hasStartBuffer = hca.StartBuffer != null;
+            var hasEndBuffer = hca.EndBuffer != null;
             var (hcaStartPoint, hcaStartDistance) = file.GetClosestPoint(hcaStartGps);
             if (hasStartBuffer)
             {
@@ -864,10 +864,10 @@ namespace IitProcessor
         private List<AllegroCISFile> GetUniqueFiles(List<AllegroCISFile> files)
         {
             files.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
-            for (int i = 0; i < files.Count; ++i)
+            for (var i = 0; i < files.Count; ++i)
             {
                 var curFile = files[i];
-                for (int j = i + 1; j < files.Count; ++j)
+                for (var j = i + 1; j < files.Count; ++j)
                 {
                     var nextFile = files[j];
                     if (curFile.Name != nextFile.Name)
@@ -899,7 +899,7 @@ namespace IitProcessor
 
         private List<(double, double, BasicGeoposition)> GetAlignedDcvgData(AllegroCISFile dcvgFile, List<(double, BasicGeoposition)> cisCombinedData, Hca hca)
         {
-            BasicGeoposition lastGps = new BasicGeoposition();
+            var lastGps = new BasicGeoposition();
             var output = new List<(double, double, BasicGeoposition)>();
             foreach (var (foot, point) in dcvgFile.Points)
             {

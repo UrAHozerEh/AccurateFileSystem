@@ -274,16 +274,16 @@ namespace AccurateReportSystem
                 return;
             if (!IsFlippedVertical)
             {
-                Rect labelDrawArea = new Rect(drawArea.Left, drawArea.Top, drawArea.Width, LabelHeight);
+                var labelDrawArea = new Rect(drawArea.Left, drawArea.Top, drawArea.Width, LabelHeight);
                 DrawLabels(session, page, transform, labelDrawArea);
-                Rect titleDrawArea = new Rect(drawArea.Left, drawArea.Top + LabelHeight, drawArea.Width, TitleTotalHeight);
+                var titleDrawArea = new Rect(drawArea.Left, drawArea.Top + LabelHeight, drawArea.Width, TitleTotalHeight);
                 DrawTitle(session, titleDrawArea);
             }
             else
             {
-                Rect labelDrawArea = new Rect(drawArea.Left, drawArea.Top + TitleTotalHeight, drawArea.Width, LabelHeight);
+                var labelDrawArea = new Rect(drawArea.Left, drawArea.Top + TitleTotalHeight, drawArea.Width, LabelHeight);
                 DrawLabels(session, page, transform, labelDrawArea);
-                Rect titleDrawArea = new Rect(drawArea.Left, drawArea.Top, drawArea.Width, TitleTotalHeight);
+                var titleDrawArea = new Rect(drawArea.Left, drawArea.Top, drawArea.Width, TitleTotalHeight);
                 DrawTitle(session, titleDrawArea);
             }
         }

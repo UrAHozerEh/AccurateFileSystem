@@ -47,7 +47,7 @@ namespace AccurateReportSystem
                 format.FontWeight = FontWeights.Thin;
                 format.FontStyle = FontStyle.Normal;
 
-                for (int i = 0; i < Values.Count; ++i)
+                for (var i = 0; i < Values.Count; ++i)
                 {
                     var (footage, comment) = Values[i];
                     if (footage < page.StartFootage)
@@ -72,7 +72,7 @@ namespace AccurateReportSystem
                             break;
                     }
                     var layout = new CanvasTextLayout(session, prefix + comment, format, (float)(drawArea.Height * PercentOfGraph) - TopEdgePadding - LineBuffer, 0);
-                    Rect textBounds = layout.DrawBounds;
+                    var textBounds = layout.DrawBounds;
                     var height = textBounds.Height;
                     var width = layout.LayoutBounds.Width;
                     var textMiddle = (float)(textBounds.Top + (textBounds.Height / 2));

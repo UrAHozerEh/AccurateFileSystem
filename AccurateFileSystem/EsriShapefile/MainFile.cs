@@ -62,7 +62,7 @@ namespace AccurateFileSystem.EsriShapefile
             Version = 1000;
             ShapeType = 1;
             Records = new List<Record>();
-            for (int i = 0; i < points.Count; ++i)
+            for (var i = 0; i < points.Count; ++i)
             {
                 var point = points[i];
                 Records.Add(new Record(i + 1, point));
@@ -213,7 +213,7 @@ namespace AccurateFileSystem.EsriShapefile
         public static async Task<MainFile> GetMainFile(StorageFile mainFile, StorageFile indexFile)
         {
             byte[] mainResult, indexResult;
-            using (Stream stream = await mainFile.OpenStreamForReadAsync())
+            using (var stream = await mainFile.OpenStreamForReadAsync())
             using (var memoryStream = new MemoryStream())
             {
 
@@ -221,7 +221,7 @@ namespace AccurateFileSystem.EsriShapefile
                 mainResult = memoryStream.ToArray();
             }
 
-            using (Stream stream = await indexFile.OpenStreamForReadAsync())
+            using (var stream = await indexFile.OpenStreamForReadAsync())
             using (var memoryStream = new MemoryStream())
             {
 

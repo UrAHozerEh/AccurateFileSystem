@@ -91,9 +91,9 @@ namespace AccurateFileSystem
         {
             if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
-            string docPattern = "(?i)DOC:?\\s?(\\d+)\\s?(in)?c?(\")?";
-            string docFootPattern = @"(?i)DOC:?\s?(\d+)\s?ft";
-            string docFootInchPattern = "(?i)DOC:?\\s?(\\d+)'(\\d*)\\s?(in)?(\")?";
+            var docPattern = "(?i)DOC:?\\s?(\\d+)\\s?(in)?c?(\")?";
+            var docFootPattern = @"(?i)DOC:?\s?(\d+)\s?ft";
+            var docFootInchPattern = "(?i)DOC:?\\s?(\\d+)'(\\d*)\\s?(in)?(\")?";
             //string offsetPattern = "(?i)(begin)?(start)?(end)? ?offset";
             //var offset = Regex.Match(OriginalComment, offsetPattern);
             //if (offset.Success)
@@ -146,23 +146,23 @@ namespace AccurateFileSystem
 
             if (string.IsNullOrWhiteSpace(OriginalComment))
                 return;
-            string testStationPattern = @"\([^\)]+\)";
+            var testStationPattern = @"\([^\)]+\)";
 
             var matches = Regex.Matches(OriginalComment, testStationPattern);
             CommentTemplate = OriginalComment;
 
-            int count = 0;
+            var count = 0;
             foreach (Match match in matches)
             {
-                string tsString = match.Value;
+                var tsString = match.Value;
                 if (tsString == "(HILO)")
                 {
                     IsHiLo = true;
                     continue;
                 }
-                string tsId = $"$${count}$$";
+                var tsId = $"$${count}$$";
                 CommentTemplate = CommentTemplate.Replace(tsString, tsId);
-                TestStationRead read = TestStationReadFactory.GetRead(tsString, tsId);
+                var read = TestStationReadFactory.GetRead(tsString, tsId);
                 if (read == null)
                     CommentTemplate = CommentTemplate.Replace(tsId, tsString);
                 else
@@ -199,7 +199,7 @@ namespace AccurateFileSystem
                     return false;
             if (Times.Count != other.Times.Count)
                 return false;
-            for (int i = 0; i < Times.Count; ++i)
+            for (var i = 0; i < Times.Count; ++i)
                 if (Times[i] != other.Times[i])
                     return false;
             return true;
