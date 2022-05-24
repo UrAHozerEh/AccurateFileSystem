@@ -993,7 +993,7 @@ namespace CisProcessor
             report.Container = splitContainer;
             var pages = report.PageSetup.GetAllPages(0, allegroFile.Points.Last().Footage);
             var curFileName = $"{response.Value.Item1}\\{topGlobalXAxis.Title}";
-            var addedPcmValues = new List<(string, List<(double, double)>)>()
+            var addedPcmValues = new List<(string, List<(double, double)>)>
             {
                 ("PCM Values", pcmReads)
             };
