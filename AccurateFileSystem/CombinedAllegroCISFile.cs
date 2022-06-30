@@ -114,14 +114,15 @@ namespace AccurateFileSystem
             HasEndSkip = tempStartSkip;
         }
 
-        public void AddPcmDepthData(CsvPcm pcm)
+        public void AddPcmDepthData(CsvPcm pcm, double maxDist = 25)
         {
             if (pcm != null)
             {
                 foreach (var (gps, depth) in pcm.DepthData)
                 {
-                    var (Point, _) = GetClosestPoint(gps);
-                    Point.Point.Depth = depth;
+                    var (Point, dist) = GetClosestPoint(gps);
+                    if (dist <= maxDist)
+                        Point.Point.Depth = depth;
                 }
             }
         }
@@ -135,7 +136,7 @@ namespace AccurateFileSystem
                     if (distance < 20)
                     {
                         Point.Point.Depth = depth;
-                        if(depth > maxGraphDepth)
+                        if (depth > maxGraphDepth)
                         {
                             Point.Point.OriginalComment += $" Depth: {depth:F0}in";
                             Point.Point.StrippedComment += $" Depth: {depth:F0}in";
@@ -215,7 +216,7 @@ namespace AccurateFileSystem
             return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
         }
 
-        public List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> AlignAmpReads(List<CsvPcm> files)
+        public List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> AlignAmpReads(List<CsvPcm> files, double maxDist = 20)
         {
             var output = new List<(double Footage, BasicGeoposition Gps, double Value, double Percent)>();
 
@@ -224,28 +225,37 @@ namespace AccurateFileSystem
                 var data = file.AmpData;
                 if (data == null)
                     continue;
-                for (int i = 0; i < data.Count; ++i)
-                {
-                    var (curGps, curAmps) = data[i];
 
-                    var (prevGps, prevAmps) = data[Math.Max(i - 1, 0)];
+                var onLine = new List<(BasicGeoposition Gps, double Value)>();
+                foreach (var (curGps, curAmps) in data)
+                {
+                    var (_, distance) = GetClosestPoint(curGps);
+                    if (distance <= maxDist)
+                        onLine.Add((curGps, curAmps));
+                }
+
+                for (int i = 0; i < onLine.Count; ++i)
+                {
+                    var (curGps, curAmps) = onLine[i];
+
+                    var (prevGps, prevAmps) = onLine[Math.Max(i - 1, 0)];
                     var prevDist = prevGps.Distance(curGps);
                     var prevDiff = prevAmps - curAmps;
-                    var prevPercent = Math.Max(prevDiff / prevAmps * 100, 0);
+                    var prevPercent = Math.Max(prevDiff / prevAmps * 100.0, 0);
                     if (prevDist > 100)
                         prevPercent = 0;
 
-                    var (nextGps, nextAmps) = data[Math.Min(i + 1, data.Count - 1)];
+                    var (nextGps, nextAmps) = onLine[Math.Min(i + 1, onLine.Count - 1)];
                     var nextDist = nextGps.Distance(curGps);
                     var nextDiff = curAmps - nextAmps;
-                    var nextPercent = Math.Max(nextDiff / curAmps * 100, 0);
+                    var nextPercent = Math.Max(nextDiff / curAmps * 100.0, 0);
                     if (nextDist > 100)
                         nextPercent = 0;
 
                     var percent = Math.Max(nextPercent, prevPercent);
 
                     var (Point, distance) = GetClosestPoint(curGps);
-                    if (distance < 20)
+                    if (distance <= maxDist)
                         output.Add((Point.Footage, curGps, curAmps, percent));
                 }
             }
@@ -1374,13 +1384,13 @@ namespace AccurateFileSystem
             var lastFile = Points[0].File;
             foreach (var point in Points)
             {
-                if(lastFile != point.File)
+                if (lastFile != point.File)
                 {
                     lastDate = point.File.Header["date"];
                     lastFile = point.File;
                 }
                 var curDate = lastDate;
-                if(point.Point.OnTime.HasValue)
+                if (point.Point.OnTime.HasValue)
                     curDate = point.Point.OnTime.Value.ToShortDateString();
                 lastDate = curDate;
                 output.Add((point.Footage, point.IsReverse, curDate));
@@ -1442,7 +1452,7 @@ namespace AccurateFileSystem
             var type = first.Type;
 
             var allSolution = new FileInfoLinkedList(new FileInfo(first));
-            if(first.Name.Contains("rev", StringComparison.OrdinalIgnoreCase))
+            if (first.Name.Contains("rev", StringComparison.OrdinalIgnoreCase))
             {
                 allSolution = new FileInfoLinkedList(new FileInfo(first, first.Points.Count - 1, 0));
             }
@@ -1530,14 +1540,14 @@ namespace AccurateFileSystem
         {
             var (closestPoint, closestDist) = GetClosestPoint(gps);
             var foundIndex = -1;
-            for(int i = 1; i < Points.Count - 2; ++i)
+            for (int i = 1; i < Points.Count - 2; ++i)
             {
-                if(Points[i].Equals(closestPoint))
+                if (Points[i].Equals(closestPoint))
                 {
                     foundIndex = i;
                 }
             }
-            if(foundIndex == -1 || closestDist <= 2.5)
+            if (foundIndex == -1 || closestDist <= 2.5)
             {
                 closestPoint.Point.OriginalComment += $" {comment}";
                 return closestPoint;
@@ -1559,7 +1569,7 @@ namespace AccurateFileSystem
                 (nextDistToSeg, nextSegGps) = gps.DistanceToSegment(closestPoint.Point.GPS, next.Point.GPS);
             }
 
-            if(nextDistToSeg < prevDistToSeg)
+            if (nextDistToSeg < prevDistToSeg)
             {
                 var nextDist = closestPoint.Point.GPS.Distance(nextSegGps);
                 var nextAllegroPoint = new AllegroDataPoint(closestPoint.Point, nextSegGps, comment);

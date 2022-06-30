@@ -316,7 +316,7 @@ namespace AccurateReportSystem
                 }
                 if (closestPoint == null)
                     throw new Exception();
-                if (Math.Abs(closestPoint.Footage - footage) > 10)
+                if (Math.Abs(closestPoint.Footage - footage) > 20)
                     continue;
                 if (closestPoint.AmpPercent.HasValue)
                     continue;
@@ -358,7 +358,7 @@ namespace AccurateReportSystem
             }
         }
 
-        public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<(BasicGeoposition, double)> acvgIndications, Hca hca, double maxSpacing, bool useMir = false)
+        public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<(BasicGeoposition, double)> acvgIndications, List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> ampReads, Hca hca, double maxSpacing, bool useMir = false)
         {
             MaxSpacing = maxSpacing;
             IsDcvg = false;
@@ -366,6 +366,7 @@ namespace AccurateReportSystem
             CisFile = cisFile;
             Hca = hca;
             ExtrapolateCisDataUpdated();
+            AlignAmpReads(ampReads);
 
             foreach (var (gps, value) in acvgIndications)
             {
@@ -761,7 +762,7 @@ namespace AccurateReportSystem
                 output.Append($"{area.Start.IndicationSeverity}\t");
                 output.Append($"{area.Start.Priority}\t");
                 var reason = area.Start.CisReason + " " + area.Start.IndicationReason;
-                output.AppendLine($"{reason.Trim()}\t");
+                output.AppendLine($"{reason.Trim().Replace("..", ".")}\t");
             }
             return output.ToString();
         }

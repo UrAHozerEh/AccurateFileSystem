@@ -453,9 +453,10 @@ namespace AccurateReportSystem
                     if (footInt > page.EndFootage)
                         break;
                     var (severity, _) = GetAmpSeverity(percent);
-                    for(int i = -2; i <= 2; ++i)
+                    for (int i = -2; i <= 2; ++i)
                     {
-                        pcmSeverities.Add(footInt + i, (severity, footInt));
+                        if (!pcmSeverities.ContainsKey(footInt + i))
+                            pcmSeverities.Add(footInt + i, (severity, footInt));
                     }
                 }
             }

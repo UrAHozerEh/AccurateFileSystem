@@ -292,7 +292,7 @@ namespace IitProcessor
             }
             else
             {
-                reportInfo = new PgeEcdaReportInformation(combinedCisFile, acvgReads, hca, 10, false);
+                reportInfo = new PgeEcdaReportInformation(combinedCisFile, acvgReads, ampReads, hca, 10, false);
             }
 
 
@@ -572,7 +572,7 @@ namespace IitProcessor
                     var thirdToolValue = thirdToolSeverity.GetDisplayName();
                     if (!region.Name.Contains("P"))
                         thirdToolValue = "NT";
-                    output.AppendLine($"{cisSeverity.GetDisplayName()}\t{dcvgSeverity.GetDisplayName()}\t{thirdToolValue}\t{PriorityDisplayName(priority)}\t{reason}");
+                    output.AppendLine($"{cisSeverity.GetDisplayName()}\t{dcvgSeverity.GetDisplayName()}\t{thirdToolValue}\t{PriorityDisplayName(priority)}\t{reason.Replace("..",".")}");
                 }
             }
             ReportQ += output.ToString();
@@ -888,7 +888,7 @@ namespace IitProcessor
             var output = new List<(double, double, BasicGeoposition)>();
             foreach (var (readGps, read) in acvgReads)
             {
-                var (_, _, acvgExtrapFoot, _, gps) = cisCombinedData.AlignPoint(readGps);
+                var (_, dist, acvgExtrapFoot, _, gps) = cisCombinedData.AlignPoint(readGps);
                 var region = hca.GetClosestRegion(gps);
                 if (region.ShouldSkip)
                     continue;

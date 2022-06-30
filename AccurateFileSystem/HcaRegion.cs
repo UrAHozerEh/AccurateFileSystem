@@ -23,7 +23,7 @@ namespace AccurateFileSystem
         public string ShortSkipReason { get; }
         public string LongSkipReason { get; }
         public bool? FirstTime { get; }
-        public string FirstTimeString => FirstTime.HasValue ? (FirstTime.Value ? "Y" : "N") : "N/A";
+        public string FirstTimeString => (FirstTime.HasValue && !IsBuffer) ? (FirstTime.Value ? "Y" : "N") : "N/A";
 
         public HcaRegion(List<BasicGeoposition> gpsPoints, string name, string startMp, string endMp, bool? firstTime)
         {

@@ -475,13 +475,13 @@ namespace AccurateReportSystem
                     }
                 }
                 var baseline = Baselines[center];
-                var (severity, reason) = GetSeverity(centerExtrap.Off, baseline.Value);
+                var (severity, reason) = GetSeverity(centerExtrap.Off, baseline.Value);//GetSeverity(centerExtrap.Off, baseline.Value);
                 if (centerExtrap.IsSkipped)
                 {
                     severity = PGESeverity.NRI;
                     reason = "SKIP";
                 }
-                curPoint = new DataPointUpdated(centerExtrap, baseline.Value, severity, reason);
+                curPoint = new DataPointUpdated(centerExtrap, baseline.Value, severity, reason);//new DataPointUpdated(centerExtrap, baseline.Value, severity, reason);
                 output.Add(curPoint);
             }
             return output;

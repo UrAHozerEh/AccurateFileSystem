@@ -282,7 +282,11 @@ namespace CisProcessor
             };
             
             var combined = CombinedAllegroCISFile.CombineFiles(combinedName, await GetCis(cisFolder));
-           
+            if (combined.HasStartSkip)
+            {
+                combined.ShiftPoints(-combined.Points[1].Footage);
+            }
+
             foreach (var pcm in pcmData)
                 combined.AddPcmDepthData(pcm);
 

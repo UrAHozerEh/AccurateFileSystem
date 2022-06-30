@@ -98,7 +98,7 @@ namespace AccurateFileSystem
         {
             var firstDist = region1.DistanceToGps(gps);
             var secondDist = region2.DistanceToGps(gps);
-            if (firstDist == secondDist)
+            if (Math.Abs(secondDist - firstDist) < 1)
             {
                 if (region1.ShouldSkip && !region2.ShouldSkip)
                     return region2;
@@ -244,7 +244,7 @@ namespace AccurateFileSystem
                         output.Add((startGps, endGps, line));
                         continue;
                     }
-                    if(isCloseBefore)
+                    if (isCloseBefore)
                     {
                         output.Insert(closestIndex, cur);
                     }
