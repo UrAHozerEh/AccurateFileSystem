@@ -24,7 +24,7 @@ namespace AccurateReportSystem
             DataMetricRow off1250 = null;
             DataMetricRow offBetween = null;
 
-            for (int i = 0; i < onOffData.Count; ++i)
+            for (var i = 0; i < onOffData.Count; ++i)
             {
                 var (footage, point) = onOffData[i];
                 ++TotalReads;

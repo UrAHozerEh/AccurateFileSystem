@@ -69,7 +69,7 @@ namespace AccurateFileSystem
                 return false;
             if (Points.Count != other.Points.Count)
                 return false;
-            for(int i = 0; i < Points.Count; ++i)
+            for(var i = 0; i < Points.Count; ++i)
                 if (!Points[i].Equals(other.Points[i]))
                     return false;
             return true;

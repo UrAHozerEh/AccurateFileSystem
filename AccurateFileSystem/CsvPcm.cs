@@ -22,13 +22,13 @@ namespace AccurateFileSystem
             DepthData = new List<(BasicGeoposition Gps, double Depth)>();
             if (Data.GetLength(0) == 0)
                 Data = Data;
-            for (int r = 0; r < Data.GetLength(0); ++r)
+            for (var r = 0; r < Data.GetLength(0); ++r)
             {
                 var lat = GetDecimalDegree(Data[r, latColumn]);
                 var lon = GetDecimalDegree(Data[r, lonColumn]);
                 var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
                 var depthString = Data[r, depthColumn];
-                double depth = 0.0;
+                var depth = 0.0;
                 if (!string.IsNullOrWhiteSpace(depthString))
                     depth = double.Parse(Data[r, depthColumn]);
                 if (depth == 0)
@@ -40,13 +40,13 @@ namespace AccurateFileSystem
         protected void GetAmpData(int latColumn, int lonColumn, int ampColumn)
         {
             AmpData = new List<(BasicGeoposition Gps, double Depth)>();
-            for (int r = 0; r < Data.GetLength(0); ++r)
+            for (var r = 0; r < Data.GetLength(0); ++r)
             {
                 var lat = GetDecimalDegree(Data[r, latColumn]);
                 var lon = GetDecimalDegree(Data[r, lonColumn]);
                 var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
                 var ampString = Data[r, ampColumn];
-                double amps = 0.0;
+                var amps = 0.0;
                 if (!string.IsNullOrWhiteSpace(ampString))
                     amps = double.Parse(Data[r, ampColumn]) * 1000;
                 if (amps == 0)

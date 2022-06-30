@@ -66,7 +66,7 @@ namespace AccurateFileSystem
         {
             var values = new Dictionary<string, string>();
             var deletionChar = PopChar(ref data);
-            bool isDeleted = deletionChar == '*';
+            var isDeleted = deletionChar == '*';
             foreach (var field in fieldDescriptors)
             {
                 var curValue = PopAsciiString(ref data, field.Length);
@@ -81,7 +81,7 @@ namespace AccurateFileSystem
             var byteCount = (int)Math.Ceiling((double)length / 8);
             var bytes = new byte[byteCount];
             var curBits = new BitArray(length, false);
-            for (int i = 0; i < length; ++i)
+            for (var i = 0; i < length; ++i)
             {
                 curBits[i] = data[i];
             }
@@ -131,7 +131,7 @@ namespace AccurateFileSystem
         public static double GetDouble(this byte[] data, bool isLittle, int startIndex)
         {
             var curData = new byte[8];
-            for (int i = 0; i < 8; ++i)
+            for (var i = 0; i < 8; ++i)
             {
                 curData[i] = data[i + startIndex];
             }
@@ -166,7 +166,7 @@ namespace AccurateFileSystem
         public static int GetInt32(this byte[] data, bool isLittle, int startIndex)
         {
             var curData = new byte[4];
-            for (int i = 0; i < 4; ++i)
+            for (var i = 0; i < 4; ++i)
             {
                 curData[i] = data[i + startIndex];
             }
@@ -178,7 +178,7 @@ namespace AccurateFileSystem
         public static int GetInt16(this byte[] data, bool isLittle, int startIndex)
         {
             var curData = new byte[2];
-            for (int i = 0; i < 2; ++i)
+            for (var i = 0; i < 2; ++i)
             {
                 curData[i] = data[i + startIndex];
             }
@@ -252,7 +252,7 @@ namespace AccurateFileSystem
             if (points.Count < 2)
                 return 0;
             var total = 0.0;
-            for (int i = 1; i < points.Count; ++i)
+            for (var i = 1; i < points.Count; ++i)
             {
                 var last = points[i - 1];
                 var cur = points[i];
@@ -264,13 +264,13 @@ namespace AccurateFileSystem
         public static double Distance(this BasicGeoposition pos1, BasicGeoposition pos2)
         {
             double earthRadius = 3960 * 5280;
-            double deltaLat = ToRadian(pos2.Latitude - pos1.Latitude);
-            double deltaLon = ToRadian(pos2.Longitude - pos1.Longitude);
-            double a = Math.Sin(deltaLat / 2) * Math.Sin(deltaLat / 2) +
-                Math.Cos(ToRadian(pos1.Latitude)) * Math.Cos(ToRadian(pos2.Latitude)) *
-                Math.Sin(deltaLon / 2) * Math.Sin(deltaLon / 2);
-            double c = 2 * Math.Asin(Math.Min(1, Math.Sqrt(a)));
-            double distance = earthRadius * c;
+            var deltaLat = ToRadian(pos2.Latitude - pos1.Latitude);
+            var deltaLon = ToRadian(pos2.Longitude - pos1.Longitude);
+            var a = Math.Sin(deltaLat / 2) * Math.Sin(deltaLat / 2) +
+                    Math.Cos(ToRadian(pos1.Latitude)) * Math.Cos(ToRadian(pos2.Latitude)) *
+                    Math.Sin(deltaLon / 2) * Math.Sin(deltaLon / 2);
+            var c = 2 * Math.Asin(Math.Min(1, Math.Sqrt(a)));
+            var distance = earthRadius * c;
             return distance;
         }
 
@@ -288,11 +288,11 @@ namespace AccurateFileSystem
 
         public static (double Footage, double Distance, double ExtrapolatedFootage, double ExtrapolatedDistance, BasicGeoposition Gps) AlignPoint(this List<(double, BasicGeoposition)> points, BasicGeoposition otherGps)
         {
-            int closestIndex = 0;
-            double closestDistance = double.MaxValue;
+            var closestIndex = 0;
+            var closestDistance = double.MaxValue;
             double footage = 0;
             var closestGps = new BasicGeoposition();
-            for (int i = 0; i < points.Count; ++i)
+            for (var i = 0; i < points.Count; ++i)
             {
                 var (foot, gps) = points[i];
                 var curDistance = gps.Distance(otherGps);
@@ -307,8 +307,8 @@ namespace AccurateFileSystem
             var startIndex = Math.Max(0, closestIndex - 1);
             var endIndex = Math.Min(points.Count - 1, closestIndex + 1);
             var extrapolatedDist = closestDistance;
-            double extrapolatedFoot = footage;
-            for (int i = startIndex; i < endIndex; ++i)
+            var extrapolatedFoot = footage;
+            for (var i = startIndex; i < endIndex; ++i)
             {
                 var (startFoot, startGps) = points[i];
                 var (endFoot, endGps) = points[i + 1];
@@ -316,7 +316,7 @@ namespace AccurateFileSystem
 
                 var latFactor = (endGps.Latitude - startGps.Latitude) / footDist;
                 var lonFactor = (endGps.Longitude - startGps.Longitude) / footDist;
-                for (int j = 1; j < footDist; ++j)
+                for (var j = 1; j < footDist; ++j)
                 {
                     var fakeGps = new BasicGeoposition()
                     {
@@ -394,7 +394,7 @@ namespace AccurateFileSystem
             var closeDist = double.MaxValue;
             var closePoint = point;
 
-            for (int i = 1; i < points.Count; ++i)
+            for (var i = 1; i < points.Count; ++i)
             {
                 var start = points[i - 1];
                 var end = points[i];

@@ -65,10 +65,10 @@ namespace AccurateReportSystem
                 };
                 //session.DrawGeometry(graphBodyBorder, Colors.Green, 1, style);
             }
-            Rect y1GraphArea = new Rect(page.StartFootage, YAxesInfo.Y1MinimumValue, page.Width, YAxesInfo.Y1ValuesHeight);
-            Rect y2GraphArea = new Rect(page.StartFootage, YAxesInfo.Y2MinimumValue, page.Width, YAxesInfo.Y2ValuesHeight);
-            TransformInformation2d y1Transform = new TransformInformation2d(graphBodyDrawArea, y1GraphArea, YAxesInfo.Y1IsInverted);
-            TransformInformation2d y2Transform = new TransformInformation2d(graphBodyDrawArea, y2GraphArea, YAxesInfo.Y2IsInverted);
+            var y1GraphArea = new Rect(page.StartFootage, YAxesInfo.Y1MinimumValue, page.Width, YAxesInfo.Y1ValuesHeight);
+            var y2GraphArea = new Rect(page.StartFootage, YAxesInfo.Y2MinimumValue, page.Width, YAxesInfo.Y2ValuesHeight);
+            var y1Transform = new TransformInformation2d(graphBodyDrawArea, y1GraphArea, YAxesInfo.Y1IsInverted);
+            var y2Transform = new TransformInformation2d(graphBodyDrawArea, y2GraphArea, YAxesInfo.Y2IsInverted);
 
             var (x1, y1) = y1Transform.ToDrawArea(page.StartFootage, -3);
             var (x2, y2) = y1Transform.ToDrawArea(page.EndFootage, 0);

@@ -48,7 +48,7 @@ namespace AccurateReportSystem
         private List<(float X, float Y, CanvasTextLayout TextLayout)> GetLayouts(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
         {
             var output = new List<(float X, float Y, CanvasTextLayout TextLayout)>();
-            for (int i = 0; i < Labels.Count; ++i)
+            for (var i = 0; i < Labels.Count; ++i)
             {
                 var (foot, label) = Labels[i];
                 if (string.IsNullOrWhiteSpace(label))
@@ -94,7 +94,7 @@ namespace AccurateReportSystem
         {
             //TODO: Add so you can show above and below. Maybe an anti collision check.
             var layouts = GetLayouts(session, page, transform);
-            for (int i = 0; i < layouts.Count; ++i)
+            for (var i = 0; i < layouts.Count; ++i)
             {
                 var (x, y, layout) = layouts[i];
                 //var layoutHeight = (float)(layout.LayoutBounds.Height * 1.1);
@@ -102,7 +102,7 @@ namespace AccurateReportSystem
                 do
                 {
                     hasMoved = false;
-                    for (int j = 0; j < i; ++j)
+                    for (var j = 0; j < i; ++j)
                     {
                         var (prevX, prevY, prevLayout) = layouts[j];
                         var prevLayoutWidth = prevLayout.LayoutBounds.Width * 1.1;

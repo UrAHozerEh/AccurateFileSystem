@@ -48,8 +48,8 @@ namespace AccurateReportSystem
             double? start = null;
             (double On, double Off) startValue = (0, 0);
             double lastFootage = 0;
-            bool lastIsReverse = false;
-            for (int i = 0; i < Data.Count; ++i)
+            var lastIsReverse = false;
+            for (var i = 0; i < Data.Count; ++i)
             {
                 var (footage, on, off, isReverse) = Data[i];
 

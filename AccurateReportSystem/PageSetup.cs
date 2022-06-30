@@ -22,10 +22,10 @@ namespace AccurateReportSystem
 
         public List<PageInformation> GetAllPages(double startFootage, double totalFootage)
         {
-            int numPages = (int)Math.Ceiling(totalFootage / FootagePerPage);
+            var numPages = (int)Math.Ceiling(totalFootage / FootagePerPage);
             if (numPages == 0) return null;
             var list = new List<PageInformation>();
-            for (int i = 0; i < numPages; ++i)
+            for (var i = 0; i < numPages; ++i)
             {
                 list.Add(new PageInformation
                 {

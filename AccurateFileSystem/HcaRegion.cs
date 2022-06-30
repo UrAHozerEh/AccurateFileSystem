@@ -58,7 +58,7 @@ namespace AccurateFileSystem
         public double DistanceToGps(BasicGeoposition gps)
         {
             var closestDistance = double.MaxValue;
-            for (int i = 0; i < GpsPoints.Count - 1; ++i)
+            for (var i = 0; i < GpsPoints.Count - 1; ++i)
             {
                 var start = GpsPoints[i];
                 var end = GpsPoints[i + 1];

@@ -219,7 +219,7 @@ namespace AccurateReportSystem
             var extrapolatedData = new List<ExtrapolatedDataPoint>();
             string curRegion;
             ExtrapolatedDataPoint curExtrapPoint;
-            for (int i = 0; i < data.Count - 1; ++i)
+            for (var i = 0; i < data.Count - 1; ++i)
             {
                 var (startFoot, startPoint) = data[i];
                 var (endFoot, endPoint) = data[i + 1];
@@ -245,7 +245,7 @@ namespace AccurateReportSystem
                     curRegion = GetClosestRegion(midGps);
                 }
 
-                for (int offset = 1; offset < dist; ++offset)
+                for (var offset = 1; offset < dist; ++offset)
                 {
                     var newOn = onPerFoot * offset + startPoint.On;
                     var newOff = offPerFoot * offset + startPoint.Off;
@@ -279,7 +279,7 @@ namespace AccurateReportSystem
             if (foot <= 200)
             {
                 var average = extrapolatedData.Average(value => value.Off);
-                for (int i = 0; i < extrapolatedData.Count; ++i)
+                for (var i = 0; i < extrapolatedData.Count; ++i)
                 {
                     curExtrapPoint = extrapolatedData[i];
                     foot = curExtrapPoint.Footage;
@@ -297,7 +297,7 @@ namespace AccurateReportSystem
                 return output;
             }
             var curAverages = new List<double>(extrapolatedData.Count);
-            for (int i = 0; i < extrapolatedData.Count; ++i)
+            for (var i = 0; i < extrapolatedData.Count; ++i)
             {
                 curExtrapPoint = extrapolatedData[i];
                 foot = curExtrapPoint.Footage;
@@ -306,13 +306,13 @@ namespace AccurateReportSystem
                 curAverages.Add(average);
             }
             var curBaselines = Enumerable.Repeat(double.NaN, extrapolatedData.Count).ToList();
-            for (int center = 0; center < extrapolatedData.Count; ++center)
+            for (var center = 0; center < extrapolatedData.Count; ++center)
             {
                 var start = Math.Max(center - 105, 0);
                 var end = Math.Min(center + 105, extrapolatedData.Count - 1);
                 var centerExtrap = extrapolatedData[center];
                 var centerAverage = curAverages[center];
-                for (int i = start; i <= end; ++i)
+                for (var i = start; i <= end; ++i)
                 {
                     var curFoot = extrapolatedData[i].Footage;
                     var curAverage = curAverages[i];
@@ -351,7 +351,7 @@ namespace AccurateReportSystem
             var extrapolatedData = new List<ExtrapolatedDataPointUpdated>();
             HcaRegion curRegion;
             ExtrapolatedDataPointUpdated curExtrapPoint;
-            for (int i = 0; i < data.Count - 1; ++i)
+            for (var i = 0; i < data.Count - 1; ++i)
             {
                 var (startFoot, startPoint) = data[i];
                 var (endFoot, endPoint) = data[i + 1];
@@ -377,7 +377,7 @@ namespace AccurateReportSystem
                     curRegion = GetClosestRegionUpdated(midGps);
                 }
 
-                for (int offset = 1; offset < dist; ++offset)
+                for (var offset = 1; offset < dist; ++offset)
                 {
                     var newOn = onPerFoot * offset + startPoint.On;
                     var newOff = offPerFoot * offset + startPoint.Off;
@@ -416,7 +416,7 @@ namespace AccurateReportSystem
             if (foot <= 200)
             {
                 var average = extrapolatedData.Average(value => value.Off);
-                for (int i = 0; i < extrapolatedData.Count; ++i)
+                for (var i = 0; i < extrapolatedData.Count; ++i)
                 {
                     curExtrapPoint = extrapolatedData[i];
                     foot = curExtrapPoint.Footage;
@@ -436,7 +436,7 @@ namespace AccurateReportSystem
                 }
                 return output;
             }
-            for (int i = 0; i < extrapolatedData.Count; ++i)
+            for (var i = 0; i < extrapolatedData.Count; ++i)
             {
                 curExtrapPoint = extrapolatedData[i];
                 foot = curExtrapPoint.Footage;
@@ -446,13 +446,13 @@ namespace AccurateReportSystem
             }
             Baselines = Enumerable.Repeat((double.NaN, double.NaN), extrapolatedData.Count).ToList();
             UsedBaselineFootages = Enumerable.Repeat((double.NaN, double.NaN), extrapolatedData.Count).ToList();
-            for (int center = 0; center < extrapolatedData.Count; ++center)
+            for (var center = 0; center < extrapolatedData.Count; ++center)
             {
                 var start = Math.Max(center - 105, 0);
                 var end = Math.Min(center + 105, extrapolatedData.Count - 1);
                 var centerExtrap = extrapolatedData[center];
                 var centerAverage = Averages[center];
-                for (int i = start; i <= end; ++i)
+                for (var i = start; i <= end; ++i)
                 {
                     var curFoot = extrapolatedData[i].Footage;
                     var curAverage = Averages[i];
@@ -523,7 +523,7 @@ namespace AccurateReportSystem
             (double Start, double end, PGESeverity Severity)? prevData = null;
             (double Footage, PGESeverity Severity)? firstData = null;
             (double Footage, PGESeverity Severity)? lastData = null;
-            for (int i = 0; i < DataUpdated.Count; ++i)
+            for (var i = 0; i < DataUpdated.Count; ++i)
             {
                 var curFoot = DataUpdated[i].Footage;
                 var severity = DataUpdated[i].Severity;
@@ -611,7 +611,7 @@ namespace AccurateReportSystem
             (double Start, double end, PGESeverity Severity)? prevData = null;
             (double Footage, PGESeverity Severity)? firstData = null;
             (double Footage, PGESeverity Severity)? lastData = null;
-            for (int i = 0; i < Data.Count; ++i)
+            for (var i = 0; i < Data.Count; ++i)
             {
                 //var (curFoot, _, _, _, _, _, _, _, _, _, severity, _) = Data[i];
                 var curFoot = Data[i].Footage;

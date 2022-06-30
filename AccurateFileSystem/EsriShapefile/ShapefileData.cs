@@ -93,7 +93,7 @@ namespace AccurateFileSystem.EsriShapefile
                 var lat = 0.0;
                 var lon = 0.0;
                 if (string.IsNullOrWhiteSpace(row[1])) continue;
-                for (int i = 0; i < row.Length; ++i)
+                for (var i = 0; i < row.Length; ++i)
                 {
                     var field = Fields[i];
                     var value = row[i] ?? "";

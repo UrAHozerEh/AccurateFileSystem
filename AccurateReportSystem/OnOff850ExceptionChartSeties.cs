@@ -40,7 +40,7 @@ namespace AccurateReportSystem
             (double Start, double end, Color color)? prevData = null;
             (double Footage, Color Color)? firstData = null;
             (double Footage, Color Color)? lastData = null;
-            for (int i = 0; i < Data.Count; ++i)
+            for (var i = 0; i < Data.Count; ++i)
             {
                 var (curFoot, on, off) = Data[i];
                 var curColor = CheckValues(on, off);

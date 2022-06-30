@@ -95,7 +95,7 @@ namespace AFSTester
                         var length = double.NaN;
                         var isLat = false;
                         string route = null;
-                        for (int i = 0; i < description.Length; ++i)
+                        for (var i = 0; i < description.Length; ++i)
                         {
                             if (description[i] == "<td>Shape_Leng</td>")
                             {
@@ -173,7 +173,7 @@ namespace AFSTester
                     NewFiles.Add(newFile);
                 if (file.FileType.ToLower() == ".jpg" && file.Name.Contains("logo", StringComparison.OrdinalIgnoreCase))
                 {
-                    CanvasDevice device = CanvasDevice.GetSharedDevice();
+                    var device = CanvasDevice.GetSharedDevice();
                     using (var stream = await file.OpenAsync(FileAccessMode.Read))
                     {
                         Logo = await CanvasBitmap.LoadAsync(device, stream);
@@ -185,10 +185,10 @@ namespace AFSTester
             if (kml != null)
 
                 NewFiles.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
-            for (int i = 0; i < NewFiles.Count; ++i)
+            for (var i = 0; i < NewFiles.Count; ++i)
             {
                 var curFile = NewFiles[i];
-                for (int j = i + 1; j < NewFiles.Count; ++j)
+                for (var j = i + 1; j < NewFiles.Count; ++j)
                 {
                     var nextFile = NewFiles[j];
                     if (curFile.Name != nextFile.Name)
@@ -234,7 +234,7 @@ namespace AFSTester
             var testStationComments = new List<(AllegroDataPoint, BasicGeoposition)>();
             var allOtherComments = new List<(AllegroDataPoint, BasicGeoposition)>();
 
-            for (int i = 0; i < NewFiles.Count; ++i)
+            for (var i = 0; i < NewFiles.Count; ++i)
             {
                 var file = NewFiles[i];
                 if (file is AllegroCISFile allegroFile)
@@ -246,7 +246,7 @@ namespace AFSTester
                         else if (!string.IsNullOrWhiteSpace(point.OriginalComment))
                             allOtherComments.Add((point, point.GPS));
                     }
-                    for (int j = 0; j < ShortList.Count; ++j)
+                    for (var j = 0; j < ShortList.Count; ++j)
                     {
                         var (_, _, _, start, end) = ShortList[j];
                         var (newShort, newPoint) = allegroFile.GetClosestPoint(start, end);
@@ -259,7 +259,7 @@ namespace AFSTester
                         if (newShort < curShort)
                             shortListDistance[j] = (newShort, newPoint);
                     }
-                    for (int j = 0; j < LongList.Count; ++j)
+                    for (var j = 0; j < LongList.Count; ++j)
                     {
                         var (_, _, _, start, end) = LongList[j];
                         var (newShort, newPoint) = allegroFile.GetClosestPoint(start, end);
@@ -289,7 +289,7 @@ namespace AFSTester
 
         private double RoundDist(double dist)
         {
-            int times = (int)(dist / 10);
+            var times = (int)(dist / 10);
             var floor = times * 10;
             var ceil = (times + 1) * 10;
             var floorDiff = dist - floor;
@@ -487,7 +487,7 @@ namespace AFSTester
             if (MirFilter.IsChecked ?? false)
                 await CreateExcelFile($"{curFileName} MIR Skips", new List<(string Name, string Data)>() { ("MIR Skips", mirFilterData) });
             var imageFiles = new List<StorageFile>();
-            for (int i = 0; i < pages.Count; ++i)
+            for (var i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
@@ -525,7 +525,7 @@ namespace AFSTester
 
         private async Task<(string, bool)?> InputTextDialogAsync(string title, string testStationData, string firstComment, string lastComment)
         {
-            StackPanel panel = new StackPanel()
+            var panel = new StackPanel()
             {
                 Orientation = Orientation.Vertical
             };
@@ -541,7 +541,7 @@ namespace AFSTester
             {
                 title = title.Replace("END", endMpMatch.Groups[1].Value);
             }
-            TextBox inputTextBox = new TextBox
+            var inputTextBox = new TextBox
             {
                 AcceptsReturn = false,
                 Height = 32,
@@ -549,10 +549,10 @@ namespace AFSTester
             };
 
             var lineSplit = testStationData.Split('\n');
-            ListBox testStationList = new ListBox();
+            var testStationList = new ListBox();
             testStationList.Items.Add(new ListBoxItem() { Content = firstComment });
 
-            for (int i = 1; i < lineSplit.Length; ++i)
+            for (var i = 1; i < lineSplit.Length; ++i)
             {
                 var curSplit = lineSplit[i].Split('\t');
                 if (curSplit.Length < 7)
@@ -582,7 +582,7 @@ namespace AFSTester
             }
             testStationList.Items.Add(new ListBoxItem() { Content = lastComment });
 
-            CheckBox isReverse = new CheckBox()
+            var isReverse = new CheckBox()
             {
                 Content = "Is Reverse?"
             };
@@ -590,7 +590,7 @@ namespace AFSTester
             panel.Children.Add(testStationList);
             panel.Children.Add(inputTextBox);
             panel.Children.Add(isReverse);
-            ContentDialog dialog = new ContentDialog
+            var dialog = new ContentDialog
             {
                 Content = panel,
                 Title = title,
@@ -636,10 +636,10 @@ namespace AFSTester
         {
             var startGap = hca.GetStartFootageGap();
             file.ShiftPoints(startGap);
-            BasicGeoposition hcaStartGps = hca.GetFirstNonSkipGps();
-            BasicGeoposition hcaEndGps = hca.GetLastNonSkipGps();
-            bool hasStartBuffer = hca.StartBuffer != null;
-            bool hasEndBuffer = hca.EndBuffer != null;
+            var hcaStartGps = hca.GetFirstNonSkipGps();
+            var hcaEndGps = hca.GetLastNonSkipGps();
+            var hasStartBuffer = hca.StartBuffer != null;
+            var hasEndBuffer = hca.EndBuffer != null;
             var (hcaStartPoint, hcaStartDistance) = file.GetClosestPoint(hcaStartGps);
             if (hasStartBuffer)
             {
@@ -686,7 +686,7 @@ namespace AFSTester
             var firstDepth = depthData.First();
             if (firstDepth.Footage - startFootage > maxGap)
                 return true;
-            for (int i = 1; i < depthData.Count; ++i)
+            for (var i = 1; i < depthData.Count; ++i)
             {
                 var curDepth = depthData[i - 1];
                 var nextDepth = depthData[i];
@@ -872,7 +872,7 @@ namespace AFSTester
             var surveyLength = onData.Last().Item1;
             var pages = report.PageSetup.GetAllPages(0, surveyLength);
             //
-            for (int i = 0; i < pages.Count; ++i)
+            for (var i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
@@ -968,8 +968,8 @@ namespace AFSTester
 
         private string ToStationing(double footage)
         {
-            int hundred = (int)footage / 100;
-            int tens = (int)footage % 100;
+            var hundred = (int)footage / 100;
+            var tens = (int)footage % 100;
             return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
         }
 
@@ -1028,7 +1028,7 @@ namespace AFSTester
             if (segments.Count > 1)
             {
                 var toSegment = segments[0];
-                for (int i = 1; i < segments.Count; ++i)
+                for (var i = 1; i < segments.Count; ++i)
                 {
                     var fromSegment = segments[i];
                     while (fromSegment.HasChildren)
@@ -1043,7 +1043,7 @@ namespace AFSTester
             else if (files.Count > 0 && segments.Count == 1)
             {
                 var toSegment = segments[0];
-                for (int i = 1; i < files.Count; ++i)
+                for (var i = 1; i < files.Count; ++i)
                 {
                     var file = files[i];
                     file.Parent.Children.Remove(file);
@@ -1066,11 +1066,11 @@ namespace AFSTester
 
             if (!Layers.ContainsKey(file))
             {
-                Color color = Color.FromArgb(255, (byte)Random.Next(256), (byte)Random.Next(256), (byte)Random.Next(256));
+                var color = Color.FromArgb(255, (byte)Random.Next(256), (byte)Random.Next(256), (byte)Random.Next(256));
                 var elements = new List<MapElement>();
                 var maxFootDiff = 10;
 
-                for (int i = 0; i < file.Points.Count; ++i)
+                for (var i = 0; i < file.Points.Count; ++i)
                 {
                     var point = file.Points[i];
                     if (point.HasGPS)
@@ -1080,7 +1080,7 @@ namespace AFSTester
                             Latitude = point.GPS.Latitude,
                             Longitude = point.GPS.Longitude
                         };
-                        Geopoint startPoint = new Geopoint(startLocation);
+                        var startPoint = new Geopoint(startLocation);
                         var startIcon = new MapIcon
                         {
                             Location = startPoint,
@@ -1093,7 +1093,7 @@ namespace AFSTester
                     }
                 }
 
-                for (int i = file.Points.Count - 1; i >= 0; --i)
+                for (var i = file.Points.Count - 1; i >= 0; --i)
                 {
                     var point = file.Points[i];
                     if (point.HasGPS)
@@ -1103,7 +1103,7 @@ namespace AFSTester
                             Latitude = point.GPS.Latitude,
                             Longitude = point.GPS.Longitude
                         };
-                        Geopoint endPoint = new Geopoint(endLocation);
+                        var endPoint = new Geopoint(endLocation);
                         var endIcon = new MapIcon
                         {
                             Location = endPoint,
@@ -1120,7 +1120,7 @@ namespace AFSTester
                 var positions = new List<BasicGeoposition>();
                 MapPolyline mapPolyline;
 
-                for (int i = 0; i < file.Points.Count; ++i)
+                for (var i = 0; i < file.Points.Count; ++i)
                 {
                     var point = file.Points[i];
                     var curFoot = point.Footage;
@@ -1261,7 +1261,7 @@ namespace AFSTester
                 {
                     if (file.Extension == ".csv")
                     {
-                        for (int i = 0; i < files.Count; ++i)
+                        for (var i = 0; i < files.Count; ++i)
                         {
                             if (files[i].Name == file.Name)
                             {
@@ -1403,7 +1403,7 @@ namespace AFSTester
 
             var pages = report.PageSetup.GetAllPages(start, distance);
 
-            for (int i = 0; i < pages.Count; ++i)
+            for (var i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
@@ -1419,7 +1419,7 @@ namespace AFSTester
         private void HideButtonClick(object sender, RoutedEventArgs e)
         {
             var fileNodes = FileTreeView.SelectedNodes.Where(node => node.Content is AllegroCISFile).ToList();
-            for (int i = 0; i < fileNodes.Count; ++i)
+            for (var i = 0; i < fileNodes.Count; ++i)
             {
                 var file = fileNodes[i];
                 file.Parent.Children.Remove(file);
@@ -1452,8 +1452,8 @@ namespace AFSTester
                         combinedFootages.Add((foot, point.GPS));
                 }
                 var dcvgData = new List<(double, double, BasicGeoposition)>();
-                double lastFoot = double.MaxValue - 10;
-                BasicGeoposition lastGps = new BasicGeoposition();
+                var lastFoot = double.MaxValue - 10;
+                var lastGps = new BasicGeoposition();
                 double regFoot, regDist, extrapFoot, extrapDist;
                 foreach (var file in dcvgFiles)
                 {
@@ -1542,7 +1542,7 @@ namespace AFSTester
 
         private List<(double, double, BasicGeoposition)> GetAlignedDcvgData(AllegroCISFile dcvgFile, List<(double, BasicGeoposition)> cisCombinedData, Hca hca)
         {
-            BasicGeoposition lastGps = new BasicGeoposition();
+            var lastGps = new BasicGeoposition();
             var output = new List<(double, double, BasicGeoposition)>();
             foreach (var (foot, point) in dcvgFile.Points)
             {
@@ -1568,10 +1568,10 @@ namespace AFSTester
         private List<AllegroCISFile> GetUniqueFiles(List<AllegroCISFile> files)
         {
             files.Sort((f1, f2) => f1.Name.CompareTo(f2.Name));
-            for (int i = 0; i < files.Count; ++i)
+            for (var i = 0; i < files.Count; ++i)
             {
                 var curFile = files[i];
-                for (int j = i + 1; j < files.Count; ++j)
+                for (var j = i + 1; j < files.Count; ++j)
                 {
                     var nextFile = files[j];
                     if (curFile.Name != nextFile.Name)
@@ -1671,7 +1671,7 @@ namespace AFSTester
                     {
                         if (file.Extension == ".csv")
                         {
-                            for (int i = 0; i < files.Count; ++i)
+                            for (var i = 0; i < files.Count; ++i)
                             {
                                 if (files[i].Name == file.Name)
                                 {
@@ -1913,7 +1913,7 @@ namespace AFSTester
             report.Container = splitContainer;
             var pages = report.PageSetup.GetAllPages(0, 7900);
             var imageFiles = new List<StorageFile>();
-            for (int i = 0; i < pages.Count; ++i)
+            for (var i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
@@ -1948,7 +1948,7 @@ namespace AFSTester
                     var maxOffset = 0;
                     var length = 0;
                     string firstFile = null;
-                    int firstStartIndex = -1;
+                    var firstStartIndex = -1;
 
                     using (var outStream = await excelFile.OpenStreamForWriteAsync())
                     using (var spreadDoc = SpreadsheetDocument.Open(outStream, false))
@@ -2000,7 +2000,7 @@ namespace AFSTester
                         {
                             if (allegroFile.Extension == ".csv")
                             {
-                                for (int i = 0; i < addedFiles.Count; ++i)
+                                for (var i = 0; i < addedFiles.Count; ++i)
                                 {
                                     if (addedFiles[i].Name == allegroFile.Name)
                                     {
@@ -2176,7 +2176,7 @@ namespace AFSTester
             //await CreateExcelFile($"{curFileName} Combined Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) });
 
             var imageFiles = new List<StorageFile>();
-            for (int i = 0; i < pages.Count; ++i)
+            for (var i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
@@ -2245,7 +2245,7 @@ namespace AFSTester
             await CreateStandardExcel("Aligment Test\\On Off", onOffCombined);
             var alignedPcmReads = AlignPcmReads(pcmReads, onOffCombined);
             alignedPcmReads.Sort((read1, read2) => read1.Footage.CompareTo(read2.Footage));
-            for (int i = 0; i < alignedPcmReads.Count - 1; ++i)
+            for (var i = 0; i < alignedPcmReads.Count - 1; ++i)
             {
                 var (curFootage, _, _) = alignedPcmReads[i];
                 var (nextFootage, _, _) = alignedPcmReads[i + 1];
@@ -2422,7 +2422,7 @@ namespace AFSTester
             var chart3 = new Chart(report, "100mV Data");
             chart3.LegendInfo.SeriesNameFontSize = 8f;
             chart3.LegendInfo.NameFontSize = 15f;
-            PolarizationChartSeries depolExceptions = new PolarizationChartSeries(allegroFile.GetCombinedData(), depolFile.GetCombinedData(), chart3.LegendInfo, chart3.YAxesInfo)
+            var depolExceptions = new PolarizationChartSeries(allegroFile.GetCombinedData(), depolFile.GetCombinedData(), chart3.LegendInfo, chart3.YAxesInfo)
             {
                 LegendLabelSplit = 0.5f
             };
@@ -2451,7 +2451,7 @@ namespace AFSTester
             await CreateExcelFile($"{curFileName} Combined Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) });
 
             var imageFiles = new List<StorageFile>();
-            for (int i = 0; i < pages.Count; ++i)
+            for (var i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
                 var pageString = $"{i + 1}".PadLeft(3, '0');
@@ -2473,7 +2473,7 @@ namespace AFSTester
         private string GetOnOffDepolPcmTabularData(CombinedAllegroCISFile onOffFile, CombinedAllegroCISFile depolFile, List<(double Footage, double Polarization)> polarizationList, List<(double Footage, double Signal, double Depth)> pcmReads, int voltReadDecimals = 3, int gpsReadDecimals = 7, int pcmReadDecimals = 3)
         {
             polarizationList.Sort((pol1, pol2) => pol1.Footage.CompareTo(pol2.Footage));
-            for (int i = 0; i < polarizationList.Count - 1; ++i)
+            for (var i = 0; i < polarizationList.Count - 1; ++i)
             {
                 if (polarizationList[i].Footage == polarizationList[i + 1].Footage)
                 {
@@ -2482,7 +2482,7 @@ namespace AFSTester
                 }
             }
             var polDictionary = polarizationList.ToDictionary(x => x.Footage, x => x.Polarization);
-            Dictionary<double, (double Signal, double Depth)> pcmDictionary = pcmReads.ToDictionary(x => x.Footage, x => (x.Signal, x.Depth));
+            var pcmDictionary = pcmReads.ToDictionary(x => x.Footage, x => (x.Signal, x.Depth));
             var output = new StringBuilder();
             output.AppendLine("Footage\tOn\tOff\tDepol\tPolarization\tDepth\tPCM\tOn Off Date\tDepol Date\tLatitude\tLongitude\tRemarks");
             foreach (var curOnOffPoint in onOffFile.Points)

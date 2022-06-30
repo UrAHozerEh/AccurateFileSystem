@@ -67,10 +67,10 @@ namespace AccurateFileSystem.Xml
                 return (data, objects);
             if (!data.Contains('<'))
                 return (data, objects);
-            for (int i = 0; i < data.Length; ++i)
+            for (var i = 0; i < data.Length; ++i)
             {
                 var curChar = data[i];
-                char nextChar = (i < data.Length - 1) ? data[i + 1] : ' ';
+                var nextChar = (i < data.Length - 1) ? data[i + 1] : ' ';
                 if (curChar != '<') continue;
                 if (nextChar == '?')
                 {
@@ -109,7 +109,7 @@ namespace AccurateFileSystem.Xml
             var searchIndex = startIndex;
             var nextOpenIndex = data.IndexOf(openString, searchIndex);
             var nextCloseIndex = data.IndexOf(closeString, searchIndex);
-            int level = 0;
+            var level = 0;
             while ((nextOpenIndex != -1 && nextOpenIndex < nextCloseIndex) || level != 0)
             {
                 if (nextOpenIndex == -1)

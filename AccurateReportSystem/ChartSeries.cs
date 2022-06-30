@@ -109,8 +109,8 @@ namespace AccurateReportSystem
                         format.FontWeight = FontWeights.Thin;
                         format.FontStyle = FontStyle.Normal;
                         var textBoxHeight = TailYShift * 2;
-                        Rect textRect = new Rect(x - Width, y - TailYShift, Width, textBoxHeight);
-                        Matrix3x2 textRotation = rotationMatrix;
+                        var textRect = new Rect(x - Width, y - TailYShift, Width, textBoxHeight);
+                        var textRotation = rotationMatrix;
                         if (rotation > 90 && rotation <= 270)
                         {
                             textRect = new Rect(x, y - TailYShift, Width, textBoxHeight);
@@ -216,8 +216,8 @@ namespace AccurateReportSystem
                         format.FontWeight = FontWeights.Thin;
                         format.FontStyle = FontStyle.Normal;
                         var textHeight = TailYShift * 2;
-                        Rect textRect = new Rect(x - width, y - TailYShift, width, textHeight);
-                        Matrix3x2 textRotation = rotationMatrix;
+                        var textRect = new Rect(x - width, y - TailYShift, width, textHeight);
+                        var textRotation = rotationMatrix;
                         if (rotation > 90 && rotation <= 270)
                         {
                             textRect = new Rect(x, y - TailYShift, width, textHeight);

@@ -43,7 +43,7 @@ namespace AccurateFileSystem
 
         private void GetColumns()
         {
-            for (int i = 0; i < Headers.Count; ++i)
+            for (var i = 0; i < Headers.Count; ++i)
             {
                 var header = Headers[i];
                 if (header.Contains("region", StringComparison.OrdinalIgnoreCase))
@@ -77,11 +77,11 @@ namespace AccurateFileSystem
         {
             gps = gps.Replace(',', ' ');
             gps = gps.Replace(';', ' ').Trim();
-            string lat = "";
-            string lon = "";
+            var lat = "";
+            var lon = "";
             var split = gps.Split(' ');
             lat = split[0];
-            for (int i = 1; i < split.Length; ++i)
+            for (var i = 1; i < split.Length; ++i)
             {
                 if (!string.IsNullOrWhiteSpace(split[i]))
                 {
@@ -98,7 +98,7 @@ namespace AccurateFileSystem
             var startLineName = "";
             List<string[]> curLines = null;
             bool? isFirstTime = null;
-            for (int i = 0; i < Data.GetLength(0); ++i)
+            for (var i = 0; i < Data.GetLength(0); ++i)
             {
                 var curName = Data[i, HcaColumn].Trim();
 

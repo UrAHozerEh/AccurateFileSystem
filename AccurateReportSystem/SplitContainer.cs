@@ -30,7 +30,7 @@ namespace AccurateReportSystem
             double requestedTotalPercent = 1;
             double countPercent = 0;
             double countRemainderPercent = 0;
-            int remainderCount = 0;
+            var remainderCount = 0;
 
             foreach (var measure in ContainerMeasurements)
             {
@@ -72,7 +72,7 @@ namespace AccurateReportSystem
                     }
                     else
                     {
-                        double percent = measure.IsPercentSpecified ? measure.RequestedPercent.Value : remainderPercentPer;
+                        var percent = measure.IsPercentSpecified ? measure.RequestedPercent.Value : remainderPercentPer;
                         curSize = Math.Round(percent * size, GraphicalReport.DIGITS_TO_ROUND);
                         remainingSize -= curSize;
                     }

@@ -528,16 +528,16 @@ namespace AccurateReportSystem
             var gridlineValues = GetGridlineValues(y1Transform, MajorGridlines.Offset);
             if (Y1IsDrawn)
             {
-                Rect labelDrawArea = new Rect(graphBodyDrawArea.Left - Y1LabelHeight, graphBodyDrawArea.Top, Y1LabelHeight, graphBodyDrawArea.Height);
+                var labelDrawArea = new Rect(graphBodyDrawArea.Left - Y1LabelHeight, graphBodyDrawArea.Top, Y1LabelHeight, graphBodyDrawArea.Height);
                 DrawY1Labels(session, y1Transform, labelDrawArea);
-                Rect titleDrawArea = new Rect(graphBodyDrawArea.Left - Y1TotalHeight, graphBodyDrawArea.Top, Y1TitleHeight, graphBodyDrawArea.Height);
+                var titleDrawArea = new Rect(graphBodyDrawArea.Left - Y1TotalHeight, graphBodyDrawArea.Top, Y1TitleHeight, graphBodyDrawArea.Height);
                 DrawTitle(session, Y1Title, Y1TitleFontSize, titleDrawArea, 90f);
             }
             if (Y2IsDrawn)
             {
-                Rect labelDrawArea = new Rect(graphBodyDrawArea.Right, graphBodyDrawArea.Top, Y2LabelHeight, graphBodyDrawArea.Height);
+                var labelDrawArea = new Rect(graphBodyDrawArea.Right, graphBodyDrawArea.Top, Y2LabelHeight, graphBodyDrawArea.Height);
                 DrawY2Labels(session, gridlineValues, y2Transform, labelDrawArea);
-                Rect titleDrawArea = new Rect(graphBodyDrawArea.Right + Y2LabelHeight, graphBodyDrawArea.Top, Y2TitleHeight, graphBodyDrawArea.Height);
+                var titleDrawArea = new Rect(graphBodyDrawArea.Right + Y2LabelHeight, graphBodyDrawArea.Top, Y2TitleHeight, graphBodyDrawArea.Height);
                 DrawTitle(session, Y2Title, Y2TitleFontSize, titleDrawArea, 90f);
             }
         }

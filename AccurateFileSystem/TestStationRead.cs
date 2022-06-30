@@ -48,7 +48,7 @@ namespace AccurateFileSystem
         public double Value { get; }
         public ACTestStationRead(string original, string replaceId) : base(original, replaceId)
         {
-            Match match = Regex.Match(original, RegexPattern);
+            var match = Regex.Match(original, RegexPattern);
             if (!match.Success)
                 throw new Exception();
             if (match.Groups.Count == 3)
@@ -71,8 +71,8 @@ namespace AccurateFileSystem
         public string Title { get; }
         public SingleTestStationRead(string original, string replaceId) : base(original, replaceId)
         {
-            Match onOffMatch = Regex.Match(original, OnOffRegexPattern);
-            Match onMatch = Regex.Match(original, OnRegexPattern);
+            var onOffMatch = Regex.Match(original, OnOffRegexPattern);
+            var onMatch = Regex.Match(original, OnRegexPattern);
             if (onOffMatch.Success)
             {
                 IsOnOff = true;
@@ -85,7 +85,7 @@ namespace AccurateFileSystem
             else if (onMatch.Success)
             {
                 IsOnOff = false;
-                int count = onMatch.Groups.Count;
+                var count = onMatch.Groups.Count;
                 if (count == 3)
                     Tag = onMatch.Groups[1].Value;
                 On = double.Parse(onMatch.Groups[count - 1].Value);
@@ -111,12 +111,12 @@ namespace AccurateFileSystem
 
         public SideDrainTestStationRead(string original, string replaceId) : base(original, replaceId)
         {
-            Match onOffMatch = Regex.Match(original, OnOffRegexPattern);
-            Match onMatch = Regex.Match(original, OnRegexPattern);
+            var onOffMatch = Regex.Match(original, OnOffRegexPattern);
+            var onMatch = Regex.Match(original, OnRegexPattern);
             if (onOffMatch.Success)
             {
                 IsOnOff = true;
-                int count = onOffMatch.Groups.Count;
+                var count = onOffMatch.Groups.Count;
                 if (count == 6)
                     Tag = onOffMatch.Groups[1].Value;
                 LeftOn = double.Parse(onOffMatch.Groups[count - 4].Value);
@@ -128,7 +128,7 @@ namespace AccurateFileSystem
             else if (onMatch.Success)
             {
                 IsOnOff = false;
-                int count = onMatch.Groups.Count;
+                var count = onMatch.Groups.Count;
                 if (count == 4)
                     Tag = onMatch.Groups[1].Value;
                 LeftOn = double.Parse(onMatch.Groups[count - 2].Value);
@@ -164,12 +164,12 @@ namespace AccurateFileSystem
 
         public ReconnectTestStationRead(string original, string replaceId) : base(original, replaceId)
         {
-            Match onOffMatch = Regex.Match(original, OnOffRegexPattern);
-            Match onMatch = Regex.Match(original, OnRegexPattern);
+            var onOffMatch = Regex.Match(original, OnOffRegexPattern);
+            var onMatch = Regex.Match(original, OnRegexPattern);
             if (onOffMatch.Success)
             {
                 IsOnOff = true;
-                int count = onOffMatch.Groups.Count;
+                var count = onOffMatch.Groups.Count;
                 if (count == 8)
                     Tag = onOffMatch.Groups[1].Value;
                 FGOn = double.Parse(onOffMatch.Groups[count - 6].Value);
@@ -184,7 +184,7 @@ namespace AccurateFileSystem
             else if (onMatch.Success)
             {
                 IsOnOff = false;
-                int count = onMatch.Groups.Count;
+                var count = onMatch.Groups.Count;
                 if (count == 5)
                     Tag = onMatch.Groups[1].Value;
                 FGOn = double.Parse(onMatch.Groups[count - 3].Value);
@@ -216,12 +216,12 @@ namespace AccurateFileSystem
 
         public CasingTestStationRead(string original, string replaceId) : base(original, replaceId)
         {
-            Match onOffMatch = Regex.Match(original, OnOffRegexPattern);
-            Match onMatch = Regex.Match(original, OnRegexPattern);
+            var onOffMatch = Regex.Match(original, OnOffRegexPattern);
+            var onMatch = Regex.Match(original, OnRegexPattern);
             if (onOffMatch.Success)
             {
                 IsOnOff = true;
-                int count = onOffMatch.Groups.Count;
+                var count = onOffMatch.Groups.Count;
                 if (count == 6)
                     Tag = onOffMatch.Groups[1].Value;
                 StructOn = double.Parse(onOffMatch.Groups[count - 4].Value);
@@ -256,12 +256,12 @@ namespace AccurateFileSystem
 
         public CrossingTestStationRead(string original, string replaceId) : base(original, replaceId)
         {
-            Match onOffMatch = Regex.Match(original, OnOffRegexPattern);
-            Match onMatch = Regex.Match(original, OnRegexPattern);
+            var onOffMatch = Regex.Match(original, OnOffRegexPattern);
+            var onMatch = Regex.Match(original, OnRegexPattern);
             if (onOffMatch.Success)
             {
                 IsOnOff = true;
-                int count = onOffMatch.Groups.Count;
+                var count = onOffMatch.Groups.Count;
                 if (count == 6)
                     Tag = onOffMatch.Groups[1].Value;
                 StructOn = double.Parse(onOffMatch.Groups[count - 4].Value);
@@ -297,12 +297,12 @@ namespace AccurateFileSystem
 
         public InsulationTestStationRead(string original, string replaceId) : base(original, replaceId)
         {
-            Match onOffMatch = Regex.Match(original, OnOffRegexPattern);
-            Match onMatch = Regex.Match(original, OnRegexPattern);
+            var onOffMatch = Regex.Match(original, OnOffRegexPattern);
+            var onMatch = Regex.Match(original, OnRegexPattern);
             if (onOffMatch.Success)
             {
                 IsOnOff = true;
-                int count = onOffMatch.Groups.Count;
+                var count = onOffMatch.Groups.Count;
                 if (count == 6)
                     Tag = onOffMatch.Groups[1].Value;
                 StructOn = double.Parse(onOffMatch.Groups[count - 4].Value);

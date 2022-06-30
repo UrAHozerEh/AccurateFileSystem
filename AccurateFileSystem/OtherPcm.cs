@@ -19,7 +19,7 @@ namespace AccurateFileSystem
             var lonColumn = -1;
             var depthColumn = -1;
             var ampColumn = -1;
-            for (int i = 0; i < Headers.Count; ++i)
+            for (var i = 0; i < Headers.Count; ++i)
             {
                 var header = Headers[i];
                 switch (header)

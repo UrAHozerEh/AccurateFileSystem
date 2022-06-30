@@ -154,7 +154,7 @@ namespace AccurateFileSystem
 
             var middleGps = new List<BasicGeoposition>();
 
-            for (int i = startIndex + 1; i < lines.Count; ++i)
+            for (var i = startIndex + 1; i < lines.Count; ++i)
             {
                 line = lines[i];
                 if (line.Length != 10)
@@ -209,7 +209,7 @@ namespace AccurateFileSystem
                 var isCloseBefore = false;
                 var closestDist = double.MaxValue;
                 var closestIndex = -1;
-                for (int i = 0; i < output.Count; ++i)
+                for (var i = 0; i < output.Count; ++i)
                 {
                     var other = output[i];
                     if (other.EndGps.Equals(cur.StartGps))
@@ -260,7 +260,7 @@ namespace AccurateFileSystem
 
         private void ParseLines(List<string[]> lines)
         {
-            var curRegion = GetNextRegion(0, lines, out int startIndex);
+            var curRegion = GetNextRegion(0, lines, out var startIndex);
             if (curRegion.IsBuffer)
             {
                 StartBuffer = curRegion;
@@ -269,7 +269,7 @@ namespace AccurateFileSystem
             {
                 Regions.Add(curRegion);
             }
-            for (int i = startIndex + 1; i < lines.Count; ++i)
+            for (var i = startIndex + 1; i < lines.Count; ++i)
             {
                 curRegion = GetNextRegion(i, lines, out i);
                 if (!curRegion.IsBuffer)

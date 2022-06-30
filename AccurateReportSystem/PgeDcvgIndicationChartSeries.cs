@@ -48,7 +48,7 @@ namespace AccurateReportSystem
                         severity = PGESeverity.Minor;
                         reason = "Individual normalized ACVG indications are greater than or equal to 25 and less than 50";
                     }
-                    for (double curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
+                    for (var curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
                     {
                         Data.Add((curFoot, foot, percent, severity, reason, gps));
                     }
@@ -73,7 +73,7 @@ namespace AccurateReportSystem
                         severity = PGESeverity.Minor;
                         reason = "DCVG % IR is greater than or equal to 16% and less than or equal to 35%";
                     }
-                    for (double curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
+                    for (var curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
                     {
                         Data.Add((curFoot, foot, percent, severity, reason, gps));
                     }
@@ -87,7 +87,7 @@ namespace AccurateReportSystem
         {
             var colors = new List<(double Start, double End, Color Color)>();
             (double Start, double end, PGESeverity Severity)? prevData = null;
-            for (int i = 0; i < Data.Count; ++i)
+            for (var i = 0; i < Data.Count; ++i)
             {
                 var (curFoot, _, _, severity, _, _) = Data[i];
                 if (curFoot < page.StartFootage)
