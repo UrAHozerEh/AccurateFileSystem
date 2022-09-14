@@ -8,7 +8,7 @@ using Windows.Devices.Geolocation;
 
 namespace AccurateFileSystem
 {
-    public class CombinedAllegroCISFile
+    public class CombinedAllegroCisFile
     {
         public FileInfoLinkedList FileInfos { get; set; }
         public FileType Type { get; set; }
@@ -17,7 +17,7 @@ namespace AccurateFileSystem
         public bool HasStartSkip { get; private set; }
         public bool HasEndSkip { get; private set; }
 
-        private CombinedAllegroCISFile(string name, FileType type, FileInfoLinkedList fileInfos)
+        private CombinedAllegroCisFile(string name, FileType type, FileInfoLinkedList fileInfos)
         {
             Type = type;
             Name = name;
@@ -31,6 +31,8 @@ namespace AccurateFileSystem
         {
             foreach (var point in Points)
             {
+                if (point.Point.OriginalComment.StartsWith(comment))
+                    point.Point.OriginalComment = point.Point.OriginalComment.Remove(0, comment.Length);
                 if (point.Point.OriginalComment == comment)
                     point.Point.OriginalComment = "";
             }
@@ -301,7 +303,7 @@ namespace AccurateFileSystem
             return testStations;
         }
 
-        public void AlignTo(CombinedAllegroCISFile otherFile, double maxDistance = 25)
+        public void AlignTo(CombinedAllegroCisFile otherFile, double maxDistance = 25)
         {
             var myAnchors = GetAnchorPoints();
             var otherAnchors = otherFile.GetAnchorPoints();
@@ -1231,6 +1233,13 @@ namespace AccurateFileSystem
                 offset += info.TotalFootage;
                 tempFileInfoNode = tempFileInfoNode.Next;
             }
+
+            if (list.Count == 1)
+            {
+                list.Add(list[0]);
+                list[1].Footage += 1;
+            }
+
             Points = list;
         }
 
@@ -1398,7 +1407,7 @@ namespace AccurateFileSystem
             return output;
         }
 
-        public static CombinedAllegroCISFile CombineFiles(string name, List<AllegroCISFile> files, double maxGap = 1500)
+        public static CombinedAllegroCisFile CombineFiles(string name, List<AllegroCISFile> files, double maxGap = 1500)
         {
             if (files.Count == 0)
                 return null;
@@ -1441,12 +1450,12 @@ namespace AccurateFileSystem
 
             allSolution.CalculateOffset(10);
             var solString = allSolution.ToString();
-            var combined = new CombinedAllegroCISFile(name, type, allSolution);
+            var combined = new CombinedAllegroCisFile(name, type, allSolution);
             calc.Dispose();
             return combined;
         }
 
-        public static CombinedAllegroCISFile CombineOrderedFiles(string name, List<AllegroCISFile> files, double offset)
+        public static CombinedAllegroCisFile CombineOrderedFiles(string name, List<AllegroCISFile> files, double offset)
         {
             var first = files.First();
             var type = first.Type;
@@ -1480,7 +1489,7 @@ namespace AccurateFileSystem
             }
             allSolution.CalculateOffset(offset);
             var solString = allSolution.ToString();
-            var combined = new CombinedAllegroCISFile(name, type, allSolution);
+            var combined = new CombinedAllegroCisFile(name, type, allSolution);
             return combined;
         }
 

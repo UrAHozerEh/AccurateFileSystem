@@ -13,7 +13,7 @@ namespace AccurateReportSystem
 {
     public class PgeEcdaReportInformation
     {
-        public CombinedAllegroCISFile CisFile { get; set; }
+        public CombinedAllegroCisFile CisFile { get; set; }
         public List<PgeEcdaDataPoint> EcdaData { get; set; }
         public HcaInfo HcaInfo { get; set; }
         public Hca Hca { get; set; }
@@ -245,7 +245,7 @@ namespace AccurateReportSystem
             }
         }
 
-        public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<AllegroCISFile> dcvgFiles, List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> ampReads, Hca hca, double maxSpacing, bool useMir = false, GpsInfo? gpsInfo = null)
+        public PgeEcdaReportInformation(CombinedAllegroCisFile cisFile, List<AllegroCISFile> dcvgFiles, List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> ampReads, Hca hca, double maxSpacing, bool useMir = false, GpsInfo? gpsInfo = null)
         {
             GpsInfo = gpsInfo;
             MaxSpacing = maxSpacing;
@@ -327,7 +327,7 @@ namespace AccurateReportSystem
             }
         }
 
-        public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<(BasicGeoposition, double)> acvgIndications, HcaInfo hcaInfo, double maxSpacing, bool useMir = false)
+        public PgeEcdaReportInformation(CombinedAllegroCisFile cisFile, List<(BasicGeoposition, double)> acvgIndications, HcaInfo hcaInfo, double maxSpacing, bool useMir = false)
         {
             MaxSpacing = maxSpacing;
             IsDcvg = false;
@@ -358,7 +358,7 @@ namespace AccurateReportSystem
             }
         }
 
-        public PgeEcdaReportInformation(CombinedAllegroCISFile cisFile, List<(BasicGeoposition, double)> acvgIndications, List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> ampReads, Hca hca, double maxSpacing, bool useMir = false)
+        public PgeEcdaReportInformation(CombinedAllegroCisFile cisFile, List<(BasicGeoposition, double)> acvgIndications, List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> ampReads, Hca hca, double maxSpacing, bool useMir = false)
         {
             MaxSpacing = maxSpacing;
             IsDcvg = false;
@@ -402,7 +402,7 @@ namespace AccurateReportSystem
             return output;
         }
 
-        public void StraightenGps(CombinedAllegroCISFile file, GpsInfo info)
+        public void StraightenGps(CombinedAllegroCisFile file, GpsInfo info)
         {
             foreach (var point in file.Points)
             {
@@ -421,7 +421,7 @@ namespace AccurateReportSystem
             file.StraightenGps();
         }
 
-        public void StraightenGpsUpdated(CombinedAllegroCISFile file, GpsInfo info)
+        public void StraightenGpsUpdated(CombinedAllegroCisFile file, GpsInfo info)
         {
             foreach (var point in file.Points)
             {

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Foundation;
@@ -14,6 +15,57 @@ namespace AccurateReportSystem
 {
     public static class Extensions
     {
+
+        public static List<(double Footage, double Value)> Difference(this GraphSeries initialSeries,
+            GraphSeries otherSeries)
+        {
+            var output = new List<(double Footage, double Value)>();
+
+            foreach (var (foot, initialValue) in initialSeries.Values)
+            {
+                var closestValue = GetClosestValue(foot, otherSeries.Values);
+                if (!closestValue.HasValue)
+                    continue;
+
+                output.Add((foot, initialValue - closestValue.Value));
+            }
+
+            return output;
+        }
+
+        private static double? GetClosestValue(double findFoot, List<(double Footage, double Value)> values)
+        {
+            double? prevValue = null;
+            double prevFoot = 0;
+            foreach (var (curFoot, curValue) in values)
+            {
+                if (Math.Abs(curFoot - findFoot) < 1)
+                    return curValue;
+                if (curFoot > findFoot)
+                {
+                    if (prevValue is null)
+                        return curValue;
+
+                    var diffGap = curFoot - prevFoot;
+                    var diffSearch = findFoot - prevFoot;
+                    var percent = diffSearch / diffGap;
+
+                    var valDiff = curValue - prevValue.Value;
+
+                    return Math.Round(valDiff * percent + prevValue.Value, 4);
+                }
+
+                prevFoot = curFoot;
+                prevValue = curValue;
+            }
+
+            if (prevValue is null)
+                throw new ArgumentException();
+            if (Math.Abs(prevFoot - findFoot) < 10)
+                return prevValue.Value;
+            return null;
+        }
+
         public static void BeginFigure(this CanvasPathBuilder path, (float X, float Y) value)
         {
             path.BeginFigure(value.X, value.Y);
@@ -59,7 +111,7 @@ namespace AccurateReportSystem
             var pageStart = page.StartFootage;
             var pageEnd = page.EndFootage;
 
-            if(reconStart >= pageStart && reconStart <= pageEnd)
+            if (reconStart >= pageStart && reconStart <= pageEnd)
                 return true;
             if (pageStart >= reconStart && pageStart <= reconEnd)
                 return true;
@@ -77,7 +129,7 @@ namespace AccurateReportSystem
                 return (recon1.StartPoint.Footage, recon2.StartPoint.Footage);
             else if (startEndDiff < endStartDiff && startEndDiff < endEndDiff)
                 return (recon1.StartPoint.Footage, recon2.EndPoint.Footage);
-            else if(endStartDiff < endEndDiff)
+            else if (endStartDiff < endEndDiff)
                 return (recon1.EndPoint.Footage, recon2.StartPoint.Footage);
             return (recon1.EndPoint.Footage, recon2.EndPoint.Footage);
         }

@@ -297,7 +297,7 @@ namespace AFSTester
             return floorDiff < ceilDiff ? floor : ceil;
         }
 
-        private async Task MakeGraphs(CombinedAllegroCISFile allegroFile, string exact = null)
+        private async Task MakeGraphs(CombinedAllegroCisFile allegroFile, string exact = null)
         {
             var testStationInitial = allegroFile.GetTestStationData();
             var firstPoint = allegroFile.Points.First();
@@ -506,7 +506,7 @@ namespace AFSTester
             //await dialog.ShowAsync();
         }
 
-        private async Task CreateStandardExcel(string fileName, CombinedAllegroCISFile allegroFile)
+        private async Task CreateStandardExcel(string fileName, CombinedAllegroCisFile allegroFile)
         {
             var tabular = allegroFile.GetTabularData();
             await CreateExcelFile($"{fileName} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) });
@@ -632,7 +632,7 @@ namespace AFSTester
             return curValue + change;
         }
 
-        private (double HcaStartFootage, double HcaEndFootage) AddHcaComments(CombinedAllegroCISFile file, Hca hca)
+        private (double HcaStartFootage, double HcaEndFootage) AddHcaComments(CombinedAllegroCisFile file, Hca hca)
         {
             var startGap = hca.GetStartFootageGap();
             file.ShiftPoints(startGap);
@@ -669,7 +669,7 @@ namespace AFSTester
             return (hcaStartPoint.Footage, hcaEndPoint.Footage);
         }
 
-        private void AddMaxDepthComment(CombinedAllegroCISFile file, double maxDepth)
+        private void AddMaxDepthComment(CombinedAllegroCisFile file, double maxDepth)
         {
             foreach (var point in file.Points)
             {
@@ -714,7 +714,7 @@ namespace AFSTester
         }
 
 
-        private async Task MakeQuickIITGraphs(CombinedAllegroCISFile file, List<(double, double, BasicGeoposition)> dcvgData, List<(double Footage, double Current, double Depth, string Comment)> pcmInput, string folderName)
+        private async Task MakeQuickIITGraphs(CombinedAllegroCisFile file, List<(double, double, BasicGeoposition)> dcvgData, List<(double Footage, double Current, double Depth, string Comment)> pcmInput, string folderName)
         {
             var maxDepth = 200;
             var curDepth = 50.0;
@@ -1279,7 +1279,7 @@ namespace AFSTester
                 return;
             }
 
-            var test = CombinedAllegroCISFile.CombineFiles(files.First().Header["segment"].Trim(), files, maxGap);
+            var test = CombinedAllegroCisFile.CombineFiles(files.First().Header["segment"].Trim(), files, maxGap);
             //test.FixContactSpikes();
             await MakeGraphs(test);
         }
@@ -1444,7 +1444,7 @@ namespace AFSTester
                     else
                         onOffFiles.Add(file);
                 }
-                var combinedFile = CombinedAllegroCISFile.CombineOrderedFiles("Combined", onOffFiles, 10);
+                var combinedFile = CombinedAllegroCisFile.CombineOrderedFiles("Combined", onOffFiles, 10);
                 var combinedFootages = new List<(double, BasicGeoposition)>();
                 foreach (var (foot, _, point, _, _) in combinedFile.Points)
                 {
@@ -1687,7 +1687,7 @@ namespace AFSTester
                     continue;
                 try
                 {
-                    var test = CombinedAllegroCISFile.CombineFiles(files.First().Header["segment"].Trim().ToUpper(), files, maxGap);
+                    var test = CombinedAllegroCisFile.CombineFiles(files.First().Header["segment"].Trim().ToUpper(), files, maxGap);
                     if (test == null)
                         continue;
                     //test.FixContactSpikes();
@@ -2014,7 +2014,7 @@ namespace AFSTester
                     }
                     if (addedFiles.Count == 0)
                         continue;
-                    var test = CombinedAllegroCISFile.CombineFiles(addedFiles.First().Header["segment"].Trim().ToUpper(), addedFiles, maxOffset);
+                    var test = CombinedAllegroCisFile.CombineFiles(addedFiles.First().Header["segment"].Trim().ToUpper(), addedFiles, maxOffset);
                     if (test == null)
                         continue;
                     if (test.FileInfos.Info.File.Name != firstFile || test.FileInfos.Info.Start != firstStartIndex)
@@ -2229,8 +2229,8 @@ namespace AFSTester
             }
             onOffs = RemoveDuplicates(onOffs, ".csv");
             depols = RemoveDuplicates(depols, ".csv");
-            var depolCombined = CombinedAllegroCISFile.CombineFiles("Depol", depols, maxGap);
-            var onOffCombined = CombinedAllegroCISFile.CombineFiles("On Off", onOffs, maxGap);
+            var depolCombined = CombinedAllegroCisFile.CombineFiles("Depol", depols, maxGap);
+            var onOffCombined = CombinedAllegroCisFile.CombineFiles("On Off", onOffs, maxGap);
             var onOffStartGps = onOffCombined.Points[0].Point.GPS;
             var depolStartGps = depolCombined.Points[0].Point.GPS;
             var depolEndGps = depolCombined.Points[depolCombined.Points.Count - 1].Point.GPS;
@@ -2280,7 +2280,7 @@ namespace AFSTester
             return output;
         }
 
-        private List<(double Footage, double Signal, double Depth)> AlignPcmReads(List<(BasicGeoposition Gps, double Signal, double Depth)> pcm, CombinedAllegroCISFile file)
+        private List<(double Footage, double Signal, double Depth)> AlignPcmReads(List<(BasicGeoposition Gps, double Signal, double Depth)> pcm, CombinedAllegroCisFile file)
         {
             var output = new List<(double Footage, double Signal, double Depth)>();
 
@@ -2295,7 +2295,7 @@ namespace AFSTester
             return output;
         }
 
-        private async Task MakeOnOffDepolGraphs(CombinedAllegroCISFile allegroFile, CombinedAllegroCISFile depolFile, List<(double Footage, double Signal, double Depth)> pcmReads = null, string exact = null)
+        private async Task MakeOnOffDepolGraphs(CombinedAllegroCisFile allegroFile, CombinedAllegroCisFile depolFile, List<(double Footage, double Signal, double Depth)> pcmReads = null, string exact = null)
         {
             var testStationInitial = allegroFile.GetTestStationData();
             var firstPoint = allegroFile.Points.First();
@@ -2470,7 +2470,7 @@ namespace AFSTester
             //await dialog.ShowAsync();
         }
 
-        private string GetOnOffDepolPcmTabularData(CombinedAllegroCISFile onOffFile, CombinedAllegroCISFile depolFile, List<(double Footage, double Polarization)> polarizationList, List<(double Footage, double Signal, double Depth)> pcmReads, int voltReadDecimals = 3, int gpsReadDecimals = 7, int pcmReadDecimals = 3)
+        private string GetOnOffDepolPcmTabularData(CombinedAllegroCisFile onOffFile, CombinedAllegroCisFile depolFile, List<(double Footage, double Polarization)> polarizationList, List<(double Footage, double Signal, double Depth)> pcmReads, int voltReadDecimals = 3, int gpsReadDecimals = 7, int pcmReadDecimals = 3)
         {
             polarizationList.Sort((pol1, pol2) => pol1.Footage.CompareTo(pol2.Footage));
             for (var i = 0; i < polarizationList.Count - 1; ++i)

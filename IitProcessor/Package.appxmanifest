@@ -8,7 +8,7 @@
 
   <Identity
     Name="59928b63-39ac-4a9c-8303-c76775aaea2f"
-    Publisher="CN=Kevin Cronk"
+    Publisher="CN=kcron"
     Version="1.0.5.0" />
 
   <mp:PhoneIdentity PhoneProductId="59928b63-39ac-4a9c-8303-c76775aaea2f" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>

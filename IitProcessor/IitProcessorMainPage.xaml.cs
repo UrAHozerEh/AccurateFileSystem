@@ -200,8 +200,16 @@ namespace IitProcessor
                 return;
             }
             cisFiles = GetUniqueFiles(cisFiles);
+            foreach (var file in cisFiles)
+            {
+                if (file.Points.Count == 1)
+                {
+                    var newPoint = new AllegroDataPoint(file.Points[0], file.Points[0].GPS, "");
+                    file.Points.Add(1, newPoint);
+                }
+            }
             dcvgFiles = GetUniqueFiles(dcvgFiles);
-            var combinedCisFile = CombinedAllegroCISFile.CombineFiles("Combined", cisFiles, 1500);
+            var combinedCisFile = CombinedAllegroCisFile.CombineFiles("Combined", cisFiles, 1500);
             combinedCisFile.FixGps();
             List<List<BasicGeoposition>> curLineData = null;
             if (lineData != null)
@@ -329,7 +337,7 @@ namespace IitProcessor
             return output;
         }
 
-        private void AddMaxDepthComment(CombinedAllegroCISFile file, double maxDepth)
+        private void AddMaxDepthComment(CombinedAllegroCisFile file, double maxDepth)
         {
             foreach (var point in file.Points)
             {
@@ -341,7 +349,7 @@ namespace IitProcessor
             }
         }
 
-        private async Task MakeIITGraphsUpdated(CombinedAllegroCISFile file, PgeEcdaReportInformation ecdaReport, bool isDcvg, string folderName, Hca hca, StorageFolder outputFolder = null)
+        private async Task MakeIITGraphsUpdated(CombinedAllegroCisFile file, PgeEcdaReportInformation ecdaReport, bool isDcvg, string folderName, Hca hca, StorageFolder outputFolder = null)
         {
             if (outputFolder == null)
                 outputFolder = ApplicationData.Current.LocalFolder;
@@ -819,7 +827,7 @@ namespace IitProcessor
             return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
         }
 
-        private (double HcaStartFootage, double HcaEndFootage) AddHcaComments(CombinedAllegroCISFile file, Hca hca)
+        private (double HcaStartFootage, double HcaEndFootage) AddHcaComments(CombinedAllegroCisFile file, Hca hca)
         {
             var startGap = hca.GetStartFootageGap();
             file.ShiftPoints(startGap);
