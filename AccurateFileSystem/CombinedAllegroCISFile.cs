@@ -16,6 +16,7 @@ namespace AccurateFileSystem
         public List<CombinedDataPoint> Points = null;
         public bool HasStartSkip { get; private set; }
         public bool HasEndSkip { get; private set; }
+        public string PcmCalcOutput { get; private set; }
 
         private CombinedAllegroCisFile(string name, FileType type, FileInfoLinkedList fileInfos)
         {
@@ -35,6 +36,18 @@ namespace AccurateFileSystem
                     point.Point.OriginalComment = point.Point.OriginalComment.Remove(0, comment.Length);
                 if (point.Point.OriginalComment == comment)
                     point.Point.OriginalComment = "";
+            }
+        }
+
+        public void AddMaxDepthComment(double maxDepth, bool setToMax = true)
+        {
+            foreach (var point in Points)
+            {
+                if ((point.Point.Depth ?? 0) < maxDepth) continue;
+                var tempDepthString = $" Depth: {point.Point.Depth.Value} Inches";
+                if (setToMax)
+                    point.Point.Depth = maxDepth;
+                point.Point.OriginalComment += tempDepthString;
             }
         }
 
@@ -129,7 +142,7 @@ namespace AccurateFileSystem
             }
         }
 
-        public void AddPcmDepthData(List<CsvPcm> pcms, double maxGraphDepth = double.MaxValue)
+        public void AddPcmDepthData(List<CsvPcm> pcms, double maxGraphDepth = double.MaxValue, bool setToMax = true)
         {
             foreach (var pcm in pcms)
                 foreach (var (gps, depth) in pcm.DepthData)
@@ -142,6 +155,7 @@ namespace AccurateFileSystem
                         {
                             Point.Point.OriginalComment += $" Depth: {depth:F0}in";
                             Point.Point.StrippedComment += $" Depth: {depth:F0}in";
+                            Point.Point.Depth = maxGraphDepth;
                         }
                     }
                 }
@@ -221,6 +235,7 @@ namespace AccurateFileSystem
         public List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> AlignAmpReads(List<CsvPcm> files, double maxDist = 20)
         {
             var output = new List<(double Footage, BasicGeoposition Gps, double Value, double Percent)>();
+            var pcmCalc = new StringBuilder($"PCM ID\tReport Footage\tLatitude\tLongitude\tRead mA\tPrevious Decrease\tPrevious Percent\tNext Decrease\tNext Percent\tUsed Percent\n");
 
             foreach (var file in files)
             {
@@ -243,27 +258,33 @@ namespace AccurateFileSystem
                     var (prevGps, prevAmps) = onLine[Math.Max(i - 1, 0)];
                     var prevDist = prevGps.Distance(curGps);
                     var prevDiff = prevAmps - curAmps;
-                    var prevPercent = Math.Max(prevDiff / prevAmps * 100.0, 0);
+                    var prevPercent = prevDiff / prevAmps * 100.0;
                     if (prevDist > 100)
                         prevPercent = 0;
 
                     var (nextGps, nextAmps) = onLine[Math.Min(i + 1, onLine.Count - 1)];
                     var nextDist = nextGps.Distance(curGps);
                     var nextDiff = curAmps - nextAmps;
-                    var nextPercent = Math.Max(nextDiff / curAmps * 100.0, 0);
+                    var nextPercent = nextDiff / curAmps * 100.0;
                     if (nextDist > 100)
                         nextPercent = 0;
 
-                    var percent = Math.Max(nextPercent, prevPercent);
+                    var percent = Math.Max(Math.Max(nextPercent, prevPercent), 0);
 
                     var (Point, distance) = GetClosestPoint(curGps);
+
                     if (distance <= maxDist)
+                    {
+                        pcmCalc.AppendLine($"{i + 1}\t{Point.Footage}\t{curGps.Latitude:F9}\t{curGps.Longitude:F9}\t{curAmps}\t{prevDiff}\t{prevPercent:F3}%\t{nextDiff}\t{nextPercent:F3}%\t{percent:F3}%");
                         output.Add((Point.Footage, curGps, curAmps, percent));
+                    }
                 }
             }
-
+            PcmCalcOutput = pcmCalc.ToString();
             return output;
         }
+
+
 
         public void ShiftPoints(double footage)
         {
@@ -403,7 +424,7 @@ namespace AccurateFileSystem
             Points[lastAnchor].Footage = lastFootage;
         }
 
-        public void StraightenGps()
+        public void StraightenGps(double maxAnchorDistance = 50)
         {
             CombinedDataPoint lastData = Points[0];
             var lastPointIndex = 0;
@@ -412,12 +433,14 @@ namespace AccurateFileSystem
                 var curData = Points[index];
                 var curPoint = curData.Point;
 
-                if ((!string.IsNullOrWhiteSpace(curPoint.OriginalComment) || curPoint.Depth.HasValue) && curPoint.HasGPS)
+                var distance = curData.Footage - lastData.Footage;
+
+                if ((!string.IsNullOrWhiteSpace(curPoint.OriginalComment) || curPoint.Depth.HasValue || distance > maxAnchorDistance) && curPoint.HasGPS)
                 {
                     if (index - lastPointIndex != 1) // IF comments are next to eachother then just skip. Nothing to extrapolate.
                     {
                         var lastPoint = lastData.Point;
-                        var distance = curData.Footage - lastData.Footage;
+
                         var startGps = lastPoint.GPS;
                         var endGps = curPoint.GPS;
 
@@ -1457,6 +1480,8 @@ namespace AccurateFileSystem
 
         public static CombinedAllegroCisFile CombineOrderedFiles(string name, List<AllegroCISFile> files, double offset)
         {
+            if (files.Count == 0)
+                return null;
             var first = files.First();
             var type = first.Type;
 

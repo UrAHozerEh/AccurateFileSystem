@@ -440,7 +440,7 @@ namespace AccurateReportSystem
             Y1IsInverted = true;
 
             // Y2 Axis
-            Y2MaximumValue = 150;
+            Y2MaximumValue = 180;
             Y2MinimumValue = 0;
 
             Y2LabelTickLength = 2f;

@@ -254,16 +254,17 @@ namespace IitProcessor
                 hca.EndBuffer.GpsPoints[0] = hcaEndPoint.Point.GPS;
             }
 
-            combinedCisFile.SetFootageFromGps();
-            combinedCisFile.AddPcmDepthData(pcmFiles);
-
-            var ampReads = combinedCisFile.AlignAmpReads(pcmFiles);
-
-            var dcvgData = new List<(double, double, BasicGeoposition)>();
             if (combinedCisFile.HasStartSkip)
             {
                 combinedCisFile.ShiftPoints(-combinedCisFile.Points[1].Footage);
             }
+
+            combinedCisFile.SetFootageFromGps();
+            combinedCisFile.AddPcmDepthData(pcmFiles);
+
+            var dcvgData = new List<(double, double, BasicGeoposition)>();
+
+            var ampReads = combinedCisFile.AlignAmpReads(pcmFiles);
             var combinedFootages = new List<(double, BasicGeoposition)>();
 
             foreach (var (foot, _, point, _, _) in combinedCisFile.Points)
@@ -474,9 +475,13 @@ namespace IitProcessor
             {
                 ("200 (100 US & 100 DS) Foot Average", cisIndication.Averages),
                 ("Used Averge for Baseline Footage", cisIndication.UsedBaselineFootages),
-                ("Used Baseline", cisIndication.Baselines)
+                ("Used Baseline", cisIndication.Baselines),
+                ("PCM Data (mA)", ampData)
             });
             await CreateExcelFile($"{folderName} CIS Baseline Data", new List<(string Name, string Data)>() { ("Baseline Data", cisIndicationExcelData) }, outputFolder);
+
+            await CreateExcelFile($"{folderName} PCM Percent Change Data", new List<(string Name, string Data)>() { ("PCM Percent Change Data", file.PcmCalcOutput) }, outputFolder);
+
 
             cisClass.Series.Add(cisIndication);
 

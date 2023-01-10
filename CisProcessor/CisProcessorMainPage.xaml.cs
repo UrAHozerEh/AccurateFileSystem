@@ -29,6 +29,9 @@ using AccurateFileSystem.EsriShapefile;
 using AccurateFileSystem.Kmz;
 using Windows.Devices.Geolocation;
 using GraphSeries = AccurateReportSystem.GraphSeries;
+using DocumentFormat.OpenXml.Drawing.Charts;
+using Chart = AccurateReportSystem.Chart;
+using Orientation = Windows.UI.Xaml.Controls.Orientation;
 
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -494,8 +497,10 @@ namespace CisProcessor
 
                 var combinedOnOffFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + " On Off CIS", onOffFiles, 5);
                 var combinedStaticFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + " Static CIS", staticFiles, 5);
-                combinedStaticFiles?.AddPcmDepthData(docFiles, MaxDepth);
-                combinedOnOffFiles?.AddPcmDepthData(docFiles, MaxDepth);
+                combinedStaticFiles?.AddPcmDepthData(docFiles);
+                combinedStaticFiles?.AddMaxDepthComment(MaxDepth);
+                combinedOnOffFiles?.AddPcmDepthData(docFiles);
+                combinedOnOffFiles?.AddMaxDepthComment(MaxDepth);
                 var pcmReads = new List<(double Footage, double Read)>();
                 if(docFiles.Count != 0)
                 {
@@ -512,8 +517,8 @@ namespace CisProcessor
                 }
                 combinedOnOffFiles.FixContactSpikes();
                 combinedOnOffFiles.FixGps();
-
-                //combinedOnOffFiles.StraightenGps();
+                combinedOnOffFiles.StraightenGps();
+                //combinedOnOffFiles.SetFootageFromGps();
                 combinedOnOffFiles.RemoveComments("+");
                 if (staticFiles.Count > 0 && onOffFiles.Count > 0)
                 {
@@ -557,6 +562,7 @@ namespace CisProcessor
             }
             return output;
         }
+
         private async Task<(string Text, bool IsReversed)> MakeOnOffStaticGraphs(CombinedAllegroCisFile onOffFile, CombinedAllegroCisFile staticFile, StorageFolder outputFolder, List<(double Footage, double Read)> pcmReads, (string Text, bool IsReversed)? exact = null)
         {
             var testStationInitial = onOffFile.GetTestStationData();
@@ -841,7 +847,7 @@ namespace CisProcessor
             var endComment = lastPoint.Footage + " -> " + lastPoint.Point.StrippedComment;
             (string Text, bool IsReversed)? response;
             if (!exact.HasValue)
-                response = await InputTextDialogAsync($"SoCal Gas LS {allegroFile.Name.Replace("ls", "", StringComparison.OrdinalIgnoreCase).Replace("line", "", StringComparison.OrdinalIgnoreCase).Trim()} MP START to MP END", testStationInitial, startComment, endComment);
+                response = await InputTextDialogAsync($"PG&E LS {allegroFile.Name.Replace("ls", "", StringComparison.OrdinalIgnoreCase).Replace("line", "", StringComparison.OrdinalIgnoreCase).Trim()} MP START to MP END", testStationInitial, startComment, endComment);
             else
                 response = (exact.Value.Text, exact.Value.IsReversed);//await InputTextDialogAsync(exact, testStationInitial, startComment, endComment);
 

@@ -335,7 +335,7 @@ namespace AccurateFileSystem
                 //    if (!string.IsNullOrEmpty(split[split.Length - 2]))
                 //        realDoC = double.Parse(split[split.Length - 2]);
                 //}
-                // End Weird Stuff
+                // End Weird Stuffjknmbv
                 // Start Normal Stuff
                 var sublist = split.Skip(15);
                 comment = string.Join(",", sublist);
@@ -348,8 +348,12 @@ namespace AccurateFileSystem
             comment = Regex.Replace(comment, "\"\"", "\"");
 
             var footage = double.Parse(split[0]);
-            var on = double.Parse(split[2]);
-            var off = double.Parse(split[3]);
+            var on = 0.0;
+            if (!string.IsNullOrWhiteSpace(split[2]))
+                on = double.Parse(split[2]);
+            var off = 0.0;
+            if (!string.IsNullOrWhiteSpace(split[3]))
+                off = double.Parse(split[3]);
 
             var times = new List<DateTime>();
             if (IsValidTime(split, 4))
