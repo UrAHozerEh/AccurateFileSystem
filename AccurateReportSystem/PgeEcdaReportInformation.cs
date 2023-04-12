@@ -41,6 +41,8 @@ namespace AccurateReportSystem
             public double? Depth { get; set; }
             public double? AmpValue { get; set; } = null;
             public double? AmpPercent { get; set; } = null;
+            public bool? AmpIsReverse { get; set; } = null;
+            public string AmpReadDate { get; set; } = null;
             public BasicGeoposition? AmpGps { get; set; } = null;
             public BasicGeoposition CisGps { get; set; }
             public BasicGeoposition? IndicationGps { get; set; } = null;
@@ -245,7 +247,7 @@ namespace AccurateReportSystem
             }
         }
 
-        public PgeEcdaReportInformation(CombinedAllegroCisFile cisFile, List<AllegroCISFile> dcvgFiles, List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> ampReads, Hca hca, double maxSpacing, bool useMir = false, GpsInfo? gpsInfo = null)
+        public PgeEcdaReportInformation(CombinedAllegroCisFile cisFile, List<AllegroCISFile> dcvgFiles, List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)> ampReads, Hca hca, double maxSpacing, bool useMir = false, GpsInfo? gpsInfo = null)
         {
             GpsInfo = gpsInfo;
             MaxSpacing = maxSpacing;
@@ -297,30 +299,27 @@ namespace AccurateReportSystem
             }
         }
 
-        private void AlignAmpReads(List<(double Footage, BasicGeoposition gps, double Value, double Percent)> pcmReads)
+        private void AlignAmpReads(List<(double Footage, BasicGeoposition gps, double Value, double Percent, bool IsRevese, string ReadDate)> pcmReads)
         {
-            foreach (var (footage, gps, value, percent) in pcmReads)
+            foreach (var (footage, gps, value, percent, isReverse, readDate) in pcmReads)
             {
-                var closestDistance = double.MaxValue;
                 PgeEcdaDataPoint closestPoint = null;
                 foreach (var surveyPoint in EcdaData)
                 {
                     if (surveyPoint.IsCisSkipped)
                         continue;
-                    var curDistance = surveyPoint.CisGps.Distance(gps);
-                    if (curDistance < closestDistance)
-                    {
-                        closestDistance = curDistance;
+                    if(surveyPoint.Footage == footage)
                         closestPoint = surveyPoint;
-                    }
                 }
                 if (closestPoint == null)
-                    throw new Exception();
+                    continue;
                 if (Math.Abs(closestPoint.Footage - footage) > 20)
                     continue;
                 if (closestPoint.AmpPercent.HasValue)
                     continue;
                 closestPoint.AmpPercent = percent;
+                closestPoint.AmpIsReverse = isReverse;
+                closestPoint.AmpReadDate = readDate;
                 closestPoint.AmpValue = value;
                 var middleGps = closestPoint.CisGps.MiddleTowards(gps);
                 closestPoint.AmpGps = middleGps;
@@ -358,7 +357,7 @@ namespace AccurateReportSystem
             }
         }
 
-        public PgeEcdaReportInformation(CombinedAllegroCisFile cisFile, List<(BasicGeoposition, double)> acvgIndications, List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> ampReads, Hca hca, double maxSpacing, bool useMir = false)
+        public PgeEcdaReportInformation(CombinedAllegroCisFile cisFile, List<(BasicGeoposition, double)> acvgIndications, List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)> ampReads, Hca hca, double maxSpacing, bool useMir = false)
         {
             MaxSpacing = maxSpacing;
             IsDcvg = false;
@@ -578,19 +577,30 @@ namespace AccurateReportSystem
             var output = new List<(double Footage, double Value)>();
             foreach (var point in EcdaData)
             {
-                if (point.AmpValue.HasValue)
+                if (point.AmpValue.HasValue && !double.IsNaN(point.AmpValue.Value))
                     output.Add((point.Footage, point.AmpValue.Value));
             }
             return output;
         }
 
-        public List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> GetFullAmpData()
+        public List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)> GetFullAmpData()
         {
-            var output = new List<(double Footage, BasicGeoposition Gps, double Value, double Percent)>();
+            var output = new List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)>();
             foreach (var point in EcdaData)
             {
-                if (point.AmpValue.HasValue)
-                    output.Add((point.Footage, point.AmpGps.Value, point.AmpValue.Value, point.AmpPercent.Value));
+                if (point.AmpValue.HasValue || point.AmpPercent.HasValue)
+                    output.Add((point.Footage, point.AmpGps.Value, point.AmpValue.Value, point.AmpPercent.Value, point.AmpIsReverse.Value, point.AmpReadDate));
+            }
+            return output;
+        }
+
+        public List<(double Footage, bool IsReverse, string ReadDate)> GetAmpDirectionData()
+        {
+            var output = new List<(double Footage, bool IsReverse, string ReadDate)>();
+            foreach (var point in EcdaData)
+            {
+                if (point.AmpValue.HasValue && !double.IsNaN(point.AmpValue.Value))
+                    output.Add((point.Footage, point.AmpIsReverse.Value, point.AmpReadDate));
             }
             return output;
         }

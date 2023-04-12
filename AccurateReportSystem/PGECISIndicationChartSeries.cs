@@ -413,7 +413,7 @@ namespace AccurateReportSystem
             Averages = new List<(double Footage, double Value)>(extrapolatedData.Count);
             Baselines = Enumerable.Repeat((double.NaN, double.NaN), extrapolatedData.Count).ToList();
             UsedBaselineFootages = Enumerable.Repeat((double.NaN, double.NaN), extrapolatedData.Count).ToList();
-            var useBaselines = false;
+            var useBaselines = true;
             if (foot <= 200)
             {
                 var average = extrapolatedData.Average(value => value.Off);

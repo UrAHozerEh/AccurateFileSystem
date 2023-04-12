@@ -507,7 +507,7 @@ namespace CisProcessor
                     foreach(var docFile in docFiles)
                     {
 
-                        foreach(var (gps, read) in docFile.AmpData)
+                        foreach(var (gps, read, _) in docFile.AmpData)
                         {
                             if (read == 0) continue;
                             var (footage, dist) = combinedOnOffFiles.GetClosestFootage(gps);
@@ -520,6 +520,10 @@ namespace CisProcessor
                 combinedOnOffFiles.StraightenGps();
                 //combinedOnOffFiles.SetFootageFromGps();
                 combinedOnOffFiles.RemoveComments("+");
+                if (combinedOnOffFiles.HasStartSkip)
+                {
+                    combinedOnOffFiles.ShiftPoints(-combinedOnOffFiles.Points[1].Footage);
+                }
                 if (staticFiles.Count > 0 && onOffFiles.Count > 0)
                 {
                     var onOffStart = combinedOnOffFiles.Points.First().Point.GPS;
@@ -924,7 +928,10 @@ namespace CisProcessor
                 graph1.YAxesInfo.MinorGridlines.Offset = 0.025;
             }
             graph1.YAxesInfo.Y2MaximumValue = MaxDepth;
-            graph1.YAxesInfo.Y1MinimumValue = -3;
+            var y1Min = -3;
+            var cisValueMin = Math.Min(on.Values.Select(v => v.value).Min(), off.Values.Select(v => v.value).Min());
+            var y1ActualMin = ((int)(cisValueMin / 0.5) - 1) * 0.5;
+            graph1.YAxesInfo.Y1MinimumValue = Math.Min(y1Min, y1ActualMin);
             graph1.YAxesInfo.MajorGridlines.Offset = 0.5;
             graph1.YAxesInfo.MinorGridlines.Offset = 0.1;
 

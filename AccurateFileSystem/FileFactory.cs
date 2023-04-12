@@ -53,7 +53,7 @@ namespace AccurateFileSystem
                                 return new TidalCsvData(File.DisplayName, lines);
                             if (lines[1].Contains("Observations:"))
                                 return new VivaxPcm(File.DisplayName, lines);
-                            if ((lines[0].IndexOf("ID") <= 1 || lines[0].IndexOf("Pipeline") <= 1) && lines[0] != "Footage")
+                            if ((lines[0].IndexOf("ID") != -1 && lines[0].IndexOf("Pipeline") != -1 && lines[0].IndexOf("Depth") != -1) && lines[0] != "Footage")
                                 return new OtherPcm(File.DisplayName, lines);
                             return new GeneralCsv(File.DisplayName, lines);
                         }
@@ -79,6 +79,8 @@ namespace AccurateFileSystem
                 case ".inf":
                 case ".jpg":
                     return null;
+                case ".skips":
+                    return await Skips.GetSkips(File);
                 default:
                     return null;
             }

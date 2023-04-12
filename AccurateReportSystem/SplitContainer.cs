@@ -101,6 +101,11 @@ namespace AccurateReportSystem
             ContainerMeasurements.Add(new SplitContainerMeasurement(container));
         }
 
+        public void AddContainerPercent(Container container, double percent)
+        {
+            ContainerMeasurements.Add(new SplitContainerMeasurement(container) { RequestedPercent = percent });
+        }
+
         public void AddContainer(SplitContainerMeasurement measurement)
         {
             ContainerMeasurements.Add(measurement);

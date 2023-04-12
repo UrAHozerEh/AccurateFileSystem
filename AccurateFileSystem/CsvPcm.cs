@@ -9,17 +9,17 @@ namespace AccurateFileSystem
 {
     public abstract class CsvPcm : GeneralCsv
     {
-        public List<(BasicGeoposition Gps, double Depth)> DepthData { get; set; } = new List<(BasicGeoposition Gps, double Depth)>();
-        public List<(BasicGeoposition Gps, double Amps)> AmpData { get; set; } = new List<(BasicGeoposition Gps, double Amps)>();
+        public List<(BasicGeoposition Gps, double Depth, string Date)> DepthData { get; set; } = new List<(BasicGeoposition Gps, double Depth, string Date)>();
+        public List<(BasicGeoposition Gps, double Amps, string Date)> AmpData { get; set; } = new List<(BasicGeoposition Gps, double Amps, string Date)>();
 
         protected CsvPcm(string name, List<string> lines) : base(name, lines, FileType.PCM)
         {
 
         }
 
-        protected void GetDepthData(int latColumn, int lonColumn, int depthColumn)
+        protected void GetDepthData(int latColumn, int lonColumn, int depthColumn, int dateColumn)
         {
-            DepthData = new List<(BasicGeoposition Gps, double Depth)>();
+            DepthData = new List<(BasicGeoposition Gps, double Depth, string Date)>();
             if (Data.GetLength(0) == 0)
                 Data = Data;
             for (var r = 0; r < Data.GetLength(0); ++r)
@@ -33,13 +33,13 @@ namespace AccurateFileSystem
                     depth = double.Parse(Data[r, depthColumn]);
                 if (depth == 0)
                     continue;
-                DepthData.Add((gps, depth));
+                DepthData.Add((gps, depth, Data[r, dateColumn]));
             }
         }
 
-        protected void GetAmpData(int latColumn, int lonColumn, int ampColumn)
+        protected void GetAmpData(int latColumn, int lonColumn, int ampColumn, int dateColumn)
         {
-            AmpData = new List<(BasicGeoposition Gps, double Depth)>();
+            AmpData = new List<(BasicGeoposition Gps, double Depth, string Date)>();
             for (var r = 0; r < Data.GetLength(0); ++r)
             {
                 var lat = GetDecimalDegree(Data[r, latColumn]);
@@ -51,7 +51,7 @@ namespace AccurateFileSystem
                     amps = double.Parse(Data[r, ampColumn]) * 1000;
                 if (amps == 0)
                     continue;
-                AmpData.Add((gps, amps));
+                AmpData.Add((gps, amps, Data[r, dateColumn]));
             }
         }
 

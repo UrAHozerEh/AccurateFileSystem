@@ -53,6 +53,7 @@ namespace AccurateReportSystem
         }
         private Color? legendNameColor = null;
         public float Opcaity { get; set; } = 1f;
+        public List<double> SkipFootages { get; set; } = new List<double>();
 
         public GraphSeries(string name, List<(double footage, double value)> values)
         {
@@ -119,6 +120,17 @@ namespace AccurateReportSystem
                         var nextFootDiff = (next?.footage ?? 0) - footage;
                         var drawFromLast = last.HasValue && lastFootDiff <= MaxDrawDistance;
                         var drawToNext = next.HasValue && nextFootDiff <= MaxDrawDistance;
+
+                        if (SkipFootages != null)
+                        {
+                            foreach (var skipFoot in SkipFootages)
+                            {
+                                if (skipFoot > last?.footage && skipFoot < footage)
+                                    drawFromLast = false;
+                                if (skipFoot > footage && skipFoot < next?.footage)
+                                    drawToNext = false;
+                            }
+                        }
                         if (drawFromLast)
                         {
                             pathBuilder.AddLine(transform.ToDrawArea(footage, value));

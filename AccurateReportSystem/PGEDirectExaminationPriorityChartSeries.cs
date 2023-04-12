@@ -20,7 +20,7 @@ namespace AccurateReportSystem
         public Color ThreeColor { get; set; } = Colors.Blue;
         public CisSeries CisSeries { get; set; } = null;
         public DcvgSeries DcvgSeries { get; set; } = null;
-        private List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> AmpReads { get; set; } = null;
+        private List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool isReverse, string ReadDate)> AmpReads { get; set; } = null;
         public List<string[]> CISShapeFileOutput { get; set; }
         public List<string[]> IndicationShapeFileOutput { get; set; }
         public List<string[]> AmpsShapeFileOutput { get; set; }
@@ -44,7 +44,7 @@ namespace AccurateReportSystem
         private static int ACVG = 32;
         private static int ACVGCAT = 33;
 
-        public PGEDirectExaminationPriorityChartSeries(Chart chart, CisSeries cisSeries = null, DcvgSeries dcvgSeries = null, List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> ampReads = null) : base(chart.LegendInfo, chart.YAxesInfo)
+        public PGEDirectExaminationPriorityChartSeries(Chart chart, CisSeries cisSeries = null, DcvgSeries dcvgSeries = null, List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool isReverse, string ReadDate)> ampReads = null) : base(chart.LegendInfo, chart.YAxesInfo)
         {
             CisSeries = cisSeries;
             DcvgSeries = dcvgSeries;
@@ -108,7 +108,7 @@ namespace AccurateReportSystem
             var output = new Dictionary<int, (double, PGESeverity, string, BasicGeoposition)>();
             if (AmpReads == null)
                 return output;
-            foreach (var (footage, gps, value, percent) in AmpReads)
+            foreach (var (footage, gps, value, percent, _, _) in AmpReads)
             {
                 var (severity, reason) = GetAmpSeverity(percent);
                 output.Add((int)footage, (value, severity, reason, gps));
@@ -117,16 +117,16 @@ namespace AccurateReportSystem
             return output;
         }
 
-        private (PGESeverity Severity, string Reason) GetAmpSeverity(double percent)
+        private static (PGESeverity Severity, string Reason) GetAmpSeverity(double percent)
         {
             if (percent < 10)
                 return (PGESeverity.NRI, "");
             if (percent < 30)
-                return (PGESeverity.Minor, "Amp % change between 10% and 30%");
+                return (PGESeverity.Minor, "Amp % decrease between 10% and 30%");
             if (percent < 50)
-                return (PGESeverity.Moderate, "Amp % change between 30% and 50%");
+                return (PGESeverity.Moderate, "Amp % decrease between 30% and 50%");
 
-            return (PGESeverity.Severe, "Amp % change above 50%");
+            return (PGESeverity.Severe, "Amp % decrease above 50%");
         }
 
         public List<(double Start, double End, PGESeverity CisSeverity, PGESeverity DcvgSeverity, PGESeverity ThirdToolSeverity, HcaRegion Region, int Overall, string Comments)> GetUpdatedReportQ()
@@ -244,7 +244,7 @@ namespace AccurateReportSystem
                     firstShapeValues[ACVGCAT] = lastDcvgSeverity.GetDisplayName();
                     IndicationShapeFileOutput.Add(firstShapeValues);
                 }
-                if (pcmSeverities.ContainsKey(0))
+                if (pcmSeverities.ContainsKey(0) && !Double.IsNaN(lastAmpValue))
                 {
                     firstShapeValues = new string[34];
 
@@ -335,7 +335,7 @@ namespace AccurateReportSystem
                     IndicationShapeFileOutput.Add(shapeValues);
                 }
 
-                if (pcmSeverities.ContainsKey(curFoot) && !curRegion.ShouldSkip)
+                if (pcmSeverities.ContainsKey(curFoot) && !curRegion.ShouldSkip && !Double.IsNaN(curAmpValue))
                 {
                     var shapeValues = new string[34];
 
@@ -442,10 +442,10 @@ namespace AccurateReportSystem
                 }
             }
 
-            var pcmSeverities = new Dictionary<int, (PGESeverity, int)>();
+            var pcmSeverities = new Dictionary<int, PGESeverity>();
             if (AmpReads != null)
             {
-                foreach (var (footage, _, _, percent) in AmpReads)
+                foreach (var (footage, _, _, percent, _, _) in AmpReads)
                 {
                     var footInt = (int)footage;
                     if (footInt < page.StartFootage)
@@ -453,11 +453,7 @@ namespace AccurateReportSystem
                     if (footInt > page.EndFootage)
                         break;
                     var (severity, _) = GetAmpSeverity(percent);
-                    for (int i = -2; i <= 2; ++i)
-                    {
-                        if (!pcmSeverities.ContainsKey(footInt + i))
-                            pcmSeverities.Add(footInt + i, (severity, footInt));
-                    }
+                    pcmSeverities.Add(footInt, severity);
                 }
             }
 
@@ -470,11 +466,11 @@ namespace AccurateReportSystem
                 var cis = cisSeverities.TryGetValue(curFoot, out PGESeverity curSeverity) ? curSeverity : PGESeverity.NRI;
 
                 (PGESeverity, int) curDcvgSeverity;
-                (PGESeverity, int) curPcmSeverity;
+                PGESeverity curPcmSeverity;
                 var hasDcvg = dcvgSeverities.TryGetValue(curFoot, out curDcvgSeverity);
                 var hasToolThree = pcmSeverities.TryGetValue(curFoot, out curPcmSeverity);
                 var toolTwo = hasDcvg ? curDcvgSeverity.Item1 : PGESeverity.NRI;
-                var toolThree = hasToolThree ? curPcmSeverity.Item1 : PGESeverity.NRI;
+                var toolThree = hasToolThree ? curPcmSeverity : PGESeverity.NRI;
                 var prio = GetPriority(cis, toolTwo, toolThree);
                 if (hasDcvg)
                 {
@@ -484,16 +480,6 @@ namespace AccurateReportSystem
                     if (prio != actualDcvgPrio)
                     {
                         prio = actualDcvgPrio;
-                    }
-                }
-                if (hasToolThree)
-                {
-                    var actualPcm = pcmSeverities[curPcmSeverity.Item2].Item1;
-                    var actualCis = cisSeverities.GetValueOrDefault(curPcmSeverity.Item2, PGESeverity.NRI);
-                    var actualPcmPrio = GetPriority(actualCis, toolTwo, actualPcm);
-                    if (prio != actualPcmPrio)
-                    {
-                        prio = actualPcmPrio;
                     }
                 }
 

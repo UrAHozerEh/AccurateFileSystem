@@ -28,7 +28,7 @@ namespace AccurateFileSystem
 
         public int GetColumn(string headerName)
         {
-            for(var i = 0; i < Headers.Count; ++i)
+            for (var i = 0; i < Headers.Count; ++i)
             {
                 if (Headers[i] == headerName)
                     return i;
@@ -53,7 +53,17 @@ namespace AccurateFileSystem
                 var lineData = ParseLine(lines, nextIndex, out nextIndex);
                 if (lineData.Count > Headers.Count)
                     continue;
-                dataRows.Add(lineData);
+                var isBlank = true;
+                foreach (var data in lineData)
+                {
+                    if (!string.IsNullOrWhiteSpace(data))
+                    {
+                        isBlank = false;
+                        break;
+                    }
+                }
+                if (!isBlank)
+                    dataRows.Add(lineData);
 
             }
             Data = new string[dataRows.Count, Headers.Count];
@@ -139,7 +149,7 @@ namespace AccurateFileSystem
                     if (!InString)
                         InGps = true;
                     goto default;
-            default:
+                default:
                     CurItem += curChar;
                     break;
             }

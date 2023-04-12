@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
+using Windows.Globalization.NumberFormatting;
 
 namespace AccurateFileSystem
 {
@@ -16,7 +17,9 @@ namespace AccurateFileSystem
         public List<CombinedDataPoint> Points = null;
         public bool HasStartSkip { get; private set; }
         public bool HasEndSkip { get; private set; }
-        public string PcmCalcOutput { get; private set; }
+        public List<(string, string)> PcmCalcOutput { get; private set; }
+        public List<(double StartFootage, double EndFootage, double Percent)> PcmPercentRegions { get; private set; }
+        public List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)> PcmPercentValues { get; private set; }
 
         private CombinedAllegroCisFile(string name, FileType type, FileInfoLinkedList fileInfos)
         {
@@ -133,7 +136,7 @@ namespace AccurateFileSystem
         {
             if (pcm != null)
             {
-                foreach (var (gps, depth) in pcm.DepthData)
+                foreach (var (gps, depth, _) in pcm.DepthData)
                 {
                     var (Point, dist) = GetClosestPoint(gps);
                     if (dist <= maxDist)
@@ -145,7 +148,7 @@ namespace AccurateFileSystem
         public void AddPcmDepthData(List<CsvPcm> pcms, double maxGraphDepth = double.MaxValue, bool setToMax = true)
         {
             foreach (var pcm in pcms)
-                foreach (var (gps, depth) in pcm.DepthData)
+                foreach (var (gps, depth, _) in pcm.DepthData)
                 {
                     var (Point, distance) = GetClosestPoint(gps);
                     if (distance < 20)
@@ -232,56 +235,164 @@ namespace AccurateFileSystem
             return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
         }
 
-        public List<(double Footage, BasicGeoposition Gps, double Value, double Percent)> AlignAmpReads(List<CsvPcm> files, double maxDist = 20)
+        public List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)> AlignAmpReads(List<CsvPcm> files, double maxDist = 20)
         {
-            var output = new List<(double Footage, BasicGeoposition Gps, double Value, double Percent)>();
-            var pcmCalc = new StringBuilder($"PCM ID\tReport Footage\tLatitude\tLongitude\tRead mA\tPrevious Decrease\tPrevious Percent\tNext Decrease\tNext Percent\tUsed Percent\n");
+            var output = new List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)>();
+            PcmCalcOutput = new List<(string, string)>();
+            PcmPercentRegions = new List<(double StartFootage, double EndFootage, double Percent)>();
+            var totalOnLine = new List<(CombinedDataPoint Point, BasicGeoposition Gps, double Value, bool IsReverse, string ReadDate)>();
 
+            var fileCount = 0;
             foreach (var file in files)
             {
-                var data = file.AmpData;
-                if (data == null)
+                var pcmData = file.AmpData;
+                var docData = file.DepthData;
+                if (pcmData == null || pcmData.Count == 0)
                     continue;
+                var misAlignedDoC = false;
+                if (docData.Count != pcmData.Count)
+                    misAlignedDoC = true;
 
-                var onLine = new List<(BasicGeoposition Gps, double Value)>();
-                foreach (var (curGps, curAmps) in data)
+
+                var pcmCalc = new StringBuilder($"PCM ID\tReport Footage\tLatitude\tLongitude\tDepth of Cover (inch)\tRead (mA)\tNext ID\tNext Report Footage\tNext Latitude\tNext Longitude\tNext Distance\tNext Depth of Cover (inch)\tNext Read (mA)\tDecrease mA\tPercent Decrease\tECDA Severity\tReason\n");
+
+                var onLine = new List<(CombinedDataPoint Point, BasicGeoposition Gps, double Value, string ReadDate)>();
+                foreach (var (curGps, curAmps, readDate) in pcmData)
                 {
-                    var (_, distance) = GetClosestPoint(curGps);
+                    var (point, distance) = GetClosestPoint(curGps);
                     if (distance <= maxDist)
-                        onLine.Add((curGps, curAmps));
+                    {
+                        onLine.Add((point, curGps, curAmps, readDate));
+                    }
+                }
+
+                var isReverse = onLine.First().Point.Footage > onLine.Last().Point.Footage;
+
+                foreach (var (point, curGps, curAmps, readDate) in onLine)
+                {
+                    totalOnLine.Add((point, curGps, curAmps, isReverse, readDate));
                 }
 
                 for (int i = 0; i < onLine.Count; ++i)
                 {
-                    var (curGps, curAmps) = onLine[i];
+                    var (curPoint, curGps, curAmps, curDate) = onLine[i];
+                    var curFoot = curPoint.Footage;
+                    var curDoc = misAlignedDoC ? "N/A" : $"{docData[i].Depth}";
+                    var closestIndex = -1;
+                    var closestDistTo100 = double.MaxValue;
+                    double closestDist = 0;
+                    CombinedDataPoint closestPoint = null;
+                    double closestAmps = 0;
+                    BasicGeoposition closestGps = new BasicGeoposition();
+                    string closestDoc = "";
 
-                    var (prevGps, prevAmps) = onLine[Math.Max(i - 1, 0)];
-                    var prevDist = prevGps.Distance(curGps);
-                    var prevDiff = prevAmps - curAmps;
-                    var prevPercent = prevDiff / prevAmps * 100.0;
-                    if (prevDist > 100)
-                        prevPercent = 0;
-
-                    var (nextGps, nextAmps) = onLine[Math.Min(i + 1, onLine.Count - 1)];
-                    var nextDist = nextGps.Distance(curGps);
-                    var nextDiff = curAmps - nextAmps;
-                    var nextPercent = nextDiff / curAmps * 100.0;
-                    if (nextDist > 100)
-                        nextPercent = 0;
-
-                    var percent = Math.Max(Math.Max(nextPercent, prevPercent), 0);
-
-                    var (Point, distance) = GetClosestPoint(curGps);
-
-                    if (distance <= maxDist)
+                    for (int j = i + 1; j < onLine.Count; ++j)
                     {
-                        pcmCalc.AppendLine($"{i + 1}\t{Point.Footage}\t{curGps.Latitude:F9}\t{curGps.Longitude:F9}\t{curAmps}\t{prevDiff}\t{prevPercent:F3}%\t{nextDiff}\t{nextPercent:F3}%\t{percent:F3}%");
-                        output.Add((Point.Footage, curGps, curAmps, percent));
+                        var (nextPoint, nextGps, nextAmps, nextDate) = onLine[j];
+                        var nextFoot = nextPoint.Footage;
+                        var nextDist = Math.Abs(nextFoot - curFoot);
+                        var nextDistTo100 = Math.Abs(nextDist - 100);
+                        if (nextDistTo100 < closestDistTo100)
+                        {
+                            closestDistTo100 = nextDistTo100;
+                            closestDist = nextDist;
+                            closestIndex = j;
+                            closestPoint = nextPoint;
+                            closestGps = nextGps;
+                            closestAmps = nextAmps;
+                            closestDoc = misAlignedDoC ? "N/A" : $"{docData[j].Depth}";
+                        }
+                    }
+
+                    var ampDiff = curAmps - closestAmps;
+                    var percent = ampDiff / curAmps * 100;
+                    if (ampDiff == 0)
+                        percent = 0;
+
+                    if (closestIndex == -1)
+                    {
+                        percent = 0;
+                        pcmCalc.AppendLine($"{i + 1}\t{curPoint.Footage}\t{curGps.Latitude:F9}\t{curGps.Longitude:F9}\t{curDoc}\t{curAmps}\tN/A\tN/A\tN/A\tN/A\tN/A\tN/A\tN/A\tN/A\tN/A\tNRI\t");
+                    }
+                    else
+                    {
+                        var (severity, reason) = GetAmpSeverity(percent);
+                        if (closestDistTo100 > 25)
+                        {
+                            percent = 0;
+                            pcmCalc.AppendLine($"{i + 1}\t{curPoint.Footage}\t{curGps.Latitude:F9}\t{curGps.Longitude:F9}\t{curDoc}\t{curAmps}\t{closestIndex + 1}\t{closestPoint.Footage}\t{closestGps.Latitude:F9}\t{closestGps.Longitude:F9}\t{closestDist}\t{closestDoc}\t{closestAmps}\tN/A\tN/A\tNRI\t");
+                            //i = closestIndex + 1;
+                        }
+                        else
+                            pcmCalc.AppendLine($"{i + 1}\t{curPoint.Footage}\t{curGps.Latitude:F9}\t{curGps.Longitude:F9}\t{curDoc}\t{curAmps}\t{closestIndex + 1}\t{closestPoint.Footage}\t{closestGps.Latitude:F9}\t{closestGps.Longitude:F9}\t{closestDist}\t{closestDoc}\t{closestAmps}\t{ampDiff}\t{percent:F3}%\t{severity}\t{reason}");
+                        var start = Math.Min(curPoint.Footage, closestPoint.Footage);
+                        var end = Math.Max(curPoint.Footage, closestPoint.Footage);
+                        PcmPercentRegions.Add((start, end, percent));
+                        //i = closestIndex - 1;
+                    }
+
+                    output.Add((curPoint.Footage, curGps, curAmps, percent, isReverse, curDate));
+
+                }
+                PcmCalcOutput.Add(($"PCM Import File {++fileCount}", pcmCalc.ToString()));
+            }
+
+            PcmPercentRegions.OrderBy(r => r.StartFootage);
+            PcmPercentValues = new List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)>();
+
+            var curPcmPercentValues = new Dictionary<int, double>();
+            foreach (var (start, stop, percent) in PcmPercentRegions)
+            {
+                for (int i = (int)start; i <= (int)stop; ++i)
+                {
+                    if (curPcmPercentValues.ContainsKey(i))
+                    {
+                        if (percent > curPcmPercentValues[i])
+                            curPcmPercentValues[i] = percent;
+                    }
+                    else
+                    {
+                        curPcmPercentValues.Add(i, percent);
                     }
                 }
             }
-            PcmCalcOutput = pcmCalc.ToString();
-            return output;
+
+            foreach (var (footage, percent) in curPcmPercentValues)
+            {
+                var found = false;
+                foreach (var (curFoot, gps, amp, _, isReverse, readDate) in output)
+                {
+                    if (curFoot == footage)
+                    {
+                        PcmPercentValues.Add((footage, gps, amp, percent, isReverse, readDate));
+                        found = true;
+                    }
+                }
+                if (!found)
+                    PcmPercentValues.Add((footage, new BasicGeoposition(), double.NaN, percent, false, ""));
+            }
+
+            if (PcmPercentValues.Count == 0 && totalOnLine.Count > 0)
+            {
+                foreach (var (point, gps, value, isReverse, readDate) in totalOnLine)
+                {
+                    PcmPercentValues.Add((point.Footage, gps, value, 0, isReverse, readDate));
+                }
+            }
+
+            return PcmPercentValues;
+        }
+
+        private static (string Severity, string Reason) GetAmpSeverity(double percent)
+        {
+            if (percent < 10)
+                return ("NRI", "");
+            if (percent < 30)
+                return ("Minor", "Amp % decrease between 10% and 30%");
+            if (percent < 50)
+                return ("Moderate", "Amp % decrease between 30% and 50%");
+
+            return ("Severe", "Amp % decrease above 50%");
         }
 
 
@@ -828,17 +939,19 @@ namespace AccurateFileSystem
                             {
                                 curLine[20] = single.Off.ToString(readFormat);
                             }
-                            else if (lowerTag.Contains("coup"))
+                            else if (lowerTag.Contains("off"))
                             {
-                                if (lowerTag.Contains("off"))
-                                {
-                                    curLine[19] = single.Off.ToString(readFormat);
-                                }
-                                else
-                                {
-                                    curLine[17] = single.On.ToString(readFormat);
-                                    curLine[18] = single.Off.ToString(readFormat);
-                                }
+                                curLine[19] = single.Off.ToString(readFormat);
+                            }
+                            else if (lowerTag.Contains("on"))
+                            {
+                                curLine[17] = single.On.ToString(readFormat);
+                                curLine[18] = single.Off.ToString(readFormat);
+                            }
+                            else if (lowerTag.Contains("cas"))
+                            {
+                                curLine[21] = single.On.ToString(readFormat);
+                                curLine[22] = single.Off.ToString(readFormat);
                             }
                             else
                             {
@@ -846,6 +959,10 @@ namespace AccurateFileSystem
                                 {
                                     curLine[5] = single.On.ToString(readFormat);
                                     curLine[6] = single.Off.ToString(readFormat);
+                                }
+                                else
+                                {
+
                                 }
                             }
                         }

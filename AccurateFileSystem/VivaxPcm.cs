@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -19,6 +20,7 @@ namespace AccurateFileSystem
             var latColumn = -1;
             var lonColumn = -1;
             var depthColumn = -1;
+            var dateColumn = -1;
             for (var i = 0; i < Headers.Count; ++i)
             {
                 var header = Headers[i];
@@ -33,9 +35,12 @@ namespace AccurateFileSystem
                     case "Depth(in)":
                         depthColumn = i;
                         break;
+                    case "GPS_Date":
+                        dateColumn = i;
+                        break;
                 }
             }
-            GetDepthData(latColumn, lonColumn, depthColumn);
+            GetDepthData(latColumn, lonColumn, depthColumn, dateColumn);
         }
     }
 }

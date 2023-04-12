@@ -161,6 +161,8 @@ namespace IitProcessor
             var dcvgFiles = new List<AllegroCISFile>();
             var pcmFiles = new List<CsvPcm>();
             var acvgReads = new List<(BasicGeoposition, double)>();
+            Skips cisSkips = null;
+            Skips pcmSkips = null;
 
             foreach (var file in storageFiles)
             {
@@ -181,6 +183,16 @@ namespace IitProcessor
                     if (allegroFile.Type == FileType.DCVG)
                         dcvgFiles.Add(allegroFile);
                     continue;
+                }
+                if(newFile is Skips)
+                {
+                    var skipFile = newFile as Skips;
+                    if (newFile.Name.ToLower().Contains("cis") && cisSkips == null)
+                        cisSkips = skipFile;
+                    else if (newFile.Name.ToLower().Contains("pcm") && pcmSkips == null)
+                        pcmSkips = skipFile;
+                    else
+                        throw new Exception("Unknown Skip File");
                 }
                 if (newFile == null && file.FileType.ToLower() == ".acvg")
                 {
@@ -221,7 +233,7 @@ namespace IitProcessor
             var (startHcaFootage, endHcaFootage) = AddHcaComments(combinedCisFile, hca);
 
             //combinedCisFile.StraightenGps();
-            
+
             if (curLineData != null)
             {
                 combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
@@ -253,13 +265,11 @@ namespace IitProcessor
                 hca.EndBuffer.StartGps = hcaEndPoint.Point.GPS;
                 hca.EndBuffer.GpsPoints[0] = hcaEndPoint.Point.GPS;
             }
-
+            combinedCisFile.SetFootageFromGps();
             if (combinedCisFile.HasStartSkip)
             {
                 combinedCisFile.ShiftPoints(-combinedCisFile.Points[1].Footage);
             }
-
-            combinedCisFile.SetFootageFromGps();
             combinedCisFile.AddPcmDepthData(pcmFiles);
 
             var dcvgData = new List<(double, double, BasicGeoposition)>();
@@ -307,7 +317,7 @@ namespace IitProcessor
 
             var reportQ = "";
             reportQ += reportInfo.GetReportQ();
-            await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, isDcvg, displayName, hca, outputFolder);
+            await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, isDcvg, displayName, hca, cisSkips, pcmSkips, outputFolder);
         }
 
         private List<(BasicGeoposition Gps, double Value, double Percent)> GetAmpReads(List<CsvPcm> files)
@@ -320,13 +330,13 @@ namespace IitProcessor
                     return output;
                 for (var i = 0; i < data.Count; ++i)
                 {
-                    var (curGps, curAmps) = data[i];
+                    var (curGps, curAmps, _) = data[i];
 
-                    var (_, prevAmps) = data[Math.Max(i - 1, 0)];
+                    var (_, prevAmps, _) = data[Math.Max(i - 1, 0)];
                     var prevDiff = prevAmps - curAmps;
                     var prevPercent = Math.Max(prevDiff / curAmps * 100, 0);
 
-                    var (_, nextAmps) = data[Math.Min(i + 1, data.Count - 1)];
+                    var (_, nextAmps, _) = data[Math.Min(i + 1, data.Count - 1)];
                     var nextDiff = nextAmps - curAmps;
                     var nextPercent = Math.Max(nextDiff / curAmps * 100, 0);
 
@@ -350,7 +360,7 @@ namespace IitProcessor
             }
         }
 
-        private async Task MakeIITGraphsUpdated(CombinedAllegroCisFile file, PgeEcdaReportInformation ecdaReport, bool isDcvg, string folderName, Hca hca, StorageFolder outputFolder = null)
+        private async Task MakeIITGraphsUpdated(CombinedAllegroCisFile file, PgeEcdaReportInformation ecdaReport, bool isDcvg, string folderName, Hca hca, Skips cisSkips, Skips pcmSkips, StorageFolder outputFolder = null)
         {
             if (outputFolder == null)
                 outputFolder = ApplicationData.Current.LocalFolder;
@@ -358,6 +368,8 @@ namespace IitProcessor
 
             var maxDepth = 200;
             var curDepth = 50.0;
+            var maxDrawDistance = 20.0;
+            var shortGraphLength = 200.0;
             var directionData = new List<(double, bool, string)>();
             AddMaxDepthComment(file, maxDepth);
 
@@ -375,7 +387,7 @@ namespace IitProcessor
             }
             var report = new GraphicalReport();
             report.LegendInfo.NameFontSize = 16f;
-            if (file.Points.Last().Footage < 100)
+            if (file.Points.Last().Footage < shortGraphLength)
             {
                 report.PageSetup = new AccurateReportSystem.PageSetup(100, 10);
                 report.XAxisInfo.MajorGridline.Offset = 10;
@@ -387,7 +399,8 @@ namespace IitProcessor
                 PointShape = GraphSeries.Shape.Circle,
                 PointColor = Colors.Blue,
                 ShapeRadius = 2,
-                MaxDrawDistance = 19
+                MaxDrawDistance = maxDrawDistance,
+                SkipFootages = cisSkips?.Footages
             };
             var off = new GraphSeries("Off", offData)
             {
@@ -395,7 +408,8 @@ namespace IitProcessor
                 PointShape = GraphSeries.Shape.Circle,
                 PointColor = Colors.Green,
                 ShapeRadius = 2,
-                MaxDrawDistance = 19
+                MaxDrawDistance = maxDrawDistance,
+                SkipFootages = cisSkips?.Footages
             };
             var depth = new GraphSeries("Depth", depthData)
             {
@@ -419,12 +433,11 @@ namespace IitProcessor
             onOffGraph.YAxesInfo.Y2MaximumValue = maxDepth;
             onOffGraph.CommentSeries = commentSeries;
             onOffGraph.Series.Add(on);
-            if (hca.Name != "331")
-                onOffGraph.Series.Add(off);
+            onOffGraph.Series.Add(off);
             onOffGraph.Series.Add(redLine);
             onOffGraph.DrawTopBorder = false;
 
-            if (file != null && file.Points.Last().Footage < 100)
+            if (file != null && file.Points.Last().Footage < shortGraphLength)
             {
                 onOffGraph.CommentSeries.PercentOfGraph = 0.25f;
             }
@@ -441,15 +454,16 @@ namespace IitProcessor
             };
             onOffGraph.Series.Add(dcvgIndication);
 
-            var ampSeries = new PointWithLabelGraphSeries("PCM (mA)", -0.4, ampLabels)
-            {
-                ShapeRadius = 3,
-                PointColor = Colors.Navy,
-                BackdropOpacity = 1f,
-                PointShape = GraphSeries.Shape.Square
-            };
-            if (ampData.Count > 0)
-                onOffGraph.Series.Add(ampSeries);
+            // Old PCM Amp display
+            //var ampSeries = new PointWithLabelGraphSeries("PCM (mA)", -0.4, ampLabels)
+            //{
+            //    ShapeRadius = 3,
+            //    PointColor = Colors.Navy,
+            //    BackdropOpacity = 1f,
+            //    PointShape = GraphSeries.Shape.Square
+            //};
+            //if (ampData.Count > 0)
+            //    onOffGraph.Series.Add(ampSeries);
 
             report.XAxisInfo.IsEnabled = false;
             report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
@@ -467,7 +481,7 @@ namespace IitProcessor
 
             var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
 
-            var surveyDirectionChart = new Chart(report, "Survey Direction With Survey Date");
+            var surveyDirectionChart = new Chart(report, "CIS Survey Direction With Survey Date");
             surveyDirectionChart.LegendInfo.NameFontSize = 14f;
             var cisClass = new Chart(report, "CIS Severity");
             var cisIndication = new PGECISIndicationChartSeries(file.GetPoints(), cisClass, hca);
@@ -479,8 +493,8 @@ namespace IitProcessor
                 ("PCM Data (mA)", ampData)
             });
             await CreateExcelFile($"{folderName} CIS Baseline Data", new List<(string Name, string Data)>() { ("Baseline Data", cisIndicationExcelData) }, outputFolder);
-
-            await CreateExcelFile($"{folderName} PCM Percent Change Data", new List<(string Name, string Data)>() { ("PCM Percent Change Data", file.PcmCalcOutput) }, outputFolder);
+            if (ampData.Count > 0)
+                await CreateExcelFile($"{folderName} PCM Percent Change Data", file.PcmCalcOutput, outputFolder);
 
 
             cisClass.Series.Add(cisIndication);
@@ -499,6 +513,50 @@ namespace IitProcessor
 
             splitContainer.AddSelfSizedContainer(topGlobalXAxis);
             splitContainer.AddContainer(onOffGraph);
+            if (ampData.Count > 0)
+            {
+                var ampGraph = new Graph(report);
+
+                var minAmp = ampData.Min(v => v.Value);
+                var maxAmp = ampData.Max(v => v.Value);
+                if(maxAmp - minAmp <= 0.1)
+                {
+                    minAmp = maxAmp - (0.1 * maxAmp);
+                    maxAmp = maxAmp + (0.1 * maxAmp);
+                }
+                var diff = maxAmp - minAmp;
+                var yBuffer = diff * 0.1;
+                var minY = minAmp - yBuffer;
+                var maxY = maxAmp + yBuffer;
+                var ySize = maxY - minY;
+                ampGraph.YAxesInfo.Y2IsEnabled = false;
+                ampGraph.YAxesInfo.Y1Title = "mA";
+                ampGraph.YAxesInfo.Y1IsInverted = false;
+                ampGraph.YAxesInfo.Y1MinimumValue = minY;
+                ampGraph.YAxesInfo.Y1MaximumValue = maxY;
+                ampGraph.YAxesInfo.MajorGridlines.Offset = ySize / 3;
+                ampGraph.YAxesInfo.MinorGridlines.IsEnabled = false;
+                ampGraph.LegendInfo.Name = "PCM Data";
+                ampGraph.YAxesInfo.Y1LabelFormat = "F0";
+
+                var ampsLine = new GraphSeries("PCM Data (mA)", ampData)
+                {
+                    LineColor = Colors.Blue,
+                    PointShape = GraphSeries.Shape.Circle,
+                    PointColor = Colors.Blue,
+                    ShapeRadius = 2,
+                    MaxDrawDistance = 99999,
+                    IsDrawnInLegend = false,
+                    SkipFootages = pcmSkips?.Footages
+                };
+                ampGraph.Series.Add(ampsLine);
+                splitContainer.AddContainerPercent(ampGraph, 0.15);
+                var pcmDirectionChart = new Chart(report, "PCM Survey Direction With Survey Date");
+                pcmDirectionChart.LegendInfo.NameFontSize = 14f;
+                var pcmDirectionSeries = new SurveyDirectionWithDateSeries(ecdaReport.GetAmpDirectionData());
+                pcmDirectionChart.Series.Add(pcmDirectionSeries);
+                splitContainer.AddSelfSizedContainer(pcmDirectionChart);
+            }
             splitContainer.AddSelfSizedContainer(ecdaClassChart);
             splitContainer.AddSelfSizedContainer(surveyDirectionChart);
             splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
@@ -585,11 +643,12 @@ namespace IitProcessor
                     var thirdToolValue = thirdToolSeverity.GetDisplayName();
                     if (!region.Name.Contains("P"))
                         thirdToolValue = "NT";
-                    output.AppendLine($"{cisSeverity.GetDisplayName()}\t{dcvgSeverity.GetDisplayName()}\t{thirdToolValue}\t{PriorityDisplayName(priority)}\t{reason.Replace("..",".")}");
+                    output.AppendLine($"{cisSeverity.GetDisplayName()}\t{dcvgSeverity.GetDisplayName()}\t{thirdToolValue}\t{PriorityDisplayName(priority)}\t{reason.Replace("..", ".")}");
                 }
             }
             ReportQ += output.ToString();
             var shapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
+            var googleShapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles Google Earth", CreationCollisionOption.OpenIfExists);
             var cisShapeFileStringBuilder = new StringBuilder();
             foreach (var line in ecdaClassSeries.CISShapeFileOutput)
             {
@@ -600,7 +659,7 @@ namespace IitProcessor
             await cisShapeFileTest.WriteToFolder(shapefileFolder);
 
             var cisKmlFileTest = new KmlFile($"{folderName} CIS Shapefile", file.GetCisKmlData());
-            await cisKmlFileTest.WriteToFile(outputFolder);
+            await cisKmlFileTest.WriteToFile(googleShapefileFolder);
 
             var depthShapeFileStringBuilder = new StringBuilder();
             var depthShapeData = new List<string[]>();
@@ -620,7 +679,7 @@ namespace IitProcessor
                 await depthShapeFileTest.WriteToFolder(shapefileFolder);
 
                 var depthKmlFileTest = new KmlFile($"{folderName} Depth Shapefile", file.GetDepthKmlData());
-                await depthKmlFileTest.WriteToFile(outputFolder);
+                await depthKmlFileTest.WriteToFile(googleShapefileFolder);
             }
 
             var dcvgShapeFileStringBuilder = new StringBuilder();
@@ -936,7 +995,7 @@ namespace IitProcessor
 
         private List<(BasicGeoposition Gps, double Read)> ParseAcvgReads(List<string> lines)
         {
-            var correction = 15.563025007672872650175335959592166719366374913056088;
+            //var correction = 15.563025007672872650175335959592166719366374913056088;
             var output = new List<(BasicGeoposition Gps, double Read)>();
             foreach (var line in lines)
             {
@@ -945,7 +1004,7 @@ namespace IitProcessor
                 var splitLine = line.Split(',');
                 var lat = double.Parse(splitLine[0]);
                 var lon = double.Parse(splitLine[1]);
-                var read = double.Parse(splitLine[2]) - correction;
+                var read = double.Parse(splitLine[2]); //- correction;
                 var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
                 output.Add((gps, read));
             }
