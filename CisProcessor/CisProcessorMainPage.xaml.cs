@@ -43,6 +43,7 @@ namespace CisProcessor
     public sealed partial class MainPage : Page
     {
         private const double MaxDepth = 180;
+        private const string _client = "Sempra";
 
         public MainPage()
         {
@@ -282,7 +283,7 @@ namespace CisProcessor
 
             var topGlobalXAxis = new GlobalXAxis(report, true)
             {
-                Title = $"Sempra {combinedName}"
+                Title = $"{_client} {combinedName}"
             };
             
             var combined = CombinedAllegroCisFile.CombineFiles(combinedName, await GetCis(cisFolder));
@@ -494,8 +495,8 @@ namespace CisProcessor
                         staticFiles.Add(file);
                     }
                 }
-
-                var combinedOnOffFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + " On Off CIS", onOffFiles, 5);
+                var type = $" On Off {(staticFiles.Count == 0 ? "" : "And Static ")}CIS";
+                var combinedOnOffFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + type, onOffFiles, 5);
                 var combinedStaticFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + " Static CIS", staticFiles, 5);
                 combinedStaticFiles?.AddPcmDepthData(docFiles);
                 combinedStaticFiles?.AddMaxDepthComment(MaxDepth);
@@ -576,7 +577,7 @@ namespace CisProcessor
             var endComment = lastPoint.Footage + " -> " + lastPoint.Point.StrippedComment;
             (string Text, bool IsReversed)? response;
             if (!exact.HasValue)
-                response = await InputTextDialogAsync($"PG&E LS {onOffFile.Name.Replace("ls", "", StringComparison.OrdinalIgnoreCase).Replace("line", "", StringComparison.OrdinalIgnoreCase).Trim()} MP START to MP END", testStationInitial, startComment, endComment);
+                response = await InputTextDialogAsync($"{_client} {onOffFile.Name.Trim()} MP START to MP END", testStationInitial, startComment, endComment);
             else
                 response = (exact.Value.Text, exact.Value.IsReversed);//await InputTextDialogAsync(exact, testStationInitial, startComment, endComment);
 
@@ -851,7 +852,7 @@ namespace CisProcessor
             var endComment = lastPoint.Footage + " -> " + lastPoint.Point.StrippedComment;
             (string Text, bool IsReversed)? response;
             if (!exact.HasValue)
-                response = await InputTextDialogAsync($"PG&E LS {allegroFile.Name.Replace("ls", "", StringComparison.OrdinalIgnoreCase).Replace("line", "", StringComparison.OrdinalIgnoreCase).Trim()} MP START to MP END", testStationInitial, startComment, endComment);
+                response = await InputTextDialogAsync($"{_client} LS {allegroFile.Name.Replace("ls", "", StringComparison.OrdinalIgnoreCase).Replace("line", "", StringComparison.OrdinalIgnoreCase).Trim()} MP START to MP END", testStationInitial, startComment, endComment);
             else
                 response = (exact.Value.Text, exact.Value.IsReversed);//await InputTextDialogAsync(exact, testStationInitial, startComment, endComment);
 
