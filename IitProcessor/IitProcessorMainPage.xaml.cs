@@ -485,7 +485,7 @@ namespace IitProcessor
             surveyDirectionChart.LegendInfo.NameFontSize = 14f;
             var cisClass = new Chart(report, "CIS Severity");
             var cisIndication = new PGECISIndicationChartSeries(file.GetPoints(), cisClass, hca);
-            var cisIndicationExcelData = file.GetTabularData(4, new List<(string Name, List<(double Footage, double Value)>)>
+            var cisIndicationExcelData = file.GetTabularData(new List<(string Name, List<(double Footage, double Value)>)>
             {
                 ("200 (100 US & 100 DS) Foot Average", cisIndication.Averages),
                 ("Used Averge for Baseline Footage", cisIndication.UsedBaselineFootages),

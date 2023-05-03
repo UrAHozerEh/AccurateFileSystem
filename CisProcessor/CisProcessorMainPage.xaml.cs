@@ -112,7 +112,7 @@ namespace CisProcessor
             var testStationList = new ListBox();
             if (testStationList.Items != null)
             {
-                testStationList.Items.Add(new ListBoxItem {Content = firstComment});
+                testStationList.Items.Add(new ListBoxItem { Content = firstComment });
 
                 for (var i = 1; i < lineSplit.Length; ++i)
                 {
@@ -144,7 +144,7 @@ namespace CisProcessor
                     }
                 }
 
-                testStationList.Items.Add(new ListBoxItem() {Content = lastComment});
+                testStationList.Items.Add(new ListBoxItem() { Content = lastComment });
             }
 
             var isReverse = new CheckBox
@@ -285,7 +285,7 @@ namespace CisProcessor
             {
                 Title = $"{_client} {combinedName}"
             };
-            
+
             var combined = CombinedAllegroCisFile.CombineFiles(combinedName, await GetCis(cisFolder));
             if (combined.HasStartSkip)
             {
@@ -302,7 +302,7 @@ namespace CisProcessor
             var addedTabularData = new List<(string Name, List<(double Footage, double Value)>)>();
             var pcmFootageData = pcmValues.Select((value) => (value.Footage, value.Value)).ToList();
             addedTabularData.Add(("PCM (Amps)", pcmFootageData));
-            await CreateExcelFile(combinedName + " Tabular Data Extended", new List<(string Name, string Data)>() { ("Tabular Data", combined.GetTabularData(4, addedTabularData)) }, curOutputFolder);
+            await CreateExcelFile(combinedName + " Tabular Data Extended", new List<(string Name, string Data)>() { ("Tabular Data", combined.GetTabularData(addedTabularData)) }, curOutputFolder);
 
             var on = new GraphSeries("On", combined.GetDoubleData("On"))
             {
@@ -448,7 +448,7 @@ namespace CisProcessor
                 var cisFiles = new List<AllegroCISFile>();
                 var docFiles = new List<CsvPcm>();
                 var fileNames = new HashSet<string>();
-                
+
                 foreach (var storageFile in files)
                 {
                     var fileFactory = new FileFactory(storageFile);
@@ -478,7 +478,7 @@ namespace CisProcessor
                 }
 
                 if (cisFiles.Count == 0) continue;
-                
+
                 cisFiles.Sort((file1, file2) => string.Compare(file1.Name, file2.Name, StringComparison.Ordinal));
 
                 var onOffFiles = new List<AllegroCISFile>();
@@ -503,12 +503,12 @@ namespace CisProcessor
                 combinedOnOffFiles?.AddPcmDepthData(docFiles);
                 combinedOnOffFiles?.AddMaxDepthComment(MaxDepth);
                 var pcmReads = new List<(double Footage, double Read)>();
-                if(docFiles.Count != 0)
+                if (docFiles.Count != 0)
                 {
-                    foreach(var docFile in docFiles)
+                    foreach (var docFile in docFiles)
                     {
 
-                        foreach(var (gps, read, _) in docFile.AmpData)
+                        foreach (var (gps, read, _) in docFile.AmpData)
                         {
                             if (read == 0) continue;
                             var (footage, dist) = combinedOnOffFiles.GetClosestFootage(gps);
@@ -683,7 +683,7 @@ namespace CisProcessor
             else
                 on.Name = "Static";
             //graph1.XAxisInfo.IsEnabled = false;
-            if(pcmReads.Count != 0)
+            if (pcmReads.Count != 0)
             {
                 var pcmSeriesLabels = pcmReads.Select(values => (values.Footage, -0.2, values.Read.ToString("F0"))).ToList();
                 var pcmSeries = new PointWithLabelGraphSeries("PCM (Milliamps)", pcmSeriesLabels)
@@ -746,7 +746,7 @@ namespace CisProcessor
             };
             chart2.Series.Add(exceptions);
 
-            
+
             var chart3 = new Chart(report, "Polarization Data")
             {
                 LegendInfo =
@@ -762,7 +762,7 @@ namespace CisProcessor
             chart3.Series.Add(polExceptions);
 
             var mirSeries = new MirDirection(onOffFile.GetReconnects());
-            
+
             //if (IsSempra.IsChecked ?? false)
             //{
             //    chart2.LegendInfo.Name = "Exception Data";
@@ -773,7 +773,7 @@ namespace CisProcessor
             //    };
             //    chart1.YAxesInfo.Y2IsDrawn = false;
             //}
-            
+
             //chart1.LegendInfo.NameFontSize = 18f;
 
             var chart1Series = new SurveyDirectionWithDateSeries(onOffFile.GetDirectionWithDateData());
@@ -1087,14 +1087,58 @@ namespace CisProcessor
             //await dialog.ShowAsync();
         }
 
-        private async Task CreateStandardFiles(string fileName, CombinedAllegroCisFile allegroFile, StorageFolder outputFolder, List<(string, List<(double, double)>)> addedValues = null)
+        private (List<(double Footage, string Value)> Values, List<(double Footage, string Value)> Dates) AlignDepolTabular(CombinedAllegroCisFile cisFile, CombinedAllegroCisFile depolFile)
+        {
+            var depolValues = new List<(double Footage, string Value)>();
+            var depolDates = new List<(double Footage, string Value)>();
+            foreach(var cisPointData in cisFile.Points)
+            {
+                var depolPointData = depolFile.GetClosesetPoint(cisPointData.Footage);
+                depolValues.Add((cisPointData.Footage, depolPointData.Point.On.ToString("F4"));
+                depolDates.Add((cisPointData.Footage, depolPointData.Point.OnTime.Value.ToShortDateString()));
+            }
+
+            return (depolValues, depolDates);
+        }
+
+        private async Task CreateStandardFiles(string fileName, CombinedAllegroCisFile allegroFile, StorageFolder outputFolder, List<(string, List<(double, double)>)> addedValues = null, CombinedAllegroCisFile depolFile = null)
         {
             var tabular = allegroFile.GetTabularData(addedValues: addedValues);
+            if (depolFile != null)
+            {
+                var (depolVals, depolDates) = AlignDepolTabular(allegroFile, depolFile);
+                var stringAddedValues = new List<(string Name, List<(double Footage, string Value)>)>();
+                foreach (var (name, values) in addedValues)
+                {
+                    var curValues = new List<(double Footage, string Value)>();
+                    foreach (var (foot, val) in values)
+                    {
+                        curValues.Add((foot, val.ToString($"F4")));
+                    }
+                    stringAddedValues.Add((name, curValues));
+                }
+                stringAddedValues.Add(("Depol (V)", depolVals));
+                stringAddedValues.Add(("Depol Dates", depolDates));
+                tabular = allegroFile.GetTabularData(addedValues: stringAddedValues);
+            }
             await CreateExcelFile($"{fileName} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) }, outputFolder);
             var dataMetrics = new DataMetrics(allegroFile.GetPoints());
             await CreateExcelFile($"{fileName} Data Metrics", dataMetrics.GetSheets(), outputFolder);
             var testStation = allegroFile.GetTestStationData();
-            await CreateExcelFile($"{fileName} Test Station Data", new List<(string Name, string Data)>() { ("Test Station Data", testStation) }, outputFolder);
+            if (depolFile != null)
+            {
+                var depolTestStation = depolFile.GetTestStationData();
+                await CreateExcelFile($"{fileName} Test Station Data", new List<(string Name, string Data)>() {
+                    ("Test Station Data", testStation),
+                    ("Depol Test Station Data", depolTestStation) 
+                }, outputFolder);
+            }
+            else
+            {
+                await CreateExcelFile($"{fileName} Test Station Data", new List<(string Name, string Data)>() {
+                    ("Test Station Data", testStation)
+                }, outputFolder);
+            }
             var cisSkips = allegroFile.GetSkipData();
             await CreateExcelFile($"{fileName} CIS Skip Data", new List<(string Name, string Data)>() { ("CIS Skip Data", cisSkips) }, outputFolder);
             var depthExceptions = allegroFile.GetDepthExceptions(36, double.MaxValue);
