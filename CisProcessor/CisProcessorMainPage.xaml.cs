@@ -1094,7 +1094,7 @@ namespace CisProcessor
             foreach(var cisPointData in cisFile.Points)
             {
                 var depolPointData = depolFile.GetClosesetPoint(cisPointData.Footage);
-                depolValues.Add((cisPointData.Footage, depolPointData.Point.On.ToString("F4"));
+                depolValues.Add((cisPointData.Footage, depolPointData.Point.On.ToString("F4")));
                 depolDates.Add((cisPointData.Footage, depolPointData.Point.OnTime.Value.ToShortDateString()));
             }
 
