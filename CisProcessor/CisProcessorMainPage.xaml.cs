@@ -568,7 +568,7 @@ namespace CisProcessor
             return output;
         }
 
-        private async Task<(string Text, bool IsReversed)> MakeOnOffStaticGraphs(CombinedAllegroCisFile onOffFile, CombinedAllegroCisFile staticFile, StorageFolder outputFolder, List<(double Footage, double Read)> pcmReads, (string Text, bool IsReversed)? exact = null)
+        private async Task<(string Text, bool IsReversed)> MakeOnOffStaticGraphs(CombinedAllegroCisFile onOffFile, CombinedAllegroCisFile staticFile, StorageFolder masterOutputFolder, List<(double Footage, double Read)> pcmReads, (string Text, bool IsReversed)? exact = null)
         {
             var testStationInitial = onOffFile.GetTestStationData();
             var firstPoint = onOffFile.Points.First();
@@ -792,19 +792,27 @@ namespace CisProcessor
             splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
             report.Container = splitContainer;
             var pages = report.PageSetup.GetAllPages(0, onOffFile.Points.Last().Footage);
-            var curFileName = $"{response.Value.Item1}\\{topGlobalXAxis.Title}";
+            var curFileName = $"{topGlobalXAxis.Title}";
             var addedPcmValues = new List<(string, List<(double, double)>)>
             {
                 ("PCM Values", pcmReads),
                 ("Polarization", polarizationData.Values)
             };
-            await CreateStandardFiles(curFileName, onOffFile, outputFolder, addedPcmValues);
+            var curOutputName = response.Value.Text;
+            var foundHyphenGap = curOutputName.IndexOf(" - ");
+            if(foundHyphenGap > 0)
+            {
+                curOutputName = curOutputName.Substring(0, foundHyphenGap).Trim();
+            }
+            var outputFolder = await masterOutputFolder.CreateFolderAsync(curOutputName, CreationCollisionOption.FailIfExists);
 
-            var shapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
+            await CreateStandardFiles(curFileName, onOffFile, outputFolder, addedPcmValues, staticFile);
+
+            var shapefileFolder = await masterOutputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
             var cisShapeFile = new ShapefileData($"{response.Value.Text}", onOffFile.GetShapeFile());
             await cisShapeFile.WriteToFolder(shapefileFolder);
 
-            var passShapefileFolder = await outputFolder.CreateFolderAsync("Passing Shapefiles", CreationCollisionOption.OpenIfExists);
+            var passShapefileFolder = await masterOutputFolder.CreateFolderAsync("Passing Shapefiles", CreationCollisionOption.OpenIfExists);
             var passingCisShapefileData = onOffFile.GetPassingShapeFile();
             if (!string.IsNullOrEmpty(passingCisShapefileData))
             {
@@ -812,7 +820,7 @@ namespace CisProcessor
                 await passingCisShapeFile.WriteToFolder(passShapefileFolder);
             }
 
-            var failingShapefileFolder = await outputFolder.CreateFolderAsync("Failing Shapefiles", CreationCollisionOption.OpenIfExists);
+            var failingShapefileFolder = await masterOutputFolder.CreateFolderAsync("Failing Shapefiles", CreationCollisionOption.OpenIfExists);
             var failingCisShapefileData = onOffFile.GetFailingShapeFile();
             if (!string.IsNullOrEmpty(failingCisShapefileData))
             {
@@ -830,7 +838,7 @@ namespace CisProcessor
                 var fileName = $"{topGlobalXAxis.Title} Page {pageString}.png";
                 if (pages.Count == 1)
                     fileName = $"{topGlobalXAxis.Title} Graph.png";
-                var imageFile = await outputFolder.CreateFileAsync($"{response.Value.Item1}\\{fileName}", CreationCollisionOption.ReplaceExisting);
+                var imageFile = await outputFolder.CreateFileAsync($"{fileName}", CreationCollisionOption.ReplaceExisting);
                 using (var image = report.GetImage(page, 300))
                 using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
                 {
@@ -1117,7 +1125,6 @@ namespace CisProcessor
                     }
                     stringAddedValues.Add((name, curValues));
                 }
-                stringAddedValues.Add(("Depol (V)", depolVals));
                 stringAddedValues.Add(("Depol Dates", depolDates));
                 tabular = allegroFile.GetTabularData(addedValues: stringAddedValues);
             }
