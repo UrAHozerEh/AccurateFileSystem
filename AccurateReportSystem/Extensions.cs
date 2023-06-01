@@ -33,7 +33,7 @@ namespace AccurateReportSystem
             return output;
         }
 
-        private static double? GetClosestValue(double findFoot, List<(double Footage, double Value)> values)
+        private static double? GetClosestValue(double findFoot, List<(double Footage, double Value)> values, double maxDist = 10)
         {
             double? prevValue = null;
             double prevFoot = 0;
@@ -43,7 +43,9 @@ namespace AccurateReportSystem
                     return curValue;
                 if (curFoot > findFoot)
                 {
-                    if (prevValue is null)
+                    var curDist = Math.Abs(curFoot - findFoot);
+                    var prevDist = Math.Abs(findFoot - prevFoot);
+                    if (prevValue is null && curDist < maxDist)
                         return curValue;
 
                     var diffGap = curFoot - prevFoot;
@@ -51,8 +53,9 @@ namespace AccurateReportSystem
                     var percent = diffSearch / diffGap;
 
                     var valDiff = curValue - prevValue.Value;
-
-                    return Math.Round(valDiff * percent + prevValue.Value, 4);
+                    if (curDist < maxDist || prevDist < maxDist)
+                        return Math.Round(valDiff * percent + prevValue.Value, 4);
+                    return null;
                 }
 
                 prevFoot = curFoot;
@@ -61,7 +64,7 @@ namespace AccurateReportSystem
 
             if (prevValue is null)
                 throw new ArgumentException();
-            if (Math.Abs(prevFoot - findFoot) < 10)
+            if (Math.Abs(prevFoot - findFoot) < maxDist)
                 return prevValue.Value;
             return null;
         }
