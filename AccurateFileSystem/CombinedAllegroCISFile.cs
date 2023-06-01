@@ -684,7 +684,22 @@ namespace AccurateFileSystem
             return output.ToString();
         }
 
-        public string GetTabularData(int readDecimals = 4, List<(string Name, List<(double Footage, double Value)>)> addedValues = null)
+        public string GetTabularData(List<(string Name, List<(double Footage, double Value)>)> addedValues, int readDecimals = 4)
+        {
+            var stringAddedValues = new List<(string Name, List<(double Footage, string Value)>)>();
+            foreach(var (name, values) in addedValues)
+            {
+                var curValues = new List<(double Footage, string Value)>();
+                foreach (var (foot, val) in values)
+                {
+                    curValues.Add((foot, val.ToString($"F{readDecimals}")));
+                }
+                stringAddedValues.Add((name, curValues));
+            }
+            return GetTabularData(readDecimals, stringAddedValues);
+        }
+
+        public string GetTabularData(int readDecimals = 4, List<(string Name, List<(double Footage, string Value)>)> addedValues = null)
         {
             var output = new StringBuilder();
             var readFormat = $"F{readDecimals}";
@@ -849,7 +864,7 @@ namespace AccurateFileSystem
                         var value = "";
                         if (curValues != null && curValues.Count() == 1)
                         {
-                            value = curValues.First().Value.ToString("F3");
+                            value = curValues.First().Value;
                         }
                         lineString = $"{lineString}\t{value}";
                     }
