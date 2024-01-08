@@ -13,6 +13,7 @@ namespace AccurateReportSystem
 {
     public class PgeEcdaReportInformation
     {
+        public static bool IsPge { get; } = true;
         public CombinedAllegroCisFile CisFile { get; set; }
         public List<PgeEcdaDataPoint> EcdaData { get; set; }
         public HcaInfo HcaInfo { get; set; }
@@ -49,6 +50,7 @@ namespace AccurateReportSystem
             public bool IsCisExtrapolated { get; set; }
             public bool IsCisSkipped { get; set; }
             public bool IsDcvg { get; set; }
+            public bool IsOnOff { get; set; }
             public double On { get; set; }
             public double Off { get; set; }
             public double Baseline { get; set; } = double.NaN;
@@ -56,11 +58,12 @@ namespace AccurateReportSystem
             public string Region { get; set; }
             public HcaRegion RegionUpdated { get; set; }
 
-            public PgeEcdaDataPoint(double footage, double on, double off, double? depth, bool isSkipped, bool isExtrapolated, BasicGeoposition gps, bool isDcvg, string region, HcaRegion regionUpdated = null)
+            public PgeEcdaDataPoint(double footage, double on, double off, bool isOnOff, double? depth, bool isSkipped, bool isExtrapolated, BasicGeoposition gps, bool isDcvg, string region, HcaRegion regionUpdated = null)
             {
                 Footage = footage;
                 On = on;
                 Off = off;
+                IsOnOff = isOnOff;
                 Depth = depth;
                 IsCisSkipped = isSkipped;
                 IsCisExtrapolated = isExtrapolated;
@@ -155,20 +158,40 @@ namespace AccurateReportSystem
                 if (IsCisSkipped)
                     return (PGESeverity.NRI, "Skip");
 
-                var changeInBaseline = Math.Abs(Off - Baseline);
-                if (Off > -0.5)
-                    return (PGESeverity.Severe, "Off is less than -0.500");
-                if (Off > -0.7 && changeInBaseline >= 0.2)
-                    return (PGESeverity.Severe, "Off is between -0.700 and -0.501 and difference in baseline is greater than 0.200");
-                if (Off > -0.7)
-                    return (PGESeverity.Moderate, "Off is between -0.700 and -0.501");
-                if (Off > -0.85 && changeInBaseline >= 0.2)
-                    return (PGESeverity.Moderate, "Off is between -0.850 and -0.701 and difference in baseline is greater than 0.200");
-                if (Off > -0.85)
-                    return (PGESeverity.Minor, "Off is between -0.850 and -0.701");
-                if (changeInBaseline >= 0.2)
-                    return (PGESeverity.Minor, "difference in baseline is greater than 0.200");
-                return (PGESeverity.NRI, "");
+                if (IsOnOff)
+                {
+                    var changeInBaseline = Math.Abs(Off - Baseline);
+                    if (Off > -0.5)
+                        return (PGESeverity.Severe, "Off is more positive than -0.500");
+                    if (Off > -0.7 && changeInBaseline >= 0.2)
+                        return (PGESeverity.Severe, "Off is between -0.700 and -0.501 and difference in baseline is greater than 0.200");
+                    if (Off > -0.7)
+                        return (PGESeverity.Moderate, "Off is between -0.700 and -0.501");
+                    if (Off > -0.85 && changeInBaseline >= 0.2)
+                        return (PGESeverity.Moderate, "Off is between -0.850 and -0.701 and difference in baseline is greater than 0.200");
+                    if (Off > -0.85)
+                        return (PGESeverity.Minor, "Off is between -0.850 and -0.701");
+                    if (changeInBaseline >= 0.2)
+                        return (PGESeverity.Minor, "difference in baseline is greater than 0.200");
+                    return (PGESeverity.NRI, "");
+                }
+                else
+                {
+                    var changeInBaseline = Math.Abs(On - Baseline);
+                    if (On > -0.6)
+                        return (PGESeverity.Severe, "On is more positive than -0.600");
+                    if (On > -0.8 && changeInBaseline >= 0.2)
+                        return (PGESeverity.Severe, "On is between -0.800 and -0.601 and difference in baseline is greater than 0.200");
+                    if (On > -0.8)
+                        return (PGESeverity.Moderate, "On is between -0.800 and -0.600");
+                    if (On > -0.95 && changeInBaseline >= 0.2)
+                        return (PGESeverity.Moderate, "On is between -0.950 and -0.801 and difference in baseline is greater than 0.200");
+                    if (On > -0.95)
+                        return (PGESeverity.Minor, "On is between -0.950 and -0.801");
+                    if (changeInBaseline >= 0.2)
+                        return (PGESeverity.Minor, "difference in baseline is greater than 0.200");
+                    return (PGESeverity.NRI, "");
+                }
             }
 
             private (PGESeverity, string) GetIndicationSeverity()
@@ -177,6 +200,11 @@ namespace AccurateReportSystem
                     return (PGESeverity.NRI, "Skip");
                 if (double.IsNaN(IndicationValue))
                     return (PGESeverity.NRI, "");
+                if(!IsPge)
+                {
+                    var indicationType = IsDcvg ? "DCVG" : "ACVG";
+                    return (PGESeverity.NRI, $"{indicationType} indication exists.");
+                }
                 if (!IsDcvg)
                 {
                     //ACVG
@@ -306,9 +334,7 @@ namespace AccurateReportSystem
                 PgeEcdaDataPoint closestPoint = null;
                 foreach (var surveyPoint in EcdaData)
                 {
-                    if (surveyPoint.IsCisSkipped)
-                        continue;
-                    if(surveyPoint.Footage == footage)
+                    if((int)surveyPoint.Footage == (int)footage)
                         closestPoint = surveyPoint;
                 }
                 if (closestPoint == null)
@@ -492,7 +518,7 @@ namespace AccurateReportSystem
                 var curDepth = curPoint.Depth;
                 if (!curDepth.HasValue)
                     curDepth = lastDepth;
-                var newPoint = new PgeEcdaDataPoint(curFootage, curOn, curOff, curDepth, false, false, curGps, IsDcvg, HcaInfo.ClosestRegion(curGps));
+                var newPoint = new PgeEcdaDataPoint(curFootage, curOn, curOff, CisFile.Type == FileType.OnOff, curDepth, false, false, curGps, IsDcvg, HcaInfo.ClosestRegion(curGps));
                 EcdaData.Add(newPoint);
 
                 if (lastPoint == null)
@@ -526,7 +552,7 @@ namespace AccurateReportSystem
                     var fakeOn = lastOn + onFactor * j;
                     var fakeOff = lastOff + offFactor * j;
                     var fakeDepth = depthFactor.HasValue ? lastDepth.Value + depthFactor.Value * j : (double?)null;
-                    newPoint = new PgeEcdaDataPoint(fakeFoot, fakeOn, fakeOff, fakeDepth, isSkipped, true, fakeGps, IsDcvg, HcaInfo.ClosestRegion(fakeGps));
+                    newPoint = new PgeEcdaDataPoint(fakeFoot, fakeOn, fakeOff, CisFile.Type == FileType.OnOff, fakeDepth, isSkipped, true, fakeGps, IsDcvg, HcaInfo.ClosestRegion(fakeGps));
                     EcdaData.Add(newPoint);
                 }
 
@@ -638,7 +664,7 @@ namespace AccurateReportSystem
                 if (!curDepth.HasValue)
                     curDepth = lastDepth;
                 var closeRegion = Hca.GetClosestRegion(curGps);
-                var newPoint = new PgeEcdaDataPoint(curFootage, curOn, curOff, curDepth, closeRegion.ShouldSkip, false, curGps, IsDcvg, closeRegion.ReportQName, closeRegion);
+                var newPoint = new PgeEcdaDataPoint(curFootage, curOn, curOff, CisFile.Type == FileType.OnOff, curDepth, closeRegion.ShouldSkip, false, curGps, IsDcvg, closeRegion.ReportQName, closeRegion);
                 EcdaData.Add(newPoint);
 
                 if (lastPoint == null)
@@ -673,7 +699,7 @@ namespace AccurateReportSystem
                     var fakeOff = lastOff + offFactor * j;
                     var fakeDepth = depthFactor.HasValue ? lastDepth.Value + depthFactor.Value * j : (double?)null;
                     closeRegion = Hca.GetClosestRegion(curGps);
-                    newPoint = new PgeEcdaDataPoint(fakeFoot, fakeOn, fakeOff, fakeDepth, isSkipped, true, fakeGps, IsDcvg, closeRegion.ReportQName, closeRegion);
+                    newPoint = new PgeEcdaDataPoint(fakeFoot, fakeOn, fakeOff, CisFile.Type == FileType.OnOff, fakeDepth, isSkipped, true, fakeGps, IsDcvg, closeRegion.ReportQName, closeRegion);
                     EcdaData.Add(newPoint);
                 }
 
@@ -699,6 +725,8 @@ namespace AccurateReportSystem
                 var point = EcdaData[i];
                 var within100 = EcdaData.Where(value => Within100(point.Footage, value.Footage) && !value.IsCisSkipped);
                 var average = (within100.Count() != 0 ? within100.Average(value => value.Off) : point.Off);
+                if(CisFile.Type == FileType.Native)
+                    average = (within100.Count() != 0 ? within100.Average(value => value.On) : point.On);
                 curAverages.Add(average);
             }
             var curBaselines = Enumerable.Repeat(double.NaN, EcdaData.Count).ToList();
@@ -720,8 +748,9 @@ namespace AccurateReportSystem
                             curBaselines[center] = curAverage;
                             continue;
                         }
-                        var diffFromBaseline = Math.Abs(centerPoint.Off - curAverage);
-                        var diffFromCurBaseline = Math.Abs(centerPoint.Off - curBaselines[center]);
+                        var valForBaseline = CisFile.Type == FileType.OnOff ? centerPoint.Off : centerPoint.On;
+                        var diffFromBaseline = Math.Abs(valForBaseline - curAverage);
+                        var diffFromCurBaseline = Math.Abs(valForBaseline - curBaselines[center]);
                         if (diffFromBaseline > diffFromCurBaseline)
                         {
                             curBaselines[center] = curAverage;

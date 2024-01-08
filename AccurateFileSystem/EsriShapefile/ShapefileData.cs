@@ -28,7 +28,7 @@ namespace AccurateFileSystem.EsriShapefile
         {
             var data = new List<string[]>();
             var dataLines = dataString.Split('\n');
-            foreach(var line in dataLines)
+            foreach (var line in dataLines)
             {
                 var lineSplit = line.Split('\t');
                 data.Add(lineSplit);
@@ -41,10 +41,16 @@ namespace AccurateFileSystem.EsriShapefile
 
         public async Task WriteToFolder(StorageFolder folder)
         {
-            var outputFolder = await folder.CreateFolderAsync(Name, CreationCollisionOption.ReplaceExisting);
-            var mainShapeFile = new MainFile(Name, Gps);
+            var curName = Name;
+            var shortenIndex = curName.IndexOf(" - ");
+            if (shortenIndex > 0)
+            {
+                curName = curName.Substring(0, shortenIndex).Trim();
+            }
+            var outputFolder = await folder.CreateFolderAsync(curName, CreationCollisionOption.ReplaceExisting);
+            var mainShapeFile = new MainFile(curName, Gps);
             await mainShapeFile.WriteToFile(outputFolder);
-            var dbfFile = new Dbf.DbfFile(Name, Fields, Records);
+            var dbfFile = new Dbf.DbfFile(curName, Fields, Records);
             await dbfFile.WriteToFile(outputFolder);
         }
 

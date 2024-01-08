@@ -90,6 +90,7 @@ namespace AccurateReportSystem
         public Color MinorColor { get; set; } = Colors.Blue;
         public Color ModerateColor { get; set; } = Colors.Green;
         public Color SevereColor { get; set; } = Colors.Red;
+        public CombinedAllegroCisFile CisFile { get; set; }
         public Hca Hca { get; set; }
         public List<DataPoint> Data { get; set; }
         public List<DataPointUpdated> DataUpdated { get; set; }
@@ -107,11 +108,12 @@ namespace AccurateReportSystem
         //    Data = ExtrapolateData(data);
         //}
 
-        public PGECISIndicationChartSeries(List<(double, AllegroDataPoint)> data, Chart chart, Hca hca) : base(chart.LegendInfo, chart.YAxesInfo)
+        public PGECISIndicationChartSeries(CombinedAllegroCisFile cisFile, Chart chart, Hca hca) : base(chart.LegendInfo, chart.YAxesInfo)
         {
-            RawData = data;
+            CisFile = cisFile;
+            RawData = cisFile.GetPoints();
             Hca = hca;
-            DataUpdated = ExtrapolateDataUpdated(data);
+            DataUpdated = ExtrapolateDataUpdated(RawData);
         }
 
         //public PGECISIndicationChartSeries(List<(double, AllegroDataPoint)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo) : base(masterLegendInfo, masterYAxesInfo)
@@ -196,13 +198,15 @@ namespace AccurateReportSystem
             public BasicGeoposition Gps;
             public HcaRegion Region;
             public bool IsExtrapolated;
+            public bool IsOnOff;
             public bool IsSkipped { get; set; }
 
-            public ExtrapolatedDataPointUpdated(double footage, AllegroDataPoint point, HcaRegion region)
+            public ExtrapolatedDataPointUpdated(double footage, bool isOnOff, AllegroDataPoint point, HcaRegion region)
             {
                 Footage = footage;
                 On = point.On;
                 Off = point.Off;
+                IsOnOff = isOnOff;
                 Comment = point.OriginalComment;
                 Date = point.Times[0];
                 Depth = point.Depth;
@@ -356,7 +360,7 @@ namespace AccurateReportSystem
                 var (startFoot, startPoint) = data[i];
                 var (endFoot, endPoint) = data[i + 1];
                 curRegion = GetClosestRegionUpdated(startPoint.GPS);
-                curExtrapPoint = new ExtrapolatedDataPointUpdated(startFoot, startPoint, curRegion);
+                curExtrapPoint = new ExtrapolatedDataPointUpdated(startFoot, CisFile.Type == FileType.OnOff, startPoint, curRegion);
                 extrapolatedData.Add(curExtrapPoint);
                 var dist = endFoot - startFoot;
 
@@ -398,6 +402,7 @@ namespace AccurateReportSystem
                         Gps = newGps,
                         Region = extrapRegion,
                         IsExtrapolated = true,
+                        IsOnOff = CisFile.Type == FileType.OnOff,
                         IsSkipped = dist > SkipDistance || curRegion.ShouldSkip
                     };
                     extrapolatedData.Add(curExtrapPoint);
@@ -405,7 +410,7 @@ namespace AccurateReportSystem
             }
             var (foot, point) = data.Last();
             curRegion = GetClosestRegionUpdated(point.GPS);
-            curExtrapPoint = new ExtrapolatedDataPointUpdated(foot, point, curRegion);
+            curExtrapPoint = new ExtrapolatedDataPointUpdated(foot, CisFile.Type == FileType.OnOff, point, curRegion);
             extrapolatedData.Add(curExtrapPoint);
             var output = new List<DataPointUpdated>(extrapolatedData.Count);
             DataPointUpdated curPoint;
@@ -416,19 +421,18 @@ namespace AccurateReportSystem
             var useBaselines = true;
             if (foot <= 200)
             {
-                var average = extrapolatedData.Average(value => value.Off);
+                var average = extrapolatedData.Average(value => curExtrapPoint.IsOnOff ? value.Off : value.On);
                 for (var i = 0; i < extrapolatedData.Count; ++i)
                 {
                     curExtrapPoint = extrapolatedData[i];
                     if (!useBaselines)
-                        average = curExtrapPoint.Off;
+                        average = curExtrapPoint.IsOnOff ? curExtrapPoint.Off : curExtrapPoint.On;
                     foot = curExtrapPoint.Footage;
                     Averages.Add((foot, average));
                     Baselines[i] = (foot, average);
                     UsedBaselineFootages[i] = (foot, foot);
                     curRegion = curExtrapPoint.Region;
-                    var changeInBaseline = Math.Abs(curExtrapPoint.Off - average);
-                    var (severity, reason) = GetSeverity(curExtrapPoint.Off, average);
+                    var (severity, reason) = curExtrapPoint.IsOnOff ? GetOnOffSeverity(curExtrapPoint.Off, average) : GetOnSeverity(curExtrapPoint.On, average);
                     if (curExtrapPoint.IsSkipped)
                     {
                         severity = PGESeverity.NRI;
@@ -444,7 +448,7 @@ namespace AccurateReportSystem
                 curExtrapPoint = extrapolatedData[i];
                 foot = curExtrapPoint.Footage;
                 var within100 = extrapolatedData.Where(value => Within100(foot, value.Footage) && !value.IsSkipped);
-                var average = (within100.Count() != 0 ? within100.Average(value => value.Off) : curExtrapPoint.Off);
+                var average = (within100.Count() != 0 ? within100.Average(value => curExtrapPoint.IsOnOff ? value.Off : value.On) : curExtrapPoint.IsOnOff ? curExtrapPoint.Off : curExtrapPoint.On);
                 Averages.Add((foot, average));
             }
             Baselines = Enumerable.Repeat((double.NaN, double.NaN), extrapolatedData.Count).ToList();
@@ -468,8 +472,8 @@ namespace AccurateReportSystem
                             UsedBaselineFootages[center] = (centerExtrap.Footage, curFoot);
                             continue;
                         }
-                        var diffFromBaseline = Math.Abs(centerExtrap.Off - curAverage.Value);
-                        var diffFromCurBaseline = Math.Abs(centerExtrap.Off - Baselines[center].Value);
+                        var diffFromBaseline = Math.Abs(curExtrapPoint.IsOnOff ? centerExtrap.Off : centerExtrap.On - curAverage.Value);
+                        var diffFromCurBaseline = Math.Abs(curExtrapPoint.IsOnOff ? centerExtrap.Off : centerExtrap.On - Baselines[center].Value);
                         if (diffFromBaseline > diffFromCurBaseline)
                         {
                             Baselines[center] = (centerExtrap.Footage, curAverage.Value);
@@ -478,8 +482,8 @@ namespace AccurateReportSystem
                     }
                 }
                 var baseline = Baselines[center];
-                var baselineValue = useBaselines ? baseline.Value : centerExtrap.Off;
-                var (severity, reason) = GetSeverity(centerExtrap.Off, baselineValue);//GetSeverity(centerExtrap.Off, baseline.Value);
+                var baselineValue = useBaselines ? baseline.Value : centerExtrap.IsOnOff ? centerExtrap.Off : centerExtrap.On;
+                var (severity, reason) = centerExtrap.IsOnOff ? GetOnOffSeverity(centerExtrap.Off, baselineValue) : GetOnSeverity(centerExtrap.On, baselineValue);//GetSeverity(centerExtrap.Off, baseline.Value);
                 
                 if (centerExtrap.IsSkipped)
                 {
@@ -492,7 +496,7 @@ namespace AccurateReportSystem
             return output;
         }
 
-        private (PGESeverity, string) GetSeverity(double off, double baseline)
+        private (PGESeverity, string) GetOnOffSeverity(double off, double baseline)
         {
             var changeInBaseline = Math.Abs(off - baseline);
             if (off > -0.5)
@@ -507,6 +511,24 @@ namespace AccurateReportSystem
                 return (PGESeverity.Minor, "Off is between -0.850V and -0.701V");
             if (changeInBaseline >= 0.2)
                 return (PGESeverity.Minor, "Difference in baseline is greater than 0.200V");
+            return (PGESeverity.NRI, "");
+        }
+
+        private (PGESeverity, string) GetOnSeverity(double on, double baseline)
+        {
+            var changeInBaseline = Math.Abs(on - baseline);
+            if (on > -0.6)
+                return (PGESeverity.Severe, "On is more positive than -0.600");
+            if (on > -0.8 && changeInBaseline >= 0.2)
+                return (PGESeverity.Severe, "On is between -0.800 and -0.601 and difference in baseline is greater than 0.200");
+            if (on > -0.8)
+                return (PGESeverity.Moderate, "On is between -0.800 and -0.600");
+            if (on > -0.95 && changeInBaseline >= 0.2)
+                return (PGESeverity.Moderate, "On is between -0.950 and -0.801 and difference in baseline is greater than 0.200");
+            if (on > -0.95)
+                return (PGESeverity.Minor, "On is between -0.950 and -0.801");
+            if (changeInBaseline >= 0.2)
+                return (PGESeverity.Minor, "difference in baseline is greater than 0.200");
             return (PGESeverity.NRI, "");
         }
 

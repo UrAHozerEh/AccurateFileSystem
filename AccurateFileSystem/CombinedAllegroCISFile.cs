@@ -113,13 +113,14 @@ namespace AccurateFileSystem
             var firstPoint = Points[0];
             var nextPoint = Points[1];
             var startDist = nextPoint.Footage - firstPoint.Footage;
+            HasStartSkip = startDist > maxDistance;
 
             var prevPoint = Points[Points.Count - 2];
             var lastPoint = Points[Points.Count - 1];
             var lastDist = lastPoint.Footage - prevPoint.Footage;
 
-            HasStartSkip = startDist > maxDistance;
-            HasEndSkip = lastDist > maxDistance;
+            if (Points.Count != 2)
+                HasEndSkip = lastDist > maxDistance;
         }
 
         public void Reverse()
@@ -337,7 +338,7 @@ namespace AccurateFileSystem
                 PcmCalcOutput.Add(($"PCM Import File {++fileCount}", pcmCalc.ToString()));
             }
 
-            PcmPercentRegions.OrderBy(r => r.StartFootage);
+            PcmPercentRegions = PcmPercentRegions.OrderBy(r => r.StartFootage).ToList();
             PcmPercentValues = new List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)>();
 
             var curPcmPercentValues = new Dictionary<int, double>();
@@ -405,7 +406,7 @@ namespace AccurateFileSystem
             }
         }
 
-        public List<int> GetAnchorPoints(int distance = 50)
+        public List<int> GetAnchorPoints(int distance = 20)
         {
             var testStations = new List<int> { 0 };
             var lastFoot = Points[0].Footage;
@@ -413,7 +414,7 @@ namespace AccurateFileSystem
             {
                 var curPoint = Points[i];
                 var nextPoint = Points[i + 1];
-                if (curPoint.Point.TestStationReads.Count != 0 && !Name.ToLower().Contains("redo"))
+                if (curPoint.Point.TestStationReads.Count != 0)
                 {
                     if (i == 1 && curPoint.Footage - lastFoot <= 10)
                         continue;
@@ -428,6 +429,7 @@ namespace AccurateFileSystem
                 else if (nextPoint.Footage - curPoint.Footage > distance)
                 {
                     testStations.Add(i);
+                    testStations.Add(i + 1);
                 }
                 lastFoot = curPoint.Footage;
             }
@@ -506,8 +508,8 @@ namespace AccurateFileSystem
             {
                 var (curAnchor, curFootage) = anchors[cur];
                 var (nextAnchor, nextFootage) = anchors[cur + 1];
-                if (nextFootage < curFootage)
-                    throw new Exception();
+                //if (nextFootage < curFootage)
+                //    throw new Exception();
                 var curStart = Points[curAnchor].Footage;
                 var curEnd = Points[nextAnchor].Footage;
                 var curLen = curEnd - curStart;
@@ -687,7 +689,7 @@ namespace AccurateFileSystem
         public string GetTabularData(List<(string Name, List<(double Footage, double Value)>)> addedValues, int readDecimals = 4)
         {
             var stringAddedValues = new List<(string Name, List<(double Footage, string Value)>)>();
-            foreach(var (name, values) in addedValues)
+            foreach (var (name, values) in addedValues)
             {
                 var curValues = new List<(double Footage, string Value)>();
                 foreach (var (foot, val) in values)
@@ -1515,10 +1517,15 @@ namespace AccurateFileSystem
             return list;
         }
 
-        public List<(double footage, string value)> GetCommentData(List<string> filters = null)
+        public List<(double footage, string value)> GetCommentData(List<string> filters = null, bool ignoreStartEndSkips = false)
         {
             var list = new List<(double, string)>();
             var (start, end) = GetActualStartEnd();
+            if (ignoreStartEndSkips)
+            {
+                start = 0;
+                end = Points.Count - 1;
+            }
             for (int i = start; i <= end; ++i)
             {
                 var comment = Points[i].Point.OriginalComment;
@@ -1610,7 +1617,7 @@ namespace AccurateFileSystem
             return combined;
         }
 
-        public static CombinedAllegroCisFile CombineOrderedFiles(string name, List<AllegroCISFile> files, double offset)
+        public static CombinedAllegroCisFile CombineOrderedFiles(string name, List<AllegroCISFile> files, double roundOffset, double? setOffset = null)
         {
             if (files.Count == 0)
                 return null;
@@ -1637,14 +1644,17 @@ namespace AccurateFileSystem
 
                 if (startDist <= endDist)
                 {
-                    allSolution.AddToEnd(new FileInfo(curFile) { Offset = offset });
+                    allSolution.AddToEnd(new FileInfo(curFile));
                 }
                 else
                 {
-                    allSolution.AddToEnd(new FileInfo(curFile, curFile.Points.Count - 1, 0) { Offset = offset });
+                    allSolution.AddToEnd(new FileInfo(curFile, curFile.Points.Count - 1, 0));
                 }
             }
-            allSolution.CalculateOffset(offset);
+            if (setOffset.HasValue)
+                allSolution.SetOffset(setOffset.Value);
+            else
+                allSolution.CalculateOffset(roundOffset);
             var solString = allSolution.ToString();
             var combined = new CombinedAllegroCisFile(name, type, allSolution);
             return combined;

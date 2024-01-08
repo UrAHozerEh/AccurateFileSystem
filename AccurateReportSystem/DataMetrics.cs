@@ -15,14 +15,16 @@ namespace AccurateReportSystem
         public List<DataMetricRow> Off850 = new List<DataMetricRow>();
         public List<DataMetricRow> Off1250 = new List<DataMetricRow>();
         public List<DataMetricRow> OffBetween = new List<DataMetricRow>();
+        public List<DataMetricRow> Polarization100 = new List<DataMetricRow>();
         public List<DataMetricRow> Ac = new List<DataMetricRow>();
 
-        public DataMetrics(List<(double, AllegroDataPoint)> onOffData)
+        public DataMetrics(List<(double, AllegroDataPoint)> onOffData, List<(double Footage, double Value)> polData = null)
         {
             DataMetricRow on850 = null;
             DataMetricRow off850 = null;
             DataMetricRow off1250 = null;
             DataMetricRow offBetween = null;
+            DataMetricRow polarization = null;
 
             for (var i = 0; i < onOffData.Count; ++i)
             {
@@ -169,6 +171,35 @@ namespace AccurateReportSystem
                         }
                     }
                 }
+                var curPol = polData?.FirstOrDefault(val => val.Footage == footage);
+                if(curPol.HasValue && curPol.Value.Value > -0.1 && curPol.Value.Footage == footage)
+                {
+                    var curPolVal = curPol.Value.Value;
+                    if(polarization == null)
+                    {
+                        polarization = new DataMetricRow()
+                        {
+                            StartFootage = footage,
+                            StartPoint = point,
+                            EndFootage = footage,
+                            EndPoint = point,
+                            Readings = 1,
+                            Worst = curPolVal
+                        };
+                    }
+                    else
+                    {
+                        polarization.Readings += 1;
+                        polarization.EndFootage = footage;
+                        polarization.EndPoint = point;
+                        if (curPolVal > polarization.Worst)
+                            polarization.Worst = curPolVal;
+                    }
+                }
+                else if(polarization != null)
+                {
+                    polarization = null;
+                }
             }
         }
 
@@ -237,6 +268,17 @@ namespace AccurateReportSystem
             }
             summary += $"Off Between -0.600V and -0.750V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads):P}\t{curLength}\n";
 
+            var pol100 = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
+            curCount = 0;
+            curLength = 0.0;
+            foreach (var row in Polarization100)
+            {
+                curCount += row.Readings;
+                curLength += row.Length;
+                pol100 += row.ToString() + "\n";
+            }
+            summary += $"Polarization < 0.100V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads):P}\t{curLength}\n";
+
             var ac = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
             curLength = 0.0;
@@ -253,6 +295,7 @@ namespace AccurateReportSystem
             sheets.Add(("Off < -0.850V", off850));
             sheets.Add(("Off > -1.250V", off1250));
             sheets.Add(("Off Between -0.600V and -0.750V", offBetween));
+            sheets.Add(("Polarization < 0.100V", pol100));
             sheets.Add(("AC > 2V", ac));
 
             return sheets;

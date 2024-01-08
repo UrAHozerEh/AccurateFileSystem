@@ -136,6 +136,7 @@
     <Compile Include="GridlineInfo.cs" />
     <Compile Include="LegendInfo.cs" />
     <Compile Include="MirDirection.cs" />
+    <Compile Include="OnOffPassingRangeExceptionChartSeries.cs" />
     <Compile Include="OnOff850ExceptionChartSeties.cs" />
     <Compile Include="PGECISIndicationChartSeries.cs" />
     <Compile Include="PgeDcvgIndicationChartSeries.cs" />

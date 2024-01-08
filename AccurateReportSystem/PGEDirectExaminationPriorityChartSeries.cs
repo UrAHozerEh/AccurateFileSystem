@@ -14,6 +14,7 @@ namespace AccurateReportSystem
 {
     public class PGEDirectExaminationPriorityChartSeries : ExceptionsChartSeries
     {
+        public bool IsPge { get; } = true;
         public override int NumberOfValues => 3;
         public Color OneColor { get; set; } = Colors.Red;
         public Color TwoColor { get; set; } = Colors.Green;
@@ -214,15 +215,15 @@ namespace AccurateReportSystem
                     firstShapeValues[ON] = lastOn.ToString("F4");
                     firstShapeValues[OFF] = lastOff.ToString("F4");
 
-                    firstShapeValues[LABEL] = $"DCVG: {lastDcvgValue:F1}%";
+                    firstShapeValues[LABEL] = IsPge ? $"DCVG: {lastDcvgValue:F1}%" : "DCVG Indication";
                     firstShapeValues[STATION] = "0";
                     firstShapeValues[DATE] = lastDate.ToShortDateString();
-                    firstShapeValues[DCVGREMOTE] = lastDcvgValue.ToString("F1");
+                    firstShapeValues[DCVGREMOTE] = IsPge ? lastDcvgValue.ToString("F1") : "";
                     firstShapeValues[ECDAREGION] = lastRegion.ReportQName;
                     firstShapeValues[LAT] = lastDcvgGps.Latitude.ToString("F8");
                     firstShapeValues[LON] = lastDcvgGps.Longitude.ToString("F8");
                     firstShapeValues[ECDACAT] = "Priority " + lastPrio.ToString();
-                    firstShapeValues[DCVGCAT] = lastDcvgSeverity.GetDisplayName();
+                    firstShapeValues[DCVGCAT] = IsPge ? lastDcvgSeverity.GetDisplayName() : "Indication";
                     IndicationShapeFileOutput.Add(firstShapeValues);
                 }
                 if (dcvgSeverities.ContainsKey(0) && !DcvgSeries.IsDcvg)
@@ -314,7 +315,7 @@ namespace AccurateReportSystem
                     shapeValues[ON] = curOn.ToString("F4");
                     shapeValues[OFF] = curOff.ToString("F4");
 
-                    shapeValues[LABEL] = DcvgSeries.IsDcvg ? $"DCVG: {curDcvgValue:F1}%" : $"ACVG: {curDcvgValue:F2}";
+                    shapeValues[LABEL] = DcvgSeries.IsDcvg ? (IsPge ? $"DCVG: {curDcvgValue:F1}%" : "DCVG Indication") : $"ACVG: {curDcvgValue:F2}";
                     shapeValues[STATION] = curFoot.ToString("F0");
                     shapeValues[DATE] = curDate.ToShortDateString();
                     shapeValues[ECDAREGION] = curRegion.ReportQName;
@@ -323,8 +324,16 @@ namespace AccurateReportSystem
                     shapeValues[ECDACAT] = "Priority " + curPrio.ToString();
                     if (DcvgSeries.IsDcvg)
                     {
-                        shapeValues[DCVGCAT] = curDcvgSeverity.GetDisplayName();
-                        shapeValues[DCVGREMOTE] = curDcvgValue.ToString("F1");
+                        if (IsPge)
+                        {
+                            shapeValues[DCVGCAT] = curDcvgSeverity.GetDisplayName();
+                            shapeValues[DCVGREMOTE] = curDcvgValue.ToString("F1");
+                        }
+                        else
+                        {
+                            shapeValues[DCVGCAT] = "";
+                            shapeValues[DCVGCAT] = "Indication";
+                        }
                     }
 
                     if (!DcvgSeries.IsDcvg)
@@ -546,29 +555,54 @@ namespace AccurateReportSystem
 
         private int GetPriority(PGESeverity cis, PGESeverity toolTwo, PGESeverity toolThree)
         {
-            var worstOther = toolTwo.GetWorseOf(toolThree);
-            if (cis == PGESeverity.Moderate && worstOther == PGESeverity.Severe)
+            if (IsPge)
+            {
+                var worstOther = toolTwo.GetWorseOf(toolThree);
+                if (cis == PGESeverity.Moderate && worstOther == PGESeverity.Severe)
+                    return 1;
+                if (cis == PGESeverity.Severe && (worstOther == PGESeverity.Severe || worstOther == PGESeverity.Moderate))
+                    return 1;
+
+                if (cis == PGESeverity.NRI && worstOther == PGESeverity.Severe)
+                    return 2;
+                if (cis == PGESeverity.Minor && worstOther == PGESeverity.Severe)
+                    return 2;
+                if (cis == PGESeverity.Moderate && (worstOther == PGESeverity.Moderate || worstOther == PGESeverity.Minor))
+                    return 2;
+                if (cis == PGESeverity.Severe && (worstOther == PGESeverity.Minor || worstOther == PGESeverity.NRI))
+                    return 2;
+
+                if (cis == PGESeverity.NRI && worstOther == PGESeverity.Moderate)
+                    return 3;
+                if (cis == PGESeverity.Minor)
+                    return 3;
+                if (cis == PGESeverity.Moderate && worstOther == PGESeverity.NRI)
+                    return 3;
+
+                return 4;
+            }
+            else
+            {
+                if (toolTwo == PGESeverity.NRI)
+                {
+                    switch (cis)
+                    {
+                        case PGESeverity.NRI: return 4;
+                        case PGESeverity.Minor: return 3;
+                        case PGESeverity.Moderate: return 3;
+                        case PGESeverity.Severe: return 2;
+                    }
+                    return 2;
+                }
+                switch (cis)
+                {
+                    case PGESeverity.NRI: return 3;
+                    case PGESeverity.Minor: return 2;
+                    case PGESeverity.Moderate: return 1;
+                    case PGESeverity.Severe: return 1;
+                }
                 return 1;
-            if (cis == PGESeverity.Severe && (worstOther == PGESeverity.Severe || worstOther == PGESeverity.Moderate))
-                return 1;
-
-            if (cis == PGESeverity.NRI && worstOther == PGESeverity.Severe)
-                return 2;
-            if (cis == PGESeverity.Minor && worstOther == PGESeverity.Severe)
-                return 2;
-            if (cis == PGESeverity.Moderate && (worstOther == PGESeverity.Moderate || worstOther == PGESeverity.Minor))
-                return 2;
-            if (cis == PGESeverity.Severe && (worstOther == PGESeverity.Minor || worstOther == PGESeverity.NRI))
-                return 2;
-
-            if (cis == PGESeverity.NRI && worstOther == PGESeverity.Moderate)
-                return 3;
-            if (cis == PGESeverity.Minor)
-                return 3;
-            if (cis == PGESeverity.Moderate && worstOther == PGESeverity.NRI)
-                return 3;
-
-            return 4;
+            }
         }
 
         protected override List<(string, Color)> LegendInfo()

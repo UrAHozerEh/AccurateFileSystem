@@ -129,6 +129,19 @@ namespace AccurateReportSystem
             return colors;
         }
 
-        
+        public List<(double Start, double End, Color Color)> GetAllColorBounds()
+        {
+            var start = Data.First().Footage;
+            var end = Data.Last().Footage;
+            var allPage = new PageInformation()
+            {
+                StartFootage = start,
+                EndFootage = end,
+                Overlap = 0,
+                PageNumber = 1,
+                TotalPages = 1
+            };
+            return GetColorBounds(allPage);
+        }
     }
 }

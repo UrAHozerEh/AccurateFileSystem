@@ -43,7 +43,10 @@ namespace CisProcessor
     public sealed partial class MainPage : Page
     {
         private const double MaxDepth = 180;
-        private const string _client = "Sempra";
+        private const string _client = "TransMontaigne";
+        private const double MinPassingValue = -0.850;
+        private const double MinPolPassingValue = -0.1;
+        private const double ShallowCover = 24; //Usually 36
 
         public MainPage()
         {
@@ -331,7 +334,7 @@ namespace CisProcessor
             };
             var commentSeries = new CommentSeries
             {
-                Values = combined.GetCommentData(),
+                Values = combined.GetCommentData(ignoreStartEndSkips: true),
                 PercentOfGraph = 0.5f,
                 IsFlippedVertical = false,
                 BorderType = BorderType.Pegs,
@@ -495,9 +498,9 @@ namespace CisProcessor
                         staticFiles.Add(file);
                     }
                 }
-                var type = $" On Off {(staticFiles.Count == 0 ? "" : "And Static ")}CIS";
+                var type = $" On Off {(staticFiles.Count == 0 ? "" : "And Depol ")}CIS";
                 var combinedOnOffFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + type, onOffFiles, 5);
-                var combinedStaticFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + " Static CIS", staticFiles, 5);
+                var combinedStaticFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + " Depol CIS", staticFiles, 5);
                 combinedStaticFiles?.AddPcmDepthData(docFiles);
                 combinedStaticFiles?.AddMaxDepthComment(MaxDepth);
                 combinedOnOffFiles?.AddPcmDepthData(docFiles);
@@ -511,20 +514,29 @@ namespace CisProcessor
                         foreach (var (gps, read, _) in docFile.AmpData)
                         {
                             if (read == 0) continue;
-                            var (footage, dist) = combinedOnOffFiles.GetClosestFootage(gps);
-                            pcmReads.Add((footage, read));
+                            if (combinedOnOffFiles != null)
+                            {
+                                var (footage, dist) = combinedOnOffFiles.GetClosestFootage(gps);
+                                pcmReads.Add((footage, read));
+                            }
+                            else
+                            {
+                                var (footage, dist) = combinedStaticFiles.GetClosestFootage(gps);
+                                pcmReads.Add((footage, read));
+                            }
                         }
                     }
                 }
-                combinedOnOffFiles.FixContactSpikes();
-                combinedOnOffFiles.FixGps();
-                combinedOnOffFiles.StraightenGps();
+                combinedOnOffFiles?.FixContactSpikes();
+                combinedStaticFiles?.FixContactSpikes();
+                combinedOnOffFiles?.FixGps();
+                combinedOnOffFiles?.StraightenGps();
                 //combinedOnOffFiles.SetFootageFromGps();
-                combinedOnOffFiles.RemoveComments("+");
-                if (combinedOnOffFiles.HasStartSkip)
-                {
-                    combinedOnOffFiles.ShiftPoints(-combinedOnOffFiles.Points[1].Footage);
-                }
+                combinedOnOffFiles?.RemoveComments("+");
+                //if (combinedOnOffFiles.HasStartSkip)
+                //{
+                //    combinedOnOffFiles.ShiftPoints(-combinedOnOffFiles.Points[1].Footage);
+                //}
                 if (staticFiles.Count > 0 && onOffFiles.Count > 0)
                 {
                     var onOffStart = combinedOnOffFiles.Points.First().Point.GPS;
@@ -542,6 +554,7 @@ namespace CisProcessor
                 {
                     var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, outputFolder, pcmReads, finishedFinalName);
                     await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedOnOffFiles.FileInfos.GetExcelData(0)) }, fileOrder);
+                    await CreateExcelFile($"{folder.DisplayName} Static+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedStaticFiles.FileInfos.GetExcelData(0)) }, fileOrder);
                 }
                 else
                 {
@@ -550,6 +563,8 @@ namespace CisProcessor
                     await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", file.FileInfos.GetExcelData(0)) }, fileOrder);
                 }
             }
+            var dialog = new MessageDialog("Done");
+            await dialog.ShowAsync();
         }
 
         private async Task<Dictionary<string, (string, bool)?>> GetFilesNames(StorageFolder folder)
@@ -586,6 +601,7 @@ namespace CisProcessor
             if (response.Value.Item2)
             {
                 onOffFile.Reverse();
+                staticFile?.Reverse();
             }
             var report = new GraphicalReport();
             var commentGraph = new Graph(report);
@@ -629,11 +645,11 @@ namespace CisProcessor
                 PointShape = GraphSeries.Shape.Circle,
                 GraphType = GraphSeries.Type.Point
             };
-            var redLine = new SingleValueGraphSeries("850 Line", -0.85)
+            var redLine = new SingleValueGraphSeries($"{MinPassingValue:F3} Line", MinPassingValue)
             {
                 IsDrawnInLegend = false
             };
-            var commentSeries = new CommentSeries { Values = onOffFile.GetCommentData(), PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs };
+            var commentSeries = new CommentSeries { Values = onOffFile.GetCommentData(ignoreStartEndSkips: true), PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs };
 
             commentGraph.CommentSeries = commentSeries;
             commentGraph.LegendInfo.Name = "CIS Comments";
@@ -643,11 +659,7 @@ namespace CisProcessor
             commentGraph.YAxesInfo.MinorGridlines.IsEnabled = false;
             commentGraph.YAxesInfo.MajorGridlines.IsEnabled = false;
             commentGraph.YAxesInfo.Y1IsDrawn = false;
-            //if (onOffFile.Type == FileType.OnOff)
-            //{
-            //    graph1.Series.Add(depth);
-            //    graph1.YAxesInfo.Y2IsDrawn = true;
-            //} // DEPTH
+
             graph1.CommentSeries = commentSeries;
             /*
             graph1.YAxesInfo.Y1MaximumValue = 150;
@@ -676,6 +688,11 @@ namespace CisProcessor
                 graph1.Series.Add(staticData);
                 graph1.Series.Add(polarizationData);
             }
+            if (depth.Values.Count != 0)
+            {
+                graph1.Series.Add(depth);
+                graph1.YAxesInfo.Y2IsDrawn = true;
+            } // DEPTH
             if (onOffFile.Type != FileType.Native)
             {
                 graph1.Series.Add(redLine);
@@ -732,7 +749,7 @@ namespace CisProcessor
                     NameFontSize = 14f
                 }
             };
-            var chart2 = new Chart(report, "850 Data")
+            var chart2 = new Chart(report, $"{MinPassingValue:F3} Data")
             {
                 LegendInfo =
                 {
@@ -740,9 +757,10 @@ namespace CisProcessor
                     NameFontSize = 16f
                 }
             };
-            ExceptionsChartSeries exceptions = new OnOff850ExceptionChartSeries(onOffFile.GetCombinedMirData(), chart2.LegendInfo, chart2.YAxesInfo)
+            ExceptionsChartSeries exceptions = new OnOffPassingRangeExceptionChartSeries(onOffFile.GetCombinedMirData(), chart2.LegendInfo, chart2.YAxesInfo)
             {
-                LegendLabelSplit = 0.5f
+                LegendLabelSplit = 0.5f,
+                MinimumValue = MinPassingValue
             };
             chart2.Series.Add(exceptions);
 
@@ -755,7 +773,7 @@ namespace CisProcessor
                     NameFontSize = 12f
                 }
             };
-            ExceptionsChartSeries polExceptions = new PolarizationExceptionChartSeries(polarizationData.Values, chart3.LegendInfo, chart3.YAxesInfo)
+            ExceptionsChartSeries polExceptions = new PolarizationExceptionChartSeries(polarizationData.Values, chart3.LegendInfo, chart3.YAxesInfo, MinPolPassingValue)
             {
                 LegendLabelSplit = 0.5f
             };
@@ -791,7 +809,8 @@ namespace CisProcessor
             //splitContainer.AddContainer(graph3);
             splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
             report.Container = splitContainer;
-            var pages = report.PageSetup.GetAllPages(0, onOffFile.Points.Last().Footage);
+            var lastFoot = Math.Max(onOffFile.Points.Last().Footage, staticFile.Points.Last().Footage);
+            var pages = report.PageSetup.GetAllPages(0, lastFoot);
             var curFileName = $"{topGlobalXAxis.Title}";
             var addedPcmValues = new List<(string, List<(double, double)>)>
             {
@@ -800,11 +819,17 @@ namespace CisProcessor
             };
             var curOutputName = response.Value.Text;
             var foundHyphenGap = curOutputName.IndexOf(" - ");
-            if(foundHyphenGap > 0)
+            if (foundHyphenGap > 0)
             {
                 curOutputName = curOutputName.Substring(0, foundHyphenGap).Trim();
             }
             var outputFolder = await masterOutputFolder.CreateFolderAsync(curOutputName, CreationCollisionOption.FailIfExists);
+            const bool nestOutput = false;
+
+            if (!nestOutput)
+            {
+                outputFolder = masterOutputFolder;
+            }
 
             await CreateStandardFiles(curFileName, onOffFile, outputFolder, addedPcmValues, staticFile);
 
@@ -851,7 +876,7 @@ namespace CisProcessor
             //await dialog.ShowAsync();
         }
 
-        private async Task<(string Text, bool IsReversed)> MakeOnOffGraphs(CombinedAllegroCisFile allegroFile, List<(double Footage, double Read)> pcmReads, StorageFolder outputFolder, (string Text, bool IsReversed)? exact = null)
+        private async Task<(string Text, bool IsReversed)> MakeOnOffGraphs(CombinedAllegroCisFile allegroFile, List<(double Footage, double Read)> pcmReads, StorageFolder masterOutputFolder, (string Text, bool IsReversed)? exact = null)
         {
             var testStationInitial = allegroFile.GetTestStationData();
             var firstPoint = allegroFile.Points.First();
@@ -905,7 +930,7 @@ namespace CisProcessor
             {
                 IsDrawnInLegend = false
             };
-            var commentSeries = new CommentSeries { Values = allegroFile.GetCommentData(), PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs };
+            var commentSeries = new CommentSeries { Values = allegroFile.GetCommentData(ignoreStartEndSkips: true), PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs };
             var separateComment = false;
             if (separateComment)
             {
@@ -922,7 +947,15 @@ namespace CisProcessor
             commentGraph.YAxesInfo.MinorGridlines.IsEnabled = false;
             commentGraph.YAxesInfo.MajorGridlines.IsEnabled = false;
             commentGraph.YAxesInfo.Y1IsDrawn = false;
-            if (allegroFile.Type == FileType.OnOff)
+
+            var dcvgIndication = new PointWithLabelGraphSeries($"DCVG Indication", -0.2, new List<(double,string)>())
+            {
+                ShapeRadius = 3,
+                PointColor = Colors.Red,
+                BackdropOpacity = 1f
+            };
+            graph1.Series.Add(dcvgIndication);
+            if (depth.Values.Count != 0)
             {
                 graph1.Series.Add(depth);
                 graph1.YAxesInfo.Y2IsDrawn = true;
@@ -1045,11 +1078,25 @@ namespace CisProcessor
             splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
             report.Container = splitContainer;
             var pages = report.PageSetup.GetAllPages(0, allegroFile.Points.Last().Footage);
-            var curFileName = $"{response.Value.Item1}\\{topGlobalXAxis.Title}";
+            var curFileName = $"{topGlobalXAxis.Title}";
             var addedPcmValues = new List<(string, List<(double, double)>)>
             {
                 ("PCM Values", pcmReads)
             };
+            var curOutputName = response.Value.Text;
+            var foundHyphenGap = curOutputName.IndexOf(" - ");
+            if (foundHyphenGap > 0)
+            {
+                curOutputName = curOutputName.Substring(0, foundHyphenGap).Trim();
+            }
+            var outputFolder = await masterOutputFolder.CreateFolderAsync(curOutputName, CreationCollisionOption.FailIfExists);
+            const bool nestOutput = false;
+
+            if (!nestOutput)
+            {
+                outputFolder = masterOutputFolder;
+            }
+
             await CreateStandardFiles(curFileName, allegroFile, outputFolder, addedPcmValues);
 
             var shapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
@@ -1099,11 +1146,14 @@ namespace CisProcessor
         {
             var depolValues = new List<(double Footage, string Value)>();
             var depolDates = new List<(double Footage, string Value)>();
-            foreach(var cisPointData in cisFile.Points)
+            foreach (var cisPointData in cisFile.Points)
             {
                 var depolPointData = depolFile.GetClosesetPoint(cisPointData.Footage);
+                if (depolPointData == null)
+                    continue;
                 depolValues.Add((cisPointData.Footage, depolPointData.Point.On.ToString("F4")));
-                depolDates.Add((cisPointData.Footage, depolPointData.Point.OnTime.Value.ToShortDateString()));
+                if (depolPointData.Point.HasTime)
+                    depolDates.Add((cisPointData.Footage, depolPointData.Point.Times[0].ToShortDateString()));
             }
 
             return (depolValues, depolDates);
@@ -1130,6 +1180,13 @@ namespace CisProcessor
             }
             await CreateExcelFile($"{fileName} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) }, outputFolder);
             var dataMetrics = new DataMetrics(allegroFile.GetPoints());
+            if (depolFile != null)
+            {
+                await CreateExcelFile($"{fileName} Depol Tabular Data", new List<(string Name, string Data)>() { ("Depol Tabular Data", depolFile.GetTabularData()) }, outputFolder);
+                var polData = addedValues.First(val => val.Item1 == "Polarization");
+                dataMetrics = new DataMetrics(allegroFile.GetPoints(), polData.Item2);
+            }
+
             await CreateExcelFile($"{fileName} Data Metrics", dataMetrics.GetSheets(), outputFolder);
             var testStation = allegroFile.GetTestStationData();
             if (depolFile != null)
@@ -1137,7 +1194,7 @@ namespace CisProcessor
                 var depolTestStation = depolFile.GetTestStationData();
                 await CreateExcelFile($"{fileName} Test Station Data", new List<(string Name, string Data)>() {
                     ("Test Station Data", testStation),
-                    ("Depol Test Station Data", depolTestStation) 
+                    ("Depol Test Station Data", depolTestStation)
                 }, outputFolder);
             }
             else
@@ -1148,13 +1205,18 @@ namespace CisProcessor
             }
             var cisSkips = allegroFile.GetSkipData();
             await CreateExcelFile($"{fileName} CIS Skip Data", new List<(string Name, string Data)>() { ("CIS Skip Data", cisSkips) }, outputFolder);
-            var depthExceptions = allegroFile.GetDepthExceptions(36, double.MaxValue);
+            var depthExceptions = allegroFile.GetDepthExceptions(ShallowCover, double.MaxValue);
             await CreateExcelFile($"{fileName} Shallow Cover", new List<(string Name, string Data)>() { ("Shallow Cover", depthExceptions) }, outputFolder);
             var shapefile = allegroFile.GetShapeFile();
             await CreateExcelFile($"{fileName} Shapefile", new List<(string Name, string Data)>() { ("Shapefile", shapefile) }, outputFolder);
             await CreateExcelFile($"{fileName} Files Order", new List<(string Name, string Data)>() { ("Order", allegroFile.FileInfos.GetExcelData(0)) }, outputFolder);
             var cisKmlFile = new KmlFile($"{fileName} CIS Map", allegroFile.GetCisKmlData());
             await cisKmlFile.WriteToFile(outputFolder);
+            if(depolFile != null)
+            {
+                var depolKmlFile = new KmlFile($"{fileName} Depol Map", depolFile.GetCisKmlData());
+                await depolKmlFile.WriteToFile(outputFolder);
+            }
             var depthKmlFile = new KmlFile($"{fileName} Depth Map", allegroFile.GetDepthKmlData());
             await depthKmlFile.WriteToFile(outputFolder);
         }

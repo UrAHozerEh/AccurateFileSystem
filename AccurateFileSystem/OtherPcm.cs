@@ -20,6 +20,7 @@ namespace AccurateFileSystem
             var depthColumn = -1;
             var ampColumn = -1;
             var dateColumn = -1;
+            var txColumn = -1;
             for (var i = 0; i < Headers.Count; ++i)
             {
                 var header = Headers[i];
@@ -43,11 +44,16 @@ namespace AccurateFileSystem
                     case "GPS_Date":
                         dateColumn = i;
                         break;
+                    case "Transmitte":
+                        txColumn = i;
+                        break;
                 }
             }
             GetDepthData(latColumn, lonColumn, depthColumn, dateColumn);
             if (ampColumn != -1)
                 GetAmpData(latColumn, lonColumn, ampColumn, dateColumn);
+            if (txColumn != -1)
+                GetTxData(latColumn, lonColumn, txColumn, dateColumn);
         }
     }
 }

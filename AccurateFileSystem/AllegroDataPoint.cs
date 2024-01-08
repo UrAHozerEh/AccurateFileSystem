@@ -178,6 +178,40 @@ namespace AccurateFileSystem
                 }
             }
             StrippedComment = Regex.Replace(CommentTemplate, @"\$\$\d*\$\$", "");
+
+            CleanComments();
+        }
+
+        public void CleanComments()
+        {
+            CleanOriginalComment();
+            CleanStrippedComment();
+        }
+
+        public void CleanOriginalComment()
+        {
+            OriginalComment.Trim(',');
+            OriginalComment.Trim();
+            OriginalComment = Regex.Replace(OriginalComment, @"\s+,", ",");
+            OriginalComment = Regex.Replace(OriginalComment, @",,+", ",");
+            OriginalComment = Regex.Replace(OriginalComment, @",", ", ");
+
+            OriginalComment = Regex.Replace(OriginalComment, @"\s\s+", " ");
+            OriginalComment.Trim(',');
+            OriginalComment.Trim();
+        }
+
+        public void CleanStrippedComment()
+        {
+            StrippedComment.Trim(',');
+            StrippedComment.Trim();
+            StrippedComment = Regex.Replace(StrippedComment, @"\s+,", ",");
+            StrippedComment = Regex.Replace(StrippedComment, @",,+", ",");
+            StrippedComment = Regex.Replace(StrippedComment, @",", ", ");
+
+            StrippedComment = Regex.Replace(StrippedComment, @"\s\s+", " ");
+            StrippedComment.Trim(',');
+            StrippedComment.Trim();
         }
 
         public bool Equals(AllegroDataPoint other)

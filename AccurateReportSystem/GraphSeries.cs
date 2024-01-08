@@ -81,7 +81,7 @@ namespace AccurateReportSystem
 
         protected void DrawLineGeometry(CanvasDrawingSession session, PageInformation page, TransformInformation2d transform)
         {
-            if (Values == null || Values.Count == 0)
+            if (Values == null || Values.Count == 0 || LineThickness == 0)
                 return;
             var hasBegun = false;
             (double footage, double value)? last = null;

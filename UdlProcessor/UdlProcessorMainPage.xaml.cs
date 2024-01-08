@@ -30,6 +30,9 @@ namespace UdlProcessor
     /// </summary>
     public sealed partial class MainPage : Page
     {
+        private const bool _makeHourly = true;
+        private const bool _makeDaily = true;
+        private const bool _drawLine = false;
         public MainPage()
         {
             this.InitializeComponent();
@@ -47,6 +50,7 @@ namespace UdlProcessor
             var masterOutputFolder = await masterFolder.CreateFolderAsync("0000 Processed Data", CreationCollisionOption.OpenIfExists);
 
             var files = await masterFolder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
+            var test1 = await masterFolder.GetFoldersAsync();
             TidalCsvData tidalData = null;
             var tidalStorage = files.SingleOrDefault(f => f.DisplayName.Contains("tidal", StringComparison.OrdinalIgnoreCase));
             if (tidalStorage != null)
@@ -88,17 +92,27 @@ namespace UdlProcessor
                         await MakeTidalGraphs(dataset, tidalData, readType, $"{fileName}", tidalReadFolder, 72, 6, 1, 0, min, max);
                         continue;
                     }
-                    var readFolder = await fileFolder.CreateFolderAsync(readType + " Daily Graphs", CreationCollisionOption.OpenIfExists);
+                    var readFolder = await fileFolder.CreateFolderAsync(readType + " Hourly Graphs", CreationCollisionOption.OpenIfExists);
                     foreach (var (graphName, values) in dailyGraphData)
                     {
                         if (values.Values.Count == 0)
                         {
                             continue;
                         }
-                        if (tidalData == null)
+                        if (tidalData == null && _makeHourly)
                             await MakeHourlyGraphs(values, readType, $"'{fileName}' on {graphName}", readFolder, 1, 0.25, 5.0 / 60.0, 5.0 / 60.0, min, max);
                     }
+                    readFolder = await fileFolder.CreateFolderAsync(readType + " Daily Graphs", CreationCollisionOption.OpenIfExists);
                     var fullDataSet = udl.GetFullData(readType);
+                    foreach (var (graphName, values) in dailyGraphData)
+                    {
+                        if (values.Values.Count == 0)
+                        {
+                            continue;
+                        }
+                        if (tidalData == null && _makeDaily)
+                            await MakeHourlyGraphs(fullDataSet, readType, $"'{fileName}' Daily", readFolder, 24, 6, 1, 1, min, max);
+                    }
                     if (fullDataSet.Values.Count == 0)
                     {
                         continue;
@@ -170,7 +184,10 @@ namespace UdlProcessor
             graph1.YAxesInfo.Y1Title = $"{type} ({units})";
             var valueSeries = new GraphSeries(readName, values)
             {
-                LineColor = Colors.Blue
+                LineColor = Colors.Blue,
+                PointColor = Colors.Blue,
+                PointShape = _drawLine ? GraphSeries.Shape.None : GraphSeries.Shape.Circle,
+                LineThickness = _drawLine ? 2 : 0
             };
             graph1.Series.Add(valueSeries);
 
@@ -333,6 +350,11 @@ namespace UdlProcessor
                 minorTimeOffset = 6;
                 majorTimeOffset = 24;
             }
+            if(totalHours > 120)
+            {
+                minorTimeOffset = (int)(totalHours / 5.0);
+                majorTimeOffset = (int)(totalHours / 5.0);
+            }
             var report = CreateReport(dataSet, reportName, readName, min, max, minorTimeOffset, majorTimeOffset);
             report.XAxisInfo.LabelFormat = "DateHour";
             report.XAxisInfo.StartDate = dataSet.StartTime;
@@ -343,7 +365,7 @@ namespace UdlProcessor
             var pages = report.PageSetup.GetAllPages(startHour, totalHours);
 
             var imageFiles = new List<StorageFile>();
-            if (pages.Count > 1)
+            if (pages.Count != 1)
             {
                 return;
             }

@@ -11,20 +11,22 @@ namespace AccurateReportSystem
     {
         public Color PolarizationAbove { get; set; } = Colors.Green;
         public Color PolarizationBelow { get; set; } = Colors.Red;
-        public double PolarizationRequirement = -0.100f;
+        public double PolarizationRequirement { get; set; }
         public override int NumberOfValues => 3;
 
         public PolarizationExceptionChartSeries(IEnumerable<(double Footage, double Pol)> data,
-            LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo) : base(data, masterLegendInfo, masterYAxesInfo)
+            LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo, double rquirement = -0.100f) : base(data, masterLegendInfo, masterYAxesInfo)
         {
+            PolarizationRequirement = rquirement;
         }
 
         protected override List<(string, Color)> LegendInfo()
         {
+            var mv = PolarizationRequirement * 1000;
             var info = new List<(string, Color)>
             {
-                ("Pol > 100mV", PolarizationAbove),
-                ("Pol < 100mV", PolarizationBelow),
+                ($"Pol > {Math.Abs(mv):F0}mV", PolarizationAbove),
+                ($"Pol < {Math.Abs(mv):F0}mV", PolarizationBelow),
                 ("No Data", NoDataColor)
             };
             return info;

@@ -11,10 +11,27 @@ namespace AccurateFileSystem
     {
         public List<(BasicGeoposition Gps, double Depth, string Date)> DepthData { get; set; } = new List<(BasicGeoposition Gps, double Depth, string Date)>();
         public List<(BasicGeoposition Gps, double Amps, string Date)> AmpData { get; set; } = new List<(BasicGeoposition Gps, double Amps, string Date)>();
+        public List<(BasicGeoposition Gps, string Date)> TxData { get; set; } = new List<(BasicGeoposition Gps, string Date)>();
 
         protected CsvPcm(string name, List<string> lines) : base(name, lines, FileType.PCM)
         {
 
+        }
+
+        protected void GetTxData(int latColumn, int lonColumn, int txColumn, int dateColumn)
+        {
+            TxData = new List<(BasicGeoposition Gps, string Date)>();
+            if (Data.GetLength(0) == 0)
+                Data = Data;
+            for (var r = 0; r < Data.GetLength(0); ++r)
+            {
+                var lat = GetDecimalDegree(Data[r, latColumn]);
+                var lon = GetDecimalDegree(Data[r, lonColumn]);
+                var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+                if (string.IsNullOrWhiteSpace(Data[r, txColumn]))
+                    continue;
+                TxData.Add((gps, Data[r, dateColumn]));
+            }
         }
 
         protected void GetDepthData(int latColumn, int lonColumn, int depthColumn, int dateColumn)

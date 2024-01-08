@@ -47,6 +47,8 @@ namespace AccurateReportSystem
                     var prevDist = Math.Abs(findFoot - prevFoot);
                     if (prevValue is null && curDist < maxDist)
                         return curValue;
+                    if (prevValue is null)
+                        return null;
 
                     var diffGap = curFoot - prevFoot;
                     var diffSearch = findFoot - prevFoot;
