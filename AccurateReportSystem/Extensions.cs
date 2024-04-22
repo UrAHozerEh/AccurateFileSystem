@@ -17,13 +17,13 @@ namespace AccurateReportSystem
     {
 
         public static List<(double Footage, double Value)> Difference(this GraphSeries initialSeries,
-            GraphSeries otherSeries)
+            GraphSeries otherSeries, double maxDistance)
         {
             var output = new List<(double Footage, double Value)>();
 
             foreach (var (foot, initialValue) in initialSeries.Values)
             {
-                var closestValue = GetClosestValue(foot, otherSeries.Values);
+                var closestValue = GetClosestValue(foot, otherSeries.Values, maxDistance);
                 if (!closestValue.HasValue)
                     continue;
 

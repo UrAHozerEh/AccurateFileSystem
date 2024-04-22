@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
 using Windows.UI;
+using Windows.UI.Xaml;
 using CisSeries = AccurateReportSystem.PGECISIndicationChartSeries;
 using DcvgSeries = AccurateReportSystem.PgeDcvgIndicationChartSeries;
 
@@ -22,6 +23,7 @@ namespace AccurateReportSystem
         public CisSeries CisSeries { get; set; } = null;
         public DcvgSeries DcvgSeries { get; set; } = null;
         private List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool isReverse, string ReadDate)> AmpReads { get; set; } = null;
+        public List<string[]> SempraCISShapeFileOutput { get; set; }
         public List<string[]> CISShapeFileOutput { get; set; }
         public List<string[]> IndicationShapeFileOutput { get; set; }
         public List<string[]> AmpsShapeFileOutput { get; set; }
@@ -31,7 +33,7 @@ namespace AccurateReportSystem
         private static int DATE = 2;
         private static int PRIMARYDES = 3;
         private static int DCVGREMOTE = 6;
-        private static int DEPTH = 7;
+        private static int DEPTH { get; } = 7;
         private static int ECDAREGION { get; } = 8;
         private static int LAT = 12;
         private static int LON = 13;
@@ -51,6 +53,17 @@ namespace AccurateReportSystem
             DcvgSeries = dcvgSeries;
             AmpReads = ampReads;
             OutlineColor = null;
+        }
+
+        public List<(double Footage, BasicGeoposition Gps, string Amps)> GetAmpKmlData()
+        {
+            var output = new List<(double Footage, BasicGeoposition Gps, string Amps)>();
+            foreach (var (Footage, Gps, Value, Percent, isReverse, ReadDate) in AmpReads)
+            {
+                if (!double.IsNaN(Value))
+                    output.Add((Footage, Gps, $"{Value}mA"));
+            }
+            return output;
         }
 
         private void GenerateShapeFileTemplate()
@@ -102,6 +115,41 @@ namespace AccurateReportSystem
             {
                 header
             };
+
+            header = new string[29];
+            header[0] = "CONTROL";
+            header[1] = "CHAINAGE";
+            header[2] = "DATEOFCIS";
+            header[3] = "PRIMARYDES";
+            header[4] = "SECONDDES";
+            header[5] = "PRIMARYGPS";
+            header[6] = "SECONDGPS";
+            header[7] = "ONREAD";
+            header[8] = "OFFREAD";
+            header[9] = "DCVGREMOTE";
+            header[10] = "PCM";
+            header[11] = "DEPTH";
+            header[12] = "SOILRES";
+            header[13] = "TOPO";
+            header[14] = "ECDAREGION";
+            header[15] = "CISCAT";
+            header[16] = "PCMCAT";
+            header[17] = "DCVGCAT";
+            header[18] = "ECDACAT";
+            header[19] = "CTRL_LAT";
+            header[20] = "CTRL_LONG";
+            header[21] = "CTRL_ELV";
+            header[22] = "CTRL_NORTH";
+            header[23] = "CTRL_EAST";
+            header[24] = "GPS_STATUS";
+            header[25] = "SNAP_DISFT";
+            header[26] = "COR_LAT";
+            header[27] = "COR_LONG";
+            header[28] = "COR_ELEV";
+            SempraCISShapeFileOutput = new List<string[]>
+            {
+                header
+            };
         }
 
         private Dictionary<int, (double Value, PGESeverity Severity, string Reason, BasicGeoposition Gps)> GetPcmSeverities()
@@ -136,7 +184,7 @@ namespace AccurateReportSystem
             var lastFoot = 0.0;
             var cisSeverities = new Dictionary<int, (double, double, string, DateTime, double?, bool, PGESeverity, string, BasicGeoposition, HcaRegion)>();
             GenerateShapeFileTemplate();
-
+            var sempraControl = 1;
             if (CisSeries != null)
             {
                 foreach (var dataPoint in CisSeries.DataUpdated)
@@ -192,12 +240,52 @@ namespace AccurateReportSystem
             var lastPrio = GetPriority(lastCisSeverity, lastDcvgSeverity, lastAmpSeverity);
             if (!lastIsExtrapolated)
             {
+                var firstSempra = new string[29];
+                firstSempra[0] = sempraControl.ToString();
+                firstSempra[1] = "0";
+                firstSempra[2] = lastDate.ToShortDateString();
+                firstSempra[3] = lastPrimaryDes;
+                firstSempra[7] = $"{lastOn:F3}";
+                firstSempra[8] = $"{lastOff:F3}";
+                if (dcvgSeverities.ContainsKey(0))
+                {
+                    firstSempra[9] = "1";
+                }
+                if (pcmSeverities.ContainsKey(0) && !double.IsNaN(lastAmpValue))
+                    firstSempra[10] = $"{lastAmpValue:F1}";
+                if (lastDepth.HasValue && lastDepth.Value != 0)
+                    firstSempra[11] = $"{lastDepth.Value:F1}";
+                firstSempra[15] = lastCisSeverity.GetDisplayName();
+                firstSempra[16] = lastAmpSeverity.GetDisplayName();
+                firstSempra[17] = "Yes";
+                switch (lastPrio)
+                {
+                    case 1:
+                        firstSempra[18] = "NRI";
+                        break;
+                    case 2:
+                        firstSempra[18] = "Level II";
+                        break;
+                    case 3:
+                        firstSempra[18] = "Level III";
+                        break;
+                    case 4:
+                        firstSempra[18] = "Level IV";
+                        break;
+                }
+                firstSempra[19] = $"{lastGps.Latitude:F8}";
+                firstSempra[20] = $"{lastGps.Longitude:F8}";
+                firstSempra[21] = $"{lastGps.Altitude:F1}";
+                firstSempra[24] = "COR GPS";
+                SempraCISShapeFileOutput.Add(firstSempra);
+                sempraControl++;
+
                 var firstShapeValues = new string[34];
                 firstShapeValues[LABEL] = $"On: {lastOn}, Off: {lastOff}";
                 firstShapeValues[STATION] = "0";
                 firstShapeValues[DATE] = lastDate.ToShortDateString();
                 firstShapeValues[PRIMARYDES] = lastPrimaryDes;
-                if (lastDepth.HasValue)
+                if (lastDepth.HasValue && lastDepth.Value != 0)
                     firstShapeValues[DEPTH] = lastDepth.Value.ToString("F0");
                 firstShapeValues[ECDAREGION] = lastRegion.ReportQName;
                 firstShapeValues[LAT] = lastGps.Latitude.ToString("F8");
@@ -288,7 +376,7 @@ namespace AccurateReportSystem
                     shapeValues[STATION] = curFoot.ToString("F0");
                     shapeValues[DATE] = curDate.ToShortDateString();
                     shapeValues[PRIMARYDES] = curPrimaryDes;
-                    if (curDepth.HasValue)
+                    if (curDepth.HasValue && curDepth.Value != 0)
                         shapeValues[DEPTH] = curDepth.Value.ToString("F0");
                     shapeValues[ECDAREGION] = curRegion.ReportQName;
                     if (!curIsExtrapolated || curDcvgGps.Equals(new BasicGeoposition()))
@@ -362,6 +450,49 @@ namespace AccurateReportSystem
                     shapeValues[PCMCAT] = curAmpSeverity.GetDisplayName();
                     shapeValues[PCM] = curAmpValue.ToString("F0");
                     AmpsShapeFileOutput.Add(shapeValues);
+                }
+
+                if (!curIsExtrapolated || (pcmSeverities.ContainsKey(curFoot) && !double.IsNaN(curAmpValue)) || dcvgSeverities.ContainsKey(curFoot))
+                {
+                    var firstSempra = new string[29];
+                    firstSempra[0] = sempraControl.ToString();
+                    firstSempra[1] = curFoot.ToString("F0");
+                    firstSempra[2] = curDate.ToShortDateString();
+                    firstSempra[3] = curPrimaryDes;
+                    firstSempra[7] = $"{curOn:F3}";
+                    firstSempra[8] = $"{curOff:F3}";
+                    if (dcvgSeverities.ContainsKey(curFoot))
+                    {
+                        firstSempra[9] = "1";
+                    }
+                    if (pcmSeverities.ContainsKey(0) && !double.IsNaN(lastAmpValue))
+                        firstSempra[10] = $"{curAmpValue:F2}";
+                    if (curDepth.HasValue && curDepth.Value != 0)
+                        firstSempra[11] = $"{curDepth.Value:F2}";
+                    firstSempra[15] = curCisSeverity.GetDisplayName();
+                    firstSempra[16] = curAmpSeverity.GetDisplayName();
+                    firstSempra[17] = "Yes";
+                    switch (curPrio)
+                    {
+                        case 1:
+                            firstSempra[18] = "NRI";
+                            break;
+                        case 2:
+                            firstSempra[18] = "Level II";
+                            break;
+                        case 3:
+                            firstSempra[18] = "Level III";
+                            break;
+                        case 4:
+                            firstSempra[18] = "Level IV";
+                            break;
+                    }
+                    firstSempra[19] = $"{curGps.Latitude:F8}";
+                    firstSempra[20] = $"{curGps.Longitude:F8}";
+                    firstSempra[21] = $"{curGps.Altitude:F1}";
+                    firstSempra[24] = "COR GPS";
+                    SempraCISShapeFileOutput.Add(firstSempra);
+                    sempraControl++;
                 }
 
                 if (!(curRegion.Name == lastRegion.Name && curRegion.ShouldSkip))

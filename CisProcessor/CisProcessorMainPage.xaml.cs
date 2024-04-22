@@ -43,10 +43,11 @@ namespace CisProcessor
     public sealed partial class MainPage : Page
     {
         private const double MaxDepth = 180;
-        private const string _client = "TransMontaigne";
-        private const double MinPassingValue = -0.850;
+        private const string _client = "Sempra";
+        private const double MinPassingValue = -0.550;
         private const double MinPolPassingValue = -0.1;
-        private const double ShallowCover = 24; //Usually 36
+        private const double ShallowCover = 36; //Usually 36
+        private const double MaxCisDistance = 20;
 
         public MainPage()
         {
@@ -444,7 +445,7 @@ namespace CisProcessor
             folders = folders.OrderBy(folder => folder.DisplayName).ToList().AsReadOnly();
             foreach (var folder in folders)
             {
-                if (folder == outputFolder || folder == fileOrder)
+                if (folder.DisplayName == outputFolder.DisplayName || folder.DisplayName == fileOrder.DisplayName)
                     continue;
                 var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
                 const int maxGap = 3600;
@@ -529,8 +530,11 @@ namespace CisProcessor
                 }
                 combinedOnOffFiles?.FixContactSpikes();
                 combinedStaticFiles?.FixContactSpikes();
+                combinedStaticFiles?.FixGps();
+                //combinedStaticFiles?.StraightenGps();
+                //combinedStaticFiles?.SetFootageFromGps();
                 combinedOnOffFiles?.FixGps();
-                combinedOnOffFiles?.StraightenGps();
+                //combinedOnOffFiles?.StraightenGps();
                 //combinedOnOffFiles.SetFootageFromGps();
                 combinedOnOffFiles?.RemoveComments("+");
                 //if (combinedOnOffFiles.HasStartSkip)
@@ -613,29 +617,33 @@ namespace CisProcessor
 
             var on = new GraphSeries("On", onOffFile.GetDoubleData("On"))
             {
-                LineColor = Colors.Blue
+                LineColor = Colors.Blue,
+                MaxDrawDistance = MaxCisDistance
             };
             var off = new GraphSeries("Off", onOffFile.GetDoubleData("Off"))
             {
-                LineColor = Colors.Green
+                LineColor = Colors.Green,
+                MaxDrawDistance = MaxCisDistance
             };
             var onMir = new GraphSeries("On MIR Compensated", onOffFile.GetDoubleData("On Compensated"))
             {
-                LineColor = Colors.Purple
+                LineColor = Colors.Purple,
+                MaxDrawDistance = MaxCisDistance
             };
             var offMir = new GraphSeries("Off MIR Compensated", onOffFile.GetDoubleData("Off Compensated"))
             {
-                LineColor = Color.FromArgb(255, 57, 255, 20)
+                LineColor = Color.FromArgb(255, 57, 255, 20),
+                MaxDrawDistance = MaxCisDistance
             };
             var staticData = new GraphSeries("Static", staticFile.GetDoubleData("On"))
             {
                 LineColor = Colors.Magenta,
-                MaxDrawDistance = 25
+                MaxDrawDistance = MaxCisDistance
             };
-            var polarizationData = new GraphSeries("Polarization", offMir.Difference(staticData))
+            var polarizationData = new GraphSeries("Polarization", offMir.Difference(staticData, MaxCisDistance))
             {
                 LineColor = Colors.Crimson,
-                MaxDrawDistance = 25
+                MaxDrawDistance = MaxCisDistance
             };
             var depth = new GraphSeries("Depth", onOffFile.GetDoubleData("Depth"))
             {
@@ -760,7 +768,8 @@ namespace CisProcessor
             ExceptionsChartSeries exceptions = new OnOffPassingRangeExceptionChartSeries(onOffFile.GetCombinedMirData(), chart2.LegendInfo, chart2.YAxesInfo)
             {
                 LegendLabelSplit = 0.5f,
-                MinimumValue = MinPassingValue
+                MinimumValue = MinPassingValue,
+                MaxDistance = MaxCisDistance
             };
             chart2.Series.Add(exceptions);
 
@@ -775,7 +784,8 @@ namespace CisProcessor
             };
             ExceptionsChartSeries polExceptions = new PolarizationExceptionChartSeries(polarizationData.Values, chart3.LegendInfo, chart3.YAxesInfo, MinPolPassingValue)
             {
-                LegendLabelSplit = 0.5f
+                LegendLabelSplit = 0.5f,
+                MaxDistance = MaxCisDistance
             };
             chart3.Series.Add(polExceptions);
 
@@ -823,7 +833,7 @@ namespace CisProcessor
             {
                 curOutputName = curOutputName.Substring(0, foundHyphenGap).Trim();
             }
-            var outputFolder = await masterOutputFolder.CreateFolderAsync(curOutputName, CreationCollisionOption.FailIfExists);
+            var outputFolder = await masterOutputFolder.CreateFolderAsync(curOutputName, CreationCollisionOption.OpenIfExists);
             const bool nestOutput = false;
 
             if (!nestOutput)

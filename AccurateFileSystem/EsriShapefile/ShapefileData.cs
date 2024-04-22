@@ -16,15 +16,15 @@ namespace AccurateFileSystem.EsriShapefile
         public List<BasicGeoposition> Gps { get; set; }
         public string Name { get; set; }
 
-        public ShapefileData(string name, List<string[]> data)
+        public ShapefileData(string name, List<string[]> data, bool isPge = true)
         {
             Name = name;
             var headers = data[0];
-            CreateFields(headers);
+            CreateFields(headers, isPge);
             CreateRecords(data.Skip(1).ToList());
         }
 
-        public ShapefileData(string name, string dataString)
+        public ShapefileData(string name, string dataString, bool isPge = true)
         {
             var data = new List<string[]>();
             var dataLines = dataString.Split('\n');
@@ -35,7 +35,7 @@ namespace AccurateFileSystem.EsriShapefile
             }
             Name = name;
             var headers = data[0];
-            CreateFields(headers);
+            CreateFields(headers, isPge);
             CreateRecords(data.Skip(1).ToList());
         }
 
@@ -54,7 +54,7 @@ namespace AccurateFileSystem.EsriShapefile
             await dbfFile.WriteToFile(outputFolder);
         }
 
-        private void CreateFields(string[] headers)
+        private void CreateFields(string[] headers, bool isPge = true)
         {
             Fields = new List<FieldDescriptor>();
             foreach (var name in headers)
@@ -62,28 +62,73 @@ namespace AccurateFileSystem.EsriShapefile
                 var type = "C";
                 var length = 254;
                 var decimals = 0;
-                switch (name)
+                if(isPge)
                 {
-                    case "STATION":
-                    case "DEPTH":
-                        length = 10;
-                        type = "N";
-                        break;
-                    case "DATEOFCIS":
-                        length = 8;
-                        type = "D";
-                        break;
-                    case "LATITUDE":
-                    case "LONGITUDE":
-                    case "ONREAD":
-                    case "OFFREAD":
-                        length = 19;
-                        decimals = 11;
-                        type = "N";
-                        break;
-                    default:
-                        break;
+                    switch (name)
+                    {
+                        case "STATION":
+                        case "DEPTH":
+                        case "CONTROL":
+                        case "CHAINAGE":
+                            length = 10;
+                            type = "N";
+                            break;
+                        case "DATEOFCIS":
+                            length = 8;
+                            type = "D";
+                            break;
+                        case "LATITUDE":
+                        case "LONGITUDE":
+                        case "ONREAD":
+                        case "OFFREAD":
+                        case "PCM":
+                        case "CTRL_ELV":
+                        case "CTRL_LAT":
+                        case "CTRL_LONG":
+                        case "CTRL_NORTH":
+                        case "CTRL_EAST":
+                            length = 19;
+                            decimals = 11;
+                            type = "N";
+                            break;
+                        default:
+                            break;
+                    }
                 }
+                else
+                {
+                    switch (name)
+                    {
+                        case "STATION":
+                        case "CONTROL":
+                        case "CHAINAGE":
+                            length = 10;
+                            type = "N";
+                            break;
+                        case "DATEOFCIS":
+                            length = 8;
+                            type = "D";
+                            break;
+                        case "ONREAD":
+                        case "OFFREAD":
+                        case "CTRL_ELV":
+                            length = 19;
+                            decimals = 3;
+                            type = "N";
+                            break;
+                        case "CTRL_LAT":
+                        case "CTRL_LONG":
+                        case "CTRL_NORTH":
+                        case "CTRL_EAST":
+                            length = 19;
+                            decimals = 8;
+                            type = "N";
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                
                 var field = new FieldDescriptor(name, type, length, decimals);
                 Fields.Add(field);
             }

@@ -170,6 +170,7 @@ namespace AccurateFileSystem
                     if (read is ReconnectTestStationRead reconnect)
                     {
                         HasReconnect = true;
+                        // On Off set to NG
                         On = reconnect.NGOn;
                         Off = reconnect.NGOff;
                     }

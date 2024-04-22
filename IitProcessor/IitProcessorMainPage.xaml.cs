@@ -163,6 +163,7 @@ namespace IitProcessor
             var dcvgFiles = new List<AllegroCISFile>();
             var pcmFiles = new List<CsvPcm>();
             var acvgReads = new List<(BasicGeoposition, double)>();
+            var soilReads = new List<(BasicGeoposition, string)>();
             Skips cisSkips = null;
             Skips pcmSkips = null;
 
@@ -199,6 +200,12 @@ namespace IitProcessor
                 if (newFile == null && file.FileType.ToLower() == ".acvg")
                 {
                     acvgReads = ParseAcvgReads(await file.GetLines());
+                }
+                else if (newFile == null && file.FileType.ToLower() == ".soilres")
+                {
+                    var lines = await file.GetLines();
+                    var splitLines = lines.Select(l => l.Split(','));
+                    soilReads = splitLines.Select(s => (new BasicGeoposition() { Latitude = double.Parse(s[1]), Longitude = double.Parse(s[2]) }, s[0])).ToList();
                 }
             }
             var hca = regions.GetHca(displayName);
@@ -307,7 +314,7 @@ namespace IitProcessor
             }
             dcvgData.Sort((first, second) => first.Item1.CompareTo(second.Item1));
 
-            if(pcmFiles.Count == 1 && pcmFiles.First().TxData.Count == 1)
+            if (pcmFiles.Count == 1 && pcmFiles.First().TxData.Count == 1)
             {
                 var (txGps, _) = pcmFiles.First().TxData.First();
                 var firstCis = combinedCisFile.Points.First();
@@ -325,9 +332,9 @@ namespace IitProcessor
                     lastCis.Point.CleanComments();
                 }
             }
-            else if(pcmFiles.Count != 0)
+            else if (pcmFiles.Count != 0)
             {
-                foreach(var pcmFile in pcmFiles)
+                foreach (var pcmFile in pcmFiles)
                 {
                     if (pcmFile.TxData.Count != 1 || pcmFile.AmpData.Count == 0)
                         continue;
@@ -335,10 +342,10 @@ namespace IitProcessor
                     CombinedDataPoint lastCis = null;
                     var (txGps, _) = pcmFile.TxData.First();
 
-                    foreach(var pcmPoint in pcmFile.AmpData)
+                    foreach (var pcmPoint in pcmFile.AmpData)
                     {
                         var (closestCis, _) = combinedCisFile.GetClosestPoint(pcmPoint.Gps);
-                        if(firstCis == null || closestCis.Footage < firstCis.Footage)
+                        if (firstCis == null || closestCis.Footage < firstCis.Footage)
                         {
                             firstCis = closestCis;
                         }
@@ -372,13 +379,13 @@ namespace IitProcessor
                 reportInfo = new PgeEcdaReportInformation(combinedCisFile, acvgReads, ampReads, hca, 10, false);
             }
 
-            
+
 
             var reportQ = "";
             if (reportInfo.EcdaData.Count == 0)
                 reportInfo = reportInfo;
             reportQ += reportInfo.GetReportQ();
-            await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, isDcvg, displayName, hca, cisSkips, pcmSkips, outputFolder, pcmFiles.First().TxData);
+            await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, isDcvg, displayName, hca, cisSkips, pcmSkips, outputFolder, pcmFiles.First().TxData, soilReads);
         }
 
         private List<(BasicGeoposition Gps, double Value, double Percent)> GetAmpReads(List<CsvPcm> files)
@@ -421,7 +428,7 @@ namespace IitProcessor
             }
         }
 
-        private async Task MakeIITGraphsUpdated(CombinedAllegroCisFile file, PgeEcdaReportInformation ecdaReport, bool isDcvg, string folderName, Hca hca, Skips cisSkips, Skips pcmSkips, StorageFolder outputFolder = null, List<(BasicGeoposition, string)> txLocations = null)
+        private async Task MakeIITGraphsUpdated(CombinedAllegroCisFile file, PgeEcdaReportInformation ecdaReport, bool isDcvg, string folderName, Hca hca, Skips cisSkips, Skips pcmSkips, StorageFolder outputFolder = null, List<(BasicGeoposition, string)> txLocations = null, List<(BasicGeoposition, string)> soilRes = null)
         {
             if (outputFolder == null)
                 outputFolder = ApplicationData.Current.LocalFolder;
@@ -459,7 +466,7 @@ namespace IitProcessor
                 report.PageSetup = new AccurateReportSystem.PageSetup(100, 10);
                 report.XAxisInfo.MajorGridline.Offset = 10;
             }
-            
+
             var onOffGraph = new Graph(report);
             var on = new GraphSeries("On", onData)
             {
@@ -741,7 +748,15 @@ namespace IitProcessor
                     var thirdToolValue = thirdToolSeverity.GetDisplayName();
                     if (!region.Name.Contains("P"))
                         thirdToolValue = "NT";
-                    output.AppendLine($"{cisSeverity.GetDisplayName()}\t{dcvgSeverity.GetDisplayName()}\t{thirdToolValue}\t{PriorityDisplayName(priority)}\t{reason.Replace("..", ".")}");
+                    if (IsPge)
+                    {
+                        output.AppendLine($"{cisSeverity.GetDisplayName()}\t{dcvgSeverity.GetDisplayName()}\t{thirdToolValue}\t{PriorityDisplayName(priority)}\t{reason.Replace("..", ".")}");
+                    }
+                    else
+                    {
+                        var (mostPositiveOn, mostPositiveOff) = file.GetMostPositive(startFoot, endFoot).Value;
+                        output.AppendLine($"{cisSeverity.GetDisplayName()}\t{dcvgSeverity.GetDisplayName()}\t{thirdToolValue}\t{PriorityDisplayName(priority)}\t{reason.Replace("..", ".")}\t{mostPositiveOn:F3}\t{mostPositiveOff:F3}");
+                    }
                 }
             }
             ReportQ += output.ToString();
@@ -753,11 +768,53 @@ namespace IitProcessor
                 var lineString = string.Join('\t', line);
                 cisShapeFileStringBuilder.AppendLine(lineString);
             }
+
+            if (!IsPge)
+            {
+                var sempraShapeFileTest = new ShapefileData($"{folderName} Shapefile", ecdaClassSeries.SempraCISShapeFileOutput, false);
+                await sempraShapeFileTest.WriteToFolder(outputFolder);
+                var dcvgKmlFile = new KmlFile($"{folderName} DCVG Shapefile", dcvgData.Select(d => (d.Item1, d.Item3, "DCVG Indication")).ToList());
+                await dcvgKmlFile.WriteToFile(googleShapefileFolder);
+            }
+
             var cisShapeFileTest = new ShapefileData($"{folderName} CIS Shapefile", ecdaClassSeries.CISShapeFileOutput);
             await cisShapeFileTest.WriteToFolder(shapefileFolder);
 
+            //#region soil res
+            var soilResShapeData = new List<string[]>
+            {
+                new string[]
+                {
+                    "LABEL",
+                    "LATITUDE",
+                    "LONGITUDE"
+                }
+            };
+            var soilResKmlData = new List<(double Footage, BasicGeoposition Gps, string Comment)>();
+            foreach (var (soilDataGps, soilLabel) in soilRes)
+            {
+                soilResShapeData.Add(new string[]
+                {
+                    soilLabel,
+                    soilDataGps.Latitude.ToString("F8"),
+                    soilDataGps.Longitude.ToString("F8")
+                });
+                soilResKmlData.Add((0, soilDataGps, soilLabel));
+            }
+            if (soilRes.Count > 0)
+            {
+                var soilResShapefile = new ShapefileData($"{folderName} Soil Res Shapefile", soilResShapeData);
+                await soilResShapefile.WriteToFolder(shapefileFolder);
+
+                var soilResKml = new KmlFile($"{folderName} Soil Res Shapefile", soilResKmlData);
+                await soilResKml.WriteToFile(googleShapefileFolder);
+            }
+            //#endregion
+
             var cisKmlFileTest = new KmlFile($"{folderName} CIS Shapefile", file.GetCisKmlData());
             await cisKmlFileTest.WriteToFile(googleShapefileFolder);
+
+
 
             var depthShapeFileStringBuilder = new StringBuilder();
             var depthShapeData = new List<string[]>();
@@ -802,6 +859,8 @@ namespace IitProcessor
             {
                 var pcmShapeFileTest = new ShapefileData($"{folderName} PCM Shapefile", ecdaClassSeries.AmpsShapeFileOutput);
                 await pcmShapeFileTest.WriteToFolder(shapefileFolder);
+                var pcmKmlFileTest = new KmlFile($"{folderName} PCM Shapefile", ecdaClassSeries.GetAmpKmlData());
+                await pcmKmlFileTest.WriteToFile(googleShapefileFolder);
             }
 
             var skipReportString = skipReport.ToString();

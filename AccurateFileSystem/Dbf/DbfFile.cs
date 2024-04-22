@@ -59,9 +59,9 @@ namespace AccurateFileSystem.Dbf
             FieldDescriptors = fields;
             Records = records;
 
-            Year = 2021;
-            Month = 6;
-            Day = 3;
+            Year = DateTime.Now.Year;
+            Month = DateTime.Now.Month;
+            Day = DateTime.Now.Day;
             CalculateSizes();
         }
 

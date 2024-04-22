@@ -180,6 +180,11 @@ namespace AccurateFileSystem
 
                 NGOn = double.Parse(onOffMatch.Groups[count - 2].Value);
                 NGOff = double.Parse(onOffMatch.Groups[count - 1].Value);
+
+                // MIR Replacelent
+                //MirOn = FGOn - NGOn;
+                //MirOff = FGOff - NGOff;
+
             }
             else if (onMatch.Success)
             {
@@ -189,9 +194,9 @@ namespace AccurateFileSystem
                     Tag = onMatch.Groups[1].Value;
                 FGOn = double.Parse(onMatch.Groups[count - 3].Value);
 
-                MirOn = double.Parse(onMatch.Groups[count - 2].Value);
-
                 NGOn = double.Parse(onMatch.Groups[count - 1].Value);
+
+                MirOn = FGOn - NGOn;
 
             }
             else

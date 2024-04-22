@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
 using Windows.Globalization.NumberFormatting;
+using Windows.UI.Xaml.Media.Animation;
 
 namespace AccurateFileSystem
 {
@@ -1398,6 +1399,23 @@ namespace AccurateFileSystem
             }
 
             Points = list;
+        }
+
+        public (double On, double Off)? GetMostPositive(double startFootage, double endFootage)
+        {
+            (double, double)? output = null;
+            var mostPositive = double.MinValue;
+            foreach(var point in Points)
+            {
+                if (point.Footage < startFootage || point.Footage > endFootage)
+                    continue;
+                if(point.Point.On > mostPositive || point.Point.Off > mostPositive)
+                {
+                    mostPositive = Math.Max(point.Point.On, point.Point.Off);
+                    output = (point.Point.On, point.Point.Off);
+                }
+            }
+            return output;
         }
 
         public List<(double Footage, double On, double Off)> GetCombinedMirData()
