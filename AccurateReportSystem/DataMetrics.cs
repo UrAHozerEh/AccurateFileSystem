@@ -171,12 +171,17 @@ namespace AccurateReportSystem
                         }
                     }
                 }
-                var curPol = polData?.FirstOrDefault(val => val.Footage == footage);
-                if(curPol.HasValue && curPol.Value.Value > -0.1 && curPol.Value.Footage == footage)
+            }
+            if (polData is null)
+                return;
+            foreach (var (footage, value) in polData)
+            {
+                if (value > -0.1)
                 {
-                    var curPolVal = curPol.Value.Value;
-                    if(polarization == null)
+                    var curPolVal = value;
+                    if (polarization == null)
                     {
+                        var point = onOffData.First(x => x.Item1 >= footage).Item2;
                         polarization = new DataMetricRow()
                         {
                             StartFootage = footage,
@@ -186,9 +191,11 @@ namespace AccurateReportSystem
                             Readings = 1,
                             Worst = curPolVal
                         };
+                        Polarization100.Add(polarization);
                     }
                     else
                     {
+                        var point = onOffData.First(x => x.Item1 >= footage).Item2;
                         polarization.Readings += 1;
                         polarization.EndFootage = footage;
                         polarization.EndPoint = point;
@@ -196,7 +203,7 @@ namespace AccurateReportSystem
                             polarization.Worst = curPolVal;
                     }
                 }
-                else if(polarization != null)
+                else if (polarization != null)
                 {
                     polarization = null;
                 }

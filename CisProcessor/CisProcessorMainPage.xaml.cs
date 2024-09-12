@@ -44,7 +44,7 @@ namespace CisProcessor
     {
         private const double MaxDepth = 180;
         private const string _client = "Sempra";
-        private const double MinPassingValue = -0.550;
+        private const double MinPassingValue = -0.850;
         private const double MinPolPassingValue = -0.1;
         private const double ShallowCover = 36; //Usually 36
         private const double MaxCisDistance = 20;
