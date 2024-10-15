@@ -510,7 +510,7 @@ namespace AFSTester
         {
             var tabular = allegroFile.GetTabularData();
             await CreateExcelFile($"{fileName} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) });
-            var dataMetrics = new DataMetrics(allegroFile.GetPoints());
+            var dataMetrics = new DataMetrics(allegroFile.GetPoints(), true);
             await CreateExcelFile($"{fileName} Data Metrics", dataMetrics.GetSheets());
             var testStation = allegroFile.GetTestStationData();
             await CreateExcelFile($"{fileName} Test Station Data", new List<(string Name, string Data)>() { ("Test Station Data", testStation) });

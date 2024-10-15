@@ -43,11 +43,12 @@ namespace CisProcessor
     public sealed partial class MainPage : Page
     {
         private const double MaxDepth = 180;
-        private const string _client = "Sempra";
+        private const string _client = "TRI Pipeline";
         private const double MinPassingValue = -0.850;
         private const double MinPolPassingValue = -0.1;
         private const double ShallowCover = 36; //Usually 36
         private const double MaxCisDistance = 20;
+        private const bool IncludeMir = false;
 
         public MainPage()
         {
@@ -920,14 +921,19 @@ namespace CisProcessor
             {
                 LineColor = Colors.Green
             };
-            var onMir = new GraphSeries("On MIR Compensated", allegroFile.GetDoubleData("On Compensated"))
+            GraphSeries onMir = null;
+            GraphSeries offMir = null;
+            if (IncludeMir)
             {
-                LineColor = Colors.Purple
-            };
-            var offMir = new GraphSeries("Off MIR Compensated", allegroFile.GetDoubleData("Off Compensated"))
-            {
-                LineColor = Color.FromArgb(255, 57, 255, 20)
-            };
+                onMir = new GraphSeries("On MIR Compensated", allegroFile.GetDoubleData("On Compensated"))
+                {
+                    LineColor = Colors.Purple
+                };
+                offMir = new GraphSeries("Off MIR Compensated", allegroFile.GetDoubleData("Off Compensated"))
+                {
+                    LineColor = Color.FromArgb(255, 57, 255, 20)
+                };
+            }
             var depth = new GraphSeries("Depth", allegroFile.GetDoubleData("Depth"))
             {
                 LineColor = Colors.Black,
@@ -958,7 +964,7 @@ namespace CisProcessor
             commentGraph.YAxesInfo.MajorGridlines.IsEnabled = false;
             commentGraph.YAxesInfo.Y1IsDrawn = false;
 
-            var dcvgIndication = new PointWithLabelGraphSeries($"DCVG Indication", -0.2, new List<(double,string)>())
+            var dcvgIndication = new PointWithLabelGraphSeries($"DCVG Indication", -0.2, new List<(double, string)>())
             {
                 ShapeRadius = 3,
                 PointColor = Colors.Red,
@@ -991,8 +997,11 @@ namespace CisProcessor
             if (allegroFile.Type == FileType.OnOff)
             {
                 graph1.Series.Add(off);
-                graph1.Series.Add(onMir);
-                graph1.Series.Add(offMir);
+                if (IncludeMir)
+                {
+                    graph1.Series.Add(onMir);
+                    graph1.Series.Add(offMir);
+                }
             }
             if (allegroFile.Type != FileType.Native)
             {
@@ -1189,12 +1198,12 @@ namespace CisProcessor
                 tabular = allegroFile.GetTabularData(addedValues: stringAddedValues);
             }
             await CreateExcelFile($"{fileName} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) }, outputFolder);
-            var dataMetrics = new DataMetrics(allegroFile.GetPoints());
+            var dataMetrics = new DataMetrics(allegroFile.GetPoints(), IncludeMir);
             if (depolFile != null)
             {
                 await CreateExcelFile($"{fileName} Depol Tabular Data", new List<(string Name, string Data)>() { ("Depol Tabular Data", depolFile.GetTabularData()) }, outputFolder);
                 var polData = addedValues.First(val => val.Item1 == "Polarization");
-                dataMetrics = new DataMetrics(allegroFile.GetPoints(), polData.Item2);
+                dataMetrics = new DataMetrics(allegroFile.GetPoints(), IncludeMir, polData.Item2);
             }
 
             await CreateExcelFile($"{fileName} Data Metrics", dataMetrics.GetSheets(), outputFolder);
@@ -1222,7 +1231,7 @@ namespace CisProcessor
             await CreateExcelFile($"{fileName} Files Order", new List<(string Name, string Data)>() { ("Order", allegroFile.FileInfos.GetExcelData(0)) }, outputFolder);
             var cisKmlFile = new KmlFile($"{fileName} CIS Map", allegroFile.GetCisKmlData());
             await cisKmlFile.WriteToFile(outputFolder);
-            if(depolFile != null)
+            if (depolFile != null)
             {
                 var depolKmlFile = new KmlFile($"{fileName} Depol Map", depolFile.GetCisKmlData());
                 await depolKmlFile.WriteToFile(outputFolder);

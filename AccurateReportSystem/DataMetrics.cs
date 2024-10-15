@@ -17,20 +17,25 @@ namespace AccurateReportSystem
         public List<DataMetricRow> OffBetween = new List<DataMetricRow>();
         public List<DataMetricRow> Polarization100 = new List<DataMetricRow>();
         public List<DataMetricRow> Ac = new List<DataMetricRow>();
+        public bool UseMir = true;
 
-        public DataMetrics(List<(double, AllegroDataPoint)> onOffData, List<(double Footage, double Value)> polData = null)
+        public DataMetrics(List<(double, AllegroDataPoint)> onOffData, bool useMir, List<(double Footage, double Value)> polData = null)
         {
             DataMetricRow on850 = null;
             DataMetricRow off850 = null;
             DataMetricRow off1250 = null;
             DataMetricRow offBetween = null;
             DataMetricRow polarization = null;
+            UseMir = useMir;
 
             for (var i = 0; i < onOffData.Count; ++i)
             {
                 var (footage, point) = onOffData[i];
                 ++TotalReads;
-                if (point.MirOn > -0.85)
+                var curOn = UseMir ? point.MirOn : point.On;
+                var curOff = UseMir ? point.MirOff : point.Off;
+
+                if (curOn > -0.85)
                 {
                     if (on850 == null)
                     {
@@ -41,7 +46,7 @@ namespace AccurateReportSystem
                             EndFootage = footage,
                             EndPoint = point,
                             Readings = 1,
-                            Worst = point.MirOn
+                            Worst = curOn
                         };
                         On850.Add(on850);
                     }
@@ -50,8 +55,8 @@ namespace AccurateReportSystem
                         on850.Readings += 1;
                         on850.EndFootage = footage;
                         on850.EndPoint = point;
-                        if (point.MirOn > on850.Worst)
-                            on850.Worst = point.MirOn;
+                        if (curOn > on850.Worst)
+                            on850.Worst = curOn;
                     }
                 }
                 else if (on850 != null)
@@ -59,8 +64,8 @@ namespace AccurateReportSystem
                     //On850.Add(on850);
                     on850 = null;
                 }
-
-                if (point.MirOff > -0.85)
+                
+                if (curOff > -0.85)
                 {
                     if (off850 == null)
                     {
@@ -71,7 +76,7 @@ namespace AccurateReportSystem
                             EndFootage = footage,
                             EndPoint = point,
                             Readings = 1,
-                            Worst = point.MirOff
+                            Worst = curOff
                         };
                         Off850.Add(off850);
                     }
@@ -80,8 +85,8 @@ namespace AccurateReportSystem
                         off850.Readings += 1;
                         off850.EndFootage = footage;
                         off850.EndPoint = point;
-                        if (point.MirOff > off850.Worst)
-                            off850.Worst = point.MirOff;
+                        if (curOff > off850.Worst)
+                            off850.Worst = curOff;
                     }
                 }
                 else if (off850 != null)
@@ -90,7 +95,7 @@ namespace AccurateReportSystem
                     off850 = null;
                 }
 
-                if (point.MirOff < -1.25)
+                if (curOff < -1.25)
                 {
                     if (off1250 == null)
                     {
@@ -101,7 +106,7 @@ namespace AccurateReportSystem
                             EndFootage = footage,
                             EndPoint = point,
                             Readings = 1,
-                            Worst = point.MirOff
+                            Worst = curOff
                         };
                         Off1250.Add(off1250);
                     }
@@ -110,8 +115,8 @@ namespace AccurateReportSystem
                         off1250.Readings += 1;
                         off1250.EndFootage = footage;
                         off1250.EndPoint = point;
-                        if (point.MirOff < off1250.Worst)
-                            off1250.Worst = point.MirOff;
+                        if (curOff < off1250.Worst)
+                            off1250.Worst = curOff;
                     }
                 }
                 else if (off1250 != null)
@@ -120,7 +125,7 @@ namespace AccurateReportSystem
                     off1250 = null;
                 }
 
-                if (point.MirOff < -0.6 && point.MirOff > -0.75)
+                if (curOff < -0.6 && curOff > -0.75)
                 {
                     if (offBetween == null)
                     {
@@ -131,7 +136,7 @@ namespace AccurateReportSystem
                             EndFootage = footage,
                             EndPoint = point,
                             Readings = 1,
-                            Worst = point.MirOff
+                            Worst = curOff
                         };
                         OffBetween.Add(offBetween);
                     }
@@ -140,8 +145,8 @@ namespace AccurateReportSystem
                         offBetween.Readings += 1;
                         offBetween.EndFootage = footage;
                         offBetween.EndPoint = point;
-                        if (point.MirOff > offBetween.Worst)
-                            offBetween.Worst = point.MirOff;
+                        if (curOff > offBetween.Worst)
+                            offBetween.Worst = curOff;
                     }
                 }
                 else if (offBetween != null)
