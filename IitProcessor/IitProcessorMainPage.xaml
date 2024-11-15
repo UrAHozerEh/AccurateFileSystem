@@ -9,6 +9,7 @@
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
     <Grid>
-        <Button x:Name="buttonDoWork" Content="Do Work" Click="buttonDoWork_Click"/>
+        <Button x:Name="buttonDoOldWork" Content="Do Old Work" Click="buttonDoWork_Click"/>
+        <Button x:Name="buttonDoNewWork" Content="Do New Work" Click="buttonDoNewWork_Click"/>
     </Grid>
 </Page>

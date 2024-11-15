@@ -428,6 +428,249 @@ namespace IitProcessor
             }
         }
 
+        private async Task MakeIITGraphsFromNew()
+        {
+            // Get Input Folder
+            var folderPicker = new FolderPicker();
+            folderPicker.FileTypeFilter.Add(".");
+            var outputFolder = await folderPicker.PickSingleFolderAsync();
+            if (outputFolder == null)
+                return;
+            var folderName = "HCA 5184";
+
+            //read Data.txt file that is tab delimited
+            var dataFile = await outputFolder.GetFileAsync("Data.txt");
+            var data = await dataFile.GetLines();
+            var fullData = new Dictionary<string, List<string>>();
+            Dictionary<int, string> columnNames = null;
+
+            foreach (var line in data)
+            {
+                var values = line.Split('\t');
+                if (columnNames is null)
+                {
+                    columnNames = new Dictionary<int, string>();
+                    for (int i = 0; i < values.Length; ++i)
+                    {
+                        var name = values[i];
+                        columnNames.Add(i, name);
+                        fullData.Add(name, new List<string>());
+                    }
+                    continue;
+                }
+                for (int i = 0; i < values.Length; ++i)
+                {
+                    fullData[columnNames[i]].Add(values[i]);
+                }
+            }
+            var finalFootage = double.Parse(fullData["Extrapolated Final Gps Footage"].Last());
+
+            var maxDepth = 200;
+            var curDepth = 50.0;
+            var maxDrawDistance = 20.0;
+            var shortGraphLength = 200.0;
+            var medGraphLength = 600.0;
+            var directionData = new List<(double, bool, string)>();
+
+            var report = new GraphicalReport();
+            report.LegendInfo.NameFontSize = 16f;
+            if (finalFootage < medGraphLength)
+            {
+                report.PageSetup = new AccurateReportSystem.PageSetup(200, 20);
+                report.XAxisInfo.MajorGridline.Offset = 10;
+            }
+            if (finalFootage < shortGraphLength)
+            {
+                report.PageSetup = new AccurateReportSystem.PageSetup(100, 10);
+                report.XAxisInfo.MajorGridline.Offset = 10;
+            }
+
+            var rawFootage = fullData["Extrapolated Final Gps Footage"];
+            var onRawData = fullData["Mir Compensated On"];
+            var offRawData = fullData["Mir Compensated Off"];
+            var commentRawData = fullData["Raw Comment"];
+            var dcvgPercentRawData = fullData["Dcvg Indication Percent"];
+            var onData = new List<(double Footage, double Value)>();
+            var offData = new List<(double Footage, double Value)>();
+            var commentData = new List<(double, string)>();
+            var dcvgData = new List<(double, double)>();
+
+            for (int i = 0; i < rawFootage.Count; ++i)
+            {
+                var curFootage = double.Parse(rawFootage[i]);
+                var curOn = onRawData[i];
+                var curOff = offRawData[i];
+                var curDcvg = dcvgPercentRawData[i];
+                if (!string.IsNullOrWhiteSpace(curOn) && double.TryParse(curOn, out double onValue))
+                {
+                    onData.Add((curFootage, onValue));
+                }
+                if (!string.IsNullOrWhiteSpace(curOff) && double.TryParse(curOff, out double offValue))
+                {
+                    offData.Add((curFootage, offValue));
+                }
+                if (!string.IsNullOrWhiteSpace(curDcvg) && double.TryParse(curDcvg, out double dcvgValue))
+                {
+                    dcvgData.Add((curFootage, dcvgValue));
+                }
+                if (!string.IsNullOrWhiteSpace(commentRawData[i]))
+                {
+                    commentData.Add((curFootage, commentRawData[i]));
+                }
+                var curDirection = curFootage < finalFootage;
+                directionData.Add((curFootage, false, "10/23/2024"));
+            }
+
+            var onOffGraph = new Graph(report);
+            var on = new GraphSeries("On", onData)
+            {
+                LineColor = Colors.Blue,
+                PointShape = GraphSeries.Shape.Circle,
+                PointColor = Colors.Blue,
+                ShapeRadius = 2,
+                MaxDrawDistance = maxDrawDistance
+            };
+            var off = new GraphSeries("Off", offData)
+            {
+                LineColor = Colors.Green,
+                PointShape = GraphSeries.Shape.Circle,
+                PointColor = Colors.Green,
+                ShapeRadius = 2,
+                MaxDrawDistance = maxDrawDistance
+            };
+            var depth = new GraphSeries("Depth", new List<(double footage, double value)>())
+            {
+                LineColor = Colors.Black,
+                PointColor = Colors.Orange,
+                IsY1Axis = false,
+                PointShape = GraphSeries.Shape.Circle,
+                GraphType = GraphSeries.Type.Point,
+                ShapeRadius = 4
+            };
+            var redLine = new SingleValueGraphSeries("850 Line", -0.85)
+            {
+                IsDrawnInLegend = false,
+                Opcaity = 0.75f
+            };
+            var commentSeries = new CommentSeries { Values = commentData, PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs, BackdropOpacity = 0.75f };
+
+
+            onOffGraph.Series.Add(depth);
+            onOffGraph.YAxesInfo.Y2IsDrawn = true;
+            onOffGraph.YAxesInfo.Y2MaximumValue = maxDepth;
+            onOffGraph.CommentSeries = commentSeries;
+            onOffGraph.Series.Add(on);
+            if (offData.Count > 0)
+                onOffGraph.Series.Add(off);
+            onOffGraph.Series.Add(redLine);
+            onOffGraph.DrawTopBorder = false;
+
+            if (finalFootage < shortGraphLength)
+            {
+                onOffGraph.CommentSeries.PercentOfGraph = 0.25f;
+            }
+
+            var dcvgLabels = dcvgData.Select((value) => (value.Item1, value.Item2.ToString("F1") + "%")).ToList();
+
+            var indicationLabel = "DCVG";
+            var dcvgIndication = new PointWithLabelGraphSeries($"{indicationLabel} Indication", -0.2, dcvgLabels)
+            {
+                ShapeRadius = 3,
+                PointColor = Colors.Red,
+                BackdropOpacity = 1f
+            };
+            onOffGraph.Series.Add(dcvgIndication);
+
+            // Old PCM Amp display
+            //var ampSeries = new PointWithLabelGraphSeries("PCM (mA)", -0.4, ampLabels)
+            //{
+            //    ShapeRadius = 3,
+            //    PointColor = Colors.Navy,
+            //    BackdropOpacity = 1f,
+            //    PointShape = GraphSeries.Shape.Square
+            //};
+            //if (ampData.Count > 0)
+            //    onOffGraph.Series.Add(ampSeries);
+
+            report.XAxisInfo.IsEnabled = false;
+            report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
+            report.LegendInfo.SeriesNameFontSize = report.YAxesInfo.Y1LabelFontSize;
+
+            var bottomGlobalXAxis = new GlobalXAxis(report)
+            {
+                DrawPageInfo = true
+            };
+
+            var topGlobalXAxis = new GlobalXAxis(report, true)
+            {
+                Title = $"PGE IIT Survey HCA 5184"
+            };
+
+            var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
+
+            var surveyDirectionChart = new Chart(report, "CIS Survey Direction With Survey Date");
+            surveyDirectionChart.LegendInfo.NameFontSize = 14f;
+            //var cisClass = new Chart(report, "CIS Severity");
+            //var cisIndication = new ExceptionsChartSeries(cisClass.LegendInfo, cisClass.YAxesInfo);
+            //var cisIndicationExcelData = file.GetTabularData(new List<(string Name, List<(double Footage, double Value)>)>
+            //{
+            //    ("200 (100 US & 100 DS) Foot Average", cisIndication.Averages),
+            //    ("Used Averge for Baseline Footage", cisIndication.UsedBaselineFootages),
+            //    ("Used Baseline", cisIndication.Baselines),
+            //    ("PCM Data (mA)", ampData)
+            //});
+            //await CreateExcelFile($"{folderName} CIS Baseline Data", new List<(string Name, string Data)>() { ("Baseline Data", cisIndicationExcelData) }, outputFolder);
+            //if (ampData.Count > 0)
+            //    await CreateExcelFile($"{folderName} PCM Percent Change Data", file.PcmCalcOutput, outputFolder);
+
+
+            //cisClass.Series.Add(cisIndication);
+
+            //var dcvgClass = new Chart(report, "DCVG Severity");
+            //var dcvgIndicationSeries = new PgeDcvgIndicationChartSeries(dcvgData, dcvgClass, isDcvg);
+            //dcvgClass.Series.Add(dcvgIndicationSeries);
+            //dcvgClass.LegendInfo.NameFontSize = 13f;
+
+            //var ecdaClassChart = new Chart(report, "ECDA Clas.");
+            //var ecdaClassSeries = new PGEDirectExaminationPriorityChartSeries(ecdaClassChart, cisIndication, dcvgIndicationSeries, ecdaReport.GetFullAmpData());
+            //ecdaClassChart.Series.Add(ecdaClassSeries);
+
+            var surveyDirectionSeries = new SurveyDirectionWithDateSeries(directionData);
+            surveyDirectionChart.Series.Add(surveyDirectionSeries);
+
+            splitContainer.AddSelfSizedContainer(topGlobalXAxis);
+            splitContainer.AddContainer(onOffGraph);
+            
+            //splitContainer.AddSelfSizedContainer(ecdaClassChart);
+
+            //TODO: Add Region chart to graph.
+            //var regionChart = new Chart(report, "Regions");
+            //var regionSeries = new ChartSeries(ecdaClassChart, cisIndication, dcvgIndicationSeries, ecdaReport.GetFullAmpData());
+            //regionChart.Series.Add(regionSeries);
+
+            splitContainer.AddSelfSizedContainer(surveyDirectionChart);
+            splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
+            report.Container = splitContainer;
+            var surveyLength = onData.Last().Footage;
+            var pages = report.PageSetup.GetAllPages(0, surveyLength);
+
+            for (var i = 0; i < pages.Count; ++i)
+            {
+                var page = pages[i];
+                var pageString = $"{i + 1}".PadLeft(3, '0');
+                var image = report.GetImage(page, 300);
+                var imageFileName = $"{folderName} Page {pageString}.png";
+                if (pages.Count == 1)
+                    imageFileName = $"{folderName} Graph.png";
+                var imageFile = await outputFolder.CreateFileAsync(imageFileName, CreationCollisionOption.ReplaceExisting);
+                using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
+                {
+                    await image.SaveAsync(stream, CanvasBitmapFileFormat.Png);
+                }
+            }
+        }
+
+
         private async Task MakeIITGraphsUpdated(CombinedAllegroCisFile file, PgeEcdaReportInformation ecdaReport, bool isDcvg, string folderName, Hca hca, Skips cisSkips, Skips pcmSkips, StorageFolder outputFolder = null, List<(BasicGeoposition, string)> txLocations = null, List<(BasicGeoposition, string)> soilRes = null)
         {
             if (outputFolder == null)
@@ -1287,6 +1530,11 @@ namespace IitProcessor
                 }
             }
             return placemarkData;
+        }
+
+        private void buttonDoNewWork_Click(object sender, RoutedEventArgs e)
+        {
+            MakeIITGraphsFromNew();
         }
     }
 }
