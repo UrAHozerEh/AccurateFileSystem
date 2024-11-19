@@ -61,7 +61,7 @@ namespace AccurateFileSystem
                         {
                             return new GeneralCsv(File.DisplayName, lines);
                         }
-                        
+
                     }
                 case ".txt":
                     return await GetAllegroWaveform();
@@ -472,8 +472,14 @@ namespace AccurateFileSystem
         private DateTime ParseDateTime(string input)
         {
             if (input.Contains('.'))
-                return DateTime.ParseExact(input, "MM/dd/yyyy, HH:mm:ss.fff", CultureInfo.InvariantCulture);
-            return DateTime.ParseExact(input, "MM/dd/yyyy, HH:mm:ss", CultureInfo.InvariantCulture);
+            {
+                if (input.Contains(' '))
+                    return DateTime.ParseExact(input, "MM/dd/yyyy, HH:mm:ss.fff", CultureInfo.InvariantCulture);
+                return DateTime.ParseExact(input, "MM/dd/yyyy,HH:mm:ss.fff", CultureInfo.InvariantCulture);
+            }
+            if (input.Contains(' '))
+                return DateTime.ParseExact(input, "MM/dd/yyyy, HH:mm:ss", CultureInfo.InvariantCulture);
+            return DateTime.ParseExact(input, "MM/dd/yyyy,HH:mm:ss", CultureInfo.InvariantCulture);
         }
     }
 }

@@ -9,11 +9,11 @@ namespace AccurateReportSystem
 {
     public class OnOffPassingRangeExceptionChartSeries : ColorBoxExceptionSeries
     {
-        public Color OffBelowColor { get; set; } = Colors.Yellow;
-        public Color OnBelowColor { get; set; } = Colors.Red;
+        public Color OffBelowColor { get; set; } = Colors.Red;
+        public Color OnBelowColor { get; set; } = Colors.Yellow;
         public Color PassingColor { get; set; } = Colors.Green;
-        public Color OffAboveColor { get; set; } = Colors.Red;
-        public Color OnAboveColor { get; set; } = Colors.Yellow;
+        public Color OffAboveColor { get; set; } = Colors.Yellow;
+        public Color OnAboveColor { get; set; } = Colors.Red;
         public double? MinimumValue { get; set; } = null;
         public double? MaximumValue { get; set; } = null;
         public string LegendNumberFormat { get; set; } = "F3";
@@ -21,7 +21,8 @@ namespace AccurateReportSystem
 
         public OnOffPassingRangeExceptionChartSeries(List<(double Footage, double On, double Off)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo, double? minValue = null, double? maxValue = null) : base(data, masterLegendInfo, masterYAxesInfo)
         {
-
+            MinimumValue = minValue;
+            MaximumValue = maxValue;
         }
 
         protected override List<(string, Color)> LegendInfo()
@@ -48,16 +49,16 @@ namespace AccurateReportSystem
         {
             if (MaximumValue.HasValue)
             {
-                if (values[0] < MaximumValue.Value)
+                if (values[0] > MaximumValue.Value)
                     return OnAboveColor;
-                if (values[1] < MaximumValue.Value)
+                if (values[1] > MaximumValue.Value)
                     return OffAboveColor;
             }
             if (MinimumValue.HasValue)
             {
-                if (values[0] > MinimumValue.Value)
+                if (values[0] < MinimumValue.Value)
                     return OnBelowColor;
-                if (values[1] > MinimumValue.Value)
+                if (values[1] < MinimumValue.Value)
                     return OffBelowColor;
             }
             return PassingColor;

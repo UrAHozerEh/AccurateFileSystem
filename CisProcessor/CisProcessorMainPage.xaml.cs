@@ -43,12 +43,14 @@ namespace CisProcessor
     public sealed partial class MainPage : Page
     {
         private const double MaxDepth = 180;
-        private const string _client = "TRI Pipeline";
+        private const string _client = "SWG";
         private const double MinPassingValue = -0.850;
         private const double MinPolPassingValue = -0.1;
         private const double ShallowCover = 36; //Usually 36
         private const double MaxCisDistance = 20;
         private const bool IncludeMir = false;
+        private bool IncludeHardcodedAcvg { get; set; } = false;
+        private bool IncludeHardcodedDcvg { get; set; } = false;
 
         public MainPage()
         {
@@ -964,13 +966,16 @@ namespace CisProcessor
             commentGraph.YAxesInfo.MajorGridlines.IsEnabled = false;
             commentGraph.YAxesInfo.Y1IsDrawn = false;
 
-            var dcvgIndication = new PointWithLabelGraphSeries($"DCVG Indication", -0.2, new List<(double, string)>())
+            if (IncludeHardcodedDcvg)
             {
-                ShapeRadius = 3,
-                PointColor = Colors.Red,
-                BackdropOpacity = 1f
-            };
-            graph1.Series.Add(dcvgIndication);
+                var dcvgIndication = new PointWithLabelGraphSeries($"DCVG Indication", -0.2, new List<(double, string)>())
+                {
+                    ShapeRadius = 3,
+                    PointColor = Colors.Red,
+                    BackdropOpacity = 1f
+                };
+                graph1.Series.Add(dcvgIndication);
+            }
             if (depth.Values.Count != 0)
             {
                 graph1.Series.Add(depth);
@@ -987,9 +992,10 @@ namespace CisProcessor
             }
             graph1.YAxesInfo.Y2MaximumValue = MaxDepth;
             var y1Min = -3;
+            var autoMin = false;
             var cisValueMin = Math.Min(on.Values.Select(v => v.value).Min(), off.Values.Select(v => v.value).Min());
             var y1ActualMin = ((int)(cisValueMin / 0.5) - 1) * 0.5;
-            graph1.YAxesInfo.Y1MinimumValue = Math.Min(y1Min, y1ActualMin);
+            graph1.YAxesInfo.Y1MinimumValue = autoMin ? Math.Min(y1Min, y1ActualMin) : y1Min;
             graph1.YAxesInfo.MajorGridlines.Offset = 0.5;
             graph1.YAxesInfo.MinorGridlines.Offset = 0.1;
 
@@ -1011,6 +1017,18 @@ namespace CisProcessor
                 on.Name = "Static";
             //graph1.XAxisInfo.IsEnabled = false;
             graph1.DrawTopBorder = false;
+            if (IncludeHardcodedAcvg)
+            {
+                var acvgLabels = new List<(double Footage, double, string)>()
+                {
+                    (7830, -0.2, "55DB")
+                };
+                var acvgSeries = new PointWithLabelGraphSeries("ACVG Indication", acvgLabels)
+                {
+                    PointColor = Colors.Navy,
+                };
+                graph1.Series.Add(acvgSeries);
+            }
             if (pcmReads.Count != 0)
             {
                 var pcmSeriesLabels = pcmReads.Select(values => (values.Footage, -0.2, values.Read.ToString("F0"))).ToList();
@@ -1222,8 +1240,8 @@ namespace CisProcessor
                     ("Test Station Data", testStation)
                 }, outputFolder);
             }
-            var cisSkips = allegroFile.GetSkipData();
-            await CreateExcelFile($"{fileName} CIS Skip Data", new List<(string Name, string Data)>() { ("CIS Skip Data", cisSkips) }, outputFolder);
+            //var cisSkips = allegroFile.GetSkipData();
+            //await CreateExcelFile($"{fileName} CIS Skip Data", new List<(string Name, string Data)>() { ("CIS Skip Data", cisSkips) }, outputFolder);
             var depthExceptions = allegroFile.GetDepthExceptions(ShallowCover, double.MaxValue);
             await CreateExcelFile($"{fileName} Shallow Cover", new List<(string Name, string Data)>() { ("Shallow Cover", depthExceptions) }, outputFolder);
             var shapefile = allegroFile.GetShapeFile();
