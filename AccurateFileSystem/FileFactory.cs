@@ -81,6 +81,8 @@ namespace AccurateFileSystem
                     return null;
                 case ".skips":
                     return await Skips.GetSkips(File);
+                case ".spacers":
+                    return await Spacers.GetSpacers(File);
                 default:
                     return null;
             }
@@ -471,15 +473,32 @@ namespace AccurateFileSystem
 
         private DateTime ParseDateTime(string input)
         {
-            if (input.Contains('.'))
+            var inputFormats = new string[]
             {
-                if (input.Contains(' '))
-                    return DateTime.ParseExact(input, "MM/dd/yyyy, HH:mm:ss.fff", CultureInfo.InvariantCulture);
-                return DateTime.ParseExact(input, "MM/dd/yyyy,HH:mm:ss.fff", CultureInfo.InvariantCulture);
+                "MM/dd/yyyy, HH:mm:ss.fff",
+                "MM/dd/yyyy,HH:mm:ss.fff",
+                "MM/dd/yyyy, HH:mm:ss",
+                "MM/dd/yyyy,HH:mm:ss"
+            };
+
+            foreach (var format in inputFormats)
+            {
+                if (DateTime.TryParseExact(input, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var output))
+                {
+                    return output;
+                }
             }
-            if (input.Contains(' '))
-                return DateTime.ParseExact(input, "MM/dd/yyyy, HH:mm:ss", CultureInfo.InvariantCulture);
-            return DateTime.ParseExact(input, "MM/dd/yyyy,HH:mm:ss", CultureInfo.InvariantCulture);
+            var split = input.Split(',');
+            if (split.Length != 2)
+                throw new Exception();
+            var date = split[0].Trim();
+            var time = split[1].Trim();
+
+            var dateTime = DateTime.ParseExact(date, "M/d/yyyy", CultureInfo.InvariantCulture);
+            var excelTime = double.Parse(time);
+            var timeSpan = TimeSpan.FromDays(excelTime);
+            dateTime = dateTime.Add(timeSpan);
+            return dateTime;
         }
     }
 }

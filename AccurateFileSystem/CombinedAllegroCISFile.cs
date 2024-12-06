@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
 using Windows.Globalization.NumberFormatting;
 using Windows.UI.Xaml.Media.Animation;
+using static AccurateFileSystem.Spacers;
 
 namespace AccurateFileSystem
 {
@@ -40,6 +41,27 @@ namespace AccurateFileSystem
                     point.Point.OriginalComment = point.Point.OriginalComment.Remove(0, comment.Length);
                 if (point.Point.OriginalComment == comment)
                     point.Point.OriginalComment = "";
+            }
+        }
+
+        public void AddSpacerData(List<Spacer> spacers)
+        {
+            foreach (var (footage, length) in spacers)
+            {
+                for (int i = 0; i < Points.Count - 1; i++)
+                {
+                    var curPoint = Points[i];
+                    var nextPoint = Points[i + 1];
+                    if (curPoint.Footage <= footage && nextPoint.Footage > footage)
+                    {
+                        var distance = nextPoint.Footage - curPoint.Footage;
+                        var diff = length - distance;
+                        for(int j = i + 1; j < Points.Count; j++)
+                        {
+                            Points[j].Footage += diff;
+                        }
+                    }
+                }
             }
         }
 
@@ -1405,11 +1427,11 @@ namespace AccurateFileSystem
         {
             (double, double)? output = null;
             var mostPositive = double.MinValue;
-            foreach(var point in Points)
+            foreach (var point in Points)
             {
                 if (point.Footage < startFootage || point.Footage > endFootage)
                     continue;
-                if(point.Point.On > mostPositive || point.Point.Off > mostPositive)
+                if (point.Point.On > mostPositive || point.Point.Off > mostPositive)
                 {
                     mostPositive = Math.Max(point.Point.On, point.Point.Off);
                     output = (point.Point.On, point.Point.Off);

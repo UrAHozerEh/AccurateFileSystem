@@ -123,7 +123,7 @@
     <Compile Include="AllegroCISFile.cs" />
     <Compile Include="AllegroDataPoint.cs" />
     <Compile Include="AllegroWaveformFile.cs" />
-    <Compile Include="CisSkips.cs" />
+    <Compile Include="Skips.cs" />
     <Compile Include="CsvPcm.cs" />
     <Compile Include="Dbf\DbfFile.cs" />
     <Compile Include="EsriShapefile\IndexFile.cs" />
@@ -131,6 +131,7 @@
     <Compile Include="EsriShapefile\ProjectionFile.cs" />
     <Compile Include="EsriShapefile\ShapefileData.cs" />
     <Compile Include="Kmz\KmlFile.cs" />
+    <Compile Include="Spacers.cs" />
     <Compile Include="TidalCsvData.cs" />
     <Compile Include="Udl\UdlDataSet.cs" />
     <Compile Include="Udl\UdlFile.cs" />

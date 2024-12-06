@@ -9,7 +9,11 @@
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
     <Grid>
-        <Button x:Name="buttonDoOldWork" Content="Do Old Work" Click="buttonDoWork_Click"/>
-        <Button x:Name="buttonDoNewWork" Content="Do New Work" Click="buttonDoNewWork_Click"/>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Button x:Name="buttonDoOldWork" Content="Do Old Work" Click="buttonDoWork_Click" Grid.Column="0" HorizontalAlignment="Center"/>
+        <Button x:Name="buttonDoNewWork" Content="Do New Work" Click="buttonDoNewWork_Click" Grid.Column="1" HorizontalAlignment="Center"/>
     </Grid>
 </Page>

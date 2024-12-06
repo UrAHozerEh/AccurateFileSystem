@@ -41,6 +41,8 @@ namespace IitProcessor
         public string ReportQ { get; set; } = "";
         public bool BothAcvgDcvg = false;
         public static bool IsPge { get; } = true;
+        public double MaxDepth { get; set; } = 120;
+        public double MinDepth { get; set; } = 36;
         public MainPage()
         {
             this.InitializeComponent();
@@ -166,6 +168,7 @@ namespace IitProcessor
             var soilReads = new List<(BasicGeoposition, string)>();
             Skips cisSkips = null;
             Skips pcmSkips = null;
+            Spacers cisSpacers = null;
 
             foreach (var file in storageFiles)
             {
@@ -196,6 +199,10 @@ namespace IitProcessor
                         pcmSkips = skipFile;
                     else
                         throw new Exception("Unknown Skip File");
+                }
+                if(newFile is Spacers)
+                {
+                    cisSpacers = newFile as Spacers;
                 }
                 if (newFile == null && file.FileType.ToLower() == ".acvg")
                 {
@@ -280,6 +287,10 @@ namespace IitProcessor
             if (combinedCisFile.HasStartSkip)
             {
                 combinedCisFile.ShiftPoints(-combinedCisFile.Points[1].Footage);
+            }
+            if(cisSpacers != null)
+            {
+                combinedCisFile.AddSpacerData(cisSpacers.Data);
             }
             combinedCisFile.AddPcmDepthData(pcmFiles);
 
@@ -1112,12 +1123,12 @@ namespace IitProcessor
             for (var i = 0; i < extrapolatedDepth.Count; ++i)
             {
                 (curFoot, curDepth) = extrapolatedDepth[i];
-                if (curDepth < 36)
+                if (curDepth < MinDepth)
                 {
                     var start = i;
                     var curIndex = i;
                     var minDepth = curDepth;
-                    while (curDepth < 36 && curIndex != extrapolatedDepth.Count)
+                    while (curDepth < MinDepth && curIndex != extrapolatedDepth.Count)
                     {
                         (curFoot, curDepth) = extrapolatedDepth[curIndex];
                         if (curDepth < minDepth)
@@ -1134,12 +1145,12 @@ namespace IitProcessor
                     depthException.AppendLine($"{endGps.Latitude:F8}\t{endGps.Longitude:F8}");
                     i = curIndex + 1;
                 }
-                if (curDepth > 72)
+                if (curDepth > MaxDepth)
                 {
                     var start = i;
                     var curIndex = i;
                     var max = curDepth;
-                    while (curDepth > 72 && curIndex != extrapolatedDepth.Count)
+                    while (curDepth > MaxDepth && curIndex != extrapolatedDepth.Count)
                     {
                         (curFoot, curDepth) = extrapolatedDepth[curIndex];
                         if (curDepth > max)
@@ -1509,6 +1520,8 @@ namespace IitProcessor
 
             foreach (var placemark in placemarks)
             {
+                if(placemark.GetObjects("name").Count == 0)
+                    continue;
                 var name = placemark.GetObjects("name")[0].Value;
                 var coordsObjs = placemark.GetObjects("coordinates");
                 foreach (var coordsObj in coordsObjs)
