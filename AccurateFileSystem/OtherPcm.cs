@@ -49,7 +49,8 @@ namespace AccurateFileSystem
                         break;
                 }
             }
-            GetDepthData(latColumn, lonColumn, depthColumn, dateColumn);
+            if(depthColumn != -1)
+                GetDepthData(latColumn, lonColumn, depthColumn, dateColumn);
             if (ampColumn != -1)
                 GetAmpData(latColumn, lonColumn, ampColumn, dateColumn);
             if (txColumn != -1)

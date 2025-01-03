@@ -117,8 +117,8 @@ namespace AccurateFileSystem
             if (lineData == null || lineData.Count == 0) return;
             foreach (var point in Points)
             {
-                if (startFootage.HasValue && startFootage.Value > point.Footage) continue;
-                if (endFootage.HasValue && endFootage.Value < point.Footage) continue;
+                if (startFootage.HasValue && startFootage.Value >= point.Footage) continue;
+                if (endFootage.HasValue && endFootage.Value <= point.Footage) continue;
                 var gps = point.Point.GPS;
                 var (dist, newGps) = gps.DistanceToLines(lineData);
                 if (HasStartSkip && point.Footage == Points.First().Footage)

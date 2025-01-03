@@ -43,6 +43,7 @@ namespace IitProcessor
         public static bool IsPge { get; } = true;
         public double MaxDepth { get; set; } = 120;
         public double MinDepth { get; set; } = 36;
+        public bool BufferStartPlusOne { get; set; } = true;
         public MainPage()
         {
             this.InitializeComponent();
@@ -200,7 +201,7 @@ namespace IitProcessor
                     else
                         throw new Exception("Unknown Skip File");
                 }
-                if(newFile is Spacers)
+                if (newFile is Spacers)
                 {
                     cisSpacers = newFile as Spacers;
                 }
@@ -222,9 +223,9 @@ namespace IitProcessor
                 var region = hca.Regions[0];
                 var startGps = region.StartGps;
                 var endGps = region.EndGps;
-                ReportQ += $"{hca.Name}\t{hca.LineName}\t{startMp}\t{endMp}\tNT\tNT\t{region.Name}\t";
+                ReportQ += $"{hca.Name.TrimEnd('a')}\t{hca.LineName}\t{startMp}\t{endMp}\tNT\tNT\t{region.Name}\t";
                 ReportQ += $"{hca.HcaGpsLength:F0}\tNT\t{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t";
-                ReportQ += $"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{hca.Regions.First().FirstTimeString}\tNT\tNT\tNT\t\n";
+                ReportQ += $"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{hca.Regions.First().FirstTimeString}\tNT\tNT\tNT\tNT\t{hca.Regions[0].LongSkipReason}\n";
                 return;
             }
             cisFiles = GetUniqueFiles(cisFiles);
@@ -246,7 +247,7 @@ namespace IitProcessor
             }
 
             combinedCisFile.ReverseBasedOnHca(hca);
-            var (startHcaFootage, endHcaFootage) = AddHcaComments(combinedCisFile, hca, false);
+            var (startHcaFootage, endHcaFootage, bufferStartFootage, bufferEndFootage) = AddHcaComments(combinedCisFile, hca, false);
 
             //combinedCisFile.StraightenGps();
             if (IsPge)
@@ -267,28 +268,30 @@ namespace IitProcessor
             var hcaStartPoint = combinedCisFile.GetClosesetPoint(startHcaFootage);
             hca.Regions[0].StartGps = hcaStartPoint.Point.GPS;
             hca.Regions[0].GpsPoints[0] = hcaStartPoint.Point.GPS;
-            if (hca.StartBuffer != null)
+            if (hca.StartBuffer != null && bufferEndFootage.HasValue)
             {
+                var bufferEndPoint = combinedCisFile.GetClosesetPoint(bufferEndFootage.Value);
                 var startBufferGpsCount = hca.StartBuffer.GpsPoints.Count;
-                hca.StartBuffer.EndGps = hcaStartPoint.Point.GPS;
-                hca.StartBuffer.GpsPoints[startBufferGpsCount - 1] = hcaStartPoint.Point.GPS;
+                hca.StartBuffer.EndGps = bufferEndPoint.Point.GPS;
+                hca.StartBuffer.GpsPoints[startBufferGpsCount - 1] = bufferEndPoint.Point.GPS;
             }
 
             var hcaEndPoint = combinedCisFile.GetClosesetPoint(endHcaFootage);
             hca.Regions.Last().EndGps = hcaEndPoint.Point.GPS;
             var endHcaRegionGpsCount = hca.Regions.Last().GpsPoints.Count;
             hca.Regions.Last().GpsPoints[endHcaRegionGpsCount - 1] = hcaEndPoint.Point.GPS;
-            if (hca.EndBuffer != null)
+            if (hca.EndBuffer != null && bufferStartFootage.HasValue)
             {
-                hca.EndBuffer.StartGps = hcaEndPoint.Point.GPS;
-                hca.EndBuffer.GpsPoints[0] = hcaEndPoint.Point.GPS;
+                var bufferStartPoint = combinedCisFile.GetClosesetPoint(bufferStartFootage.Value);
+                hca.EndBuffer.StartGps = bufferStartPoint.Point.GPS;
+                hca.EndBuffer.GpsPoints[0] = bufferStartPoint.Point.GPS;
             }
             combinedCisFile.SetFootageFromGps();
             if (combinedCisFile.HasStartSkip)
             {
                 combinedCisFile.ShiftPoints(-combinedCisFile.Points[1].Footage);
             }
-            if(cisSpacers != null)
+            if (cisSpacers != null)
             {
                 combinedCisFile.AddSpacerData(cisSpacers.Data);
             }
@@ -651,7 +654,7 @@ namespace IitProcessor
 
             splitContainer.AddSelfSizedContainer(topGlobalXAxis);
             splitContainer.AddContainer(onOffGraph);
-            
+
             //splitContainer.AddSelfSizedContainer(ecdaClassChart);
 
             //TODO: Add Region chart to graph.
@@ -729,7 +732,7 @@ namespace IitProcessor
                 PointColor = Colors.Blue,
                 ShapeRadius = 2,
                 MaxDrawDistance = maxDrawDistance,
-                SkipFootages = cisSkips?.Footages
+                SkipFootages = cisSkips?.Footages.Select(f => f.Footage).ToList()
             };
             var off = new GraphSeries("Off", offData)
             {
@@ -738,7 +741,7 @@ namespace IitProcessor
                 PointColor = Colors.Green,
                 ShapeRadius = 2,
                 MaxDrawDistance = maxDrawDistance,
-                SkipFootages = cisSkips?.Footages
+                SkipFootages = cisSkips?.Footages.Select(f => f.Footage).ToList()
             };
             var depth = new GraphSeries("Depth", depthData)
             {
@@ -837,7 +840,7 @@ namespace IitProcessor
             var surveyDirectionChart = new Chart(report, "CIS Survey Direction With Survey Date");
             surveyDirectionChart.LegendInfo.NameFontSize = 14f;
             var cisClass = new Chart(report, "CIS Severity");
-            var cisIndication = new PGECISIndicationChartSeries(file, cisClass, hca);
+            var cisIndication = new PGECISIndicationChartSeries(file, cisClass, hca, cisSkips);
             var cisIndicationExcelData = file.GetTabularData(new List<(string Name, List<(double Footage, double Value)>)>
             {
                 ("200 (100 US & 100 DS) Foot Average", cisIndication.Averages),
@@ -900,7 +903,7 @@ namespace IitProcessor
                     ShapeRadius = 2,
                     MaxDrawDistance = 130,
                     IsDrawnInLegend = false,
-                    SkipFootages = pcmSkips?.Footages
+                    SkipFootages = pcmSkips?.Footages.Select(f => f.Footage).ToList()
                 };
                 ampGraph.Series.Add(ampsLine);
                 splitContainer.AddContainerPercent(ampGraph, 0.15);
@@ -979,7 +982,10 @@ namespace IitProcessor
                 var depthInArea = extrapolatedDepth.Where(value => value.Item1 >= startFoot && value.Item1 <= endFoot);
                 var minDepth = depthInArea.Count() != 0 ? depthInArea.Min(value => value.Item2) : -1;
                 var (startMp, endMp) = hca.GetMpForRegion(region);
-                output.Append($"{hca.Name}\t{hca.LineName}\t{startMp}\t{endMp}\t");
+                var name = hca.Name;
+                if (region.IsBuffer)
+                    name = name + " Buffer";
+                output.Append($"{name}\t{hca.LineName}\t{startMp}\t{endMp}\t");
                 var length = endFoot - startFoot;
                 var minDepthString = minDepth == -1 ? "" : minDepth.ToString("F0");
                 output.Append($"{ToStationing(startFoot)}\t{ToStationing(endFoot)}\t{region.ReportQName}\t{length:F0}\t{minDepthString}\t");
@@ -1172,6 +1178,14 @@ namespace IitProcessor
             var depthString = depthException.ToString();
             var uniqueRegionsString = string.Join(", ", uniqueRegions);
             var (hcaStartMp, hcaEndMp) = hca.GetMpForHca();
+            if (double.TryParse(hcaStartMp, out var hcaStartMpDouble))
+            {
+                hcaStartMp = $"{hcaStartMpDouble:F4}";
+            }
+            if (double.TryParse(hcaEndMp, out var hcaEndMpDouble))
+            {
+                hcaEndMp = $"{hcaEndMpDouble:F4}";
+            }
             //var reportLLengths = ecdaReport.GetActualReadFootage();
             var reportLLengths2 = GetActualReadFootage(areas);
             var reportLLengthsToolThree = GetActualThirdToolFootage(areas);
@@ -1302,7 +1316,7 @@ namespace IitProcessor
             return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
         }
 
-        private (double HcaStartFootage, double HcaEndFootage) AddHcaComments(CombinedAllegroCisFile file, Hca hca, bool setGps = true)
+        private (double HcaStartFootage, double HcaEndFootage, double? BufferEndFootage, double? BufferStartFootage) AddHcaComments(CombinedAllegroCisFile file, Hca hca, bool setGps = true)
         {
             var startGap = hca.GetStartFootageGap();
             file.ShiftPoints(startGap);
@@ -1319,11 +1333,16 @@ namespace IitProcessor
             {
                 hcaStartPoint = file.Points[file.HasStartSkip ? 1 : 0];
             }
-
-
             //var  hcaStartComment = (hasStartBuffer ? " END OF BUFFER" : "") + " START OF HCA";
             //hcaStartPoint = file.AddExtrapolatedPoint(hcaStartGps, hcaStartComment);
-            hcaStartPoint.Point.OriginalComment += (hasStartBuffer ? " END OF BUFFER" : "") + " START OF HCA";
+            var bufferEndIndex = file.Points.IndexOf(hcaStartPoint) - 1;
+            double? bufferEndFootage = null;
+            if(bufferEndIndex > 0)
+            {
+                file.Points[bufferEndIndex].Point.OriginalComment += " END OF BUFFER";
+                bufferEndFootage = file.Points[bufferEndIndex].Footage;
+            }
+            hcaStartPoint.Point.OriginalComment += " START OF HCA";
             if (setGps)
                 hcaStartPoint.Point.GPS = hcaStartGps;
 
@@ -1336,12 +1355,19 @@ namespace IitProcessor
             {
                 hcaEndPoint = file.Points[file.Points.Count - (file.HasEndSkip ? 2 : 1)];
             }
+            var bufferStartIndex = file.Points.IndexOf(hcaEndPoint) + 1;
+            double? bufferStartFootage = null;
+            if (bufferStartIndex < file.Points.Count - 1)
+            {
+                file.Points[bufferStartIndex].Point.OriginalComment += " START OF BUFFER";
+                bufferStartFootage = file.Points[bufferStartIndex].Footage;
+            }
             if (setGps)
                 hcaEndPoint.Point.GPS = hcaEndGps;
-            hcaEndPoint.Point.OriginalComment += " END OF HCA" + (hasEndBuffer ? " START OF BUFFER" : "");
+            hcaEndPoint.Point.OriginalComment += " END OF HCA";
             //var hcaEndComment = " END OF HCA" + (hasEndBuffer ? " START OF BUFFER" : "");
             //hcaEndPoint = file.AddExtrapolatedPoint(hcaEndGps, hcaEndComment);
-            return (hcaStartPoint.Footage, hcaEndPoint.Footage);
+            return (hcaStartPoint.Footage, hcaEndPoint.Footage, bufferEndFootage, bufferStartFootage);
         }
 
 
@@ -1520,9 +1546,13 @@ namespace IitProcessor
 
             foreach (var placemark in placemarks)
             {
-                if(placemark.GetObjects("name").Count == 0)
+                if (placemark.GetObjects("name").Count == 0)
                     continue;
                 var name = placemark.GetObjects("name")[0].Value;
+                if (name.Contains(' '))
+                {
+                    name = name.Substring(0, name.IndexOf(' '));
+                }
                 var coordsObjs = placemark.GetObjects("coordinates");
                 foreach (var coordsObj in coordsObjs)
                 {

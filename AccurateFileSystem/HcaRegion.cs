@@ -38,6 +38,13 @@ namespace AccurateFileSystem
             (ShouldSkip, ShortSkipReason, LongSkipReason) = CheckShouldSkip(name);
         }
 
+        public HcaRegion(string name, bool? firstTime)
+        {
+            Name = name;
+            FirstTime = firstTime;
+            (ShouldSkip, ShortSkipReason, LongSkipReason) = CheckShouldSkip(name);
+        }
+
         public HcaRegion()
         {
 

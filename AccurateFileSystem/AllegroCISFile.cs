@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ConstrainedExecution;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
@@ -153,6 +154,12 @@ namespace AccurateFileSystem
                 startIrDrop = startOff - startOn;
                 var endIrDrop = endOff - endOn;
                 irDropFactor = (endIrDrop - startIrDrop) / TotalFootage;
+
+                if (Points[0].HasIndication)
+                {
+                    var curIrDrop = startIrDrop;
+                    Points[0].IndicationPercent = Points[0].IndicationValue / curIrDrop * 100;
+                }
             }
             var startIndex = 0;
             double? prevOn = null;

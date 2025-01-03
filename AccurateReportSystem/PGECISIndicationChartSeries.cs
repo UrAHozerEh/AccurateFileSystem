@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
@@ -92,6 +93,7 @@ namespace AccurateReportSystem
         public Color SevereColor { get; set; } = Colors.Red;
         public CombinedAllegroCisFile CisFile { get; set; }
         public Hca Hca { get; set; }
+        public Skips Skips { get; set; }
         public List<DataPoint> Data { get; set; }
         public List<DataPointUpdated> DataUpdated { get; set; }
         public List<(double Footage, double Value)> Baselines { get; set; }
@@ -108,12 +110,13 @@ namespace AccurateReportSystem
         //    Data = ExtrapolateData(data);
         //}
 
-        public PGECISIndicationChartSeries(CombinedAllegroCisFile cisFile, Chart chart, Hca hca) : base(chart.LegendInfo, chart.YAxesInfo)
+        public PGECISIndicationChartSeries(CombinedAllegroCisFile cisFile, Chart chart, Hca hca, Skips skips) : base(chart.LegendInfo, chart.YAxesInfo)
         {
             CisFile = cisFile;
             RawData = cisFile.GetPoints();
             Hca = hca;
-            DataUpdated = ExtrapolateDataUpdated(RawData);
+            Skips = skips;
+            DataUpdated = ExtrapolateDataUpdated(RawData, skips);
         }
 
         //public PGECISIndicationChartSeries(List<(double, AllegroDataPoint)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo) : base(masterLegendInfo, masterYAxesInfo)
@@ -201,7 +204,7 @@ namespace AccurateReportSystem
             public bool IsOnOff;
             public bool IsSkipped { get; set; }
 
-            public ExtrapolatedDataPointUpdated(double footage, bool isOnOff, AllegroDataPoint point, HcaRegion region)
+            public ExtrapolatedDataPointUpdated(double footage, bool isOnOff, AllegroDataPoint point, HcaRegion region, bool shouldSkip = false)
             {
                 Footage = footage;
                 On = point.On;
@@ -213,7 +216,7 @@ namespace AccurateReportSystem
                 Gps = point.GPS;
                 Region = region;
                 IsExtrapolated = false;
-                IsSkipped = Region.ShouldSkip;
+                IsSkipped = Region.ShouldSkip || shouldSkip;
             }
         }
 
@@ -349,16 +352,44 @@ namespace AccurateReportSystem
         //    return output;
         //}
 
-        private List<DataPointUpdated> ExtrapolateDataUpdated(List<(double Footage, AllegroDataPoint Point)> data)
+        private List<DataPointUpdated> ExtrapolateDataUpdated(List<(double Footage, AllegroDataPoint Point)> data, Skips cisSkips)
         {
             //var extrapolatedData = new List<(double Footage, double On, double Off, string Comment, DateTime Date, double? Depth, BasicGeoposition GpsPoint, string Region, bool IsExtrapolated, bool isSkipped)>();
+            List<HcaRegion> allRegions = new List<HcaRegion>();
+            if (Hca.HasStartBuffer)
+                allRegions.Add(Hca.StartBuffer);
+            allRegions.AddRange(Hca.Regions);
+            if (Hca.HasEndBuffer)
+                allRegions.Add(Hca.EndBuffer);
+
+            Queue<(double Footage, HcaRegion Region)> regionEnds = new Queue<(double Footage, HcaRegion Region)>();
+            var lastFoot = double.MinValue;
+            foreach (var region in allRegions)
+            {
+                var end = data.Where(d => d.Footage > lastFoot).OrderBy(d => d.Point.GPS.Distance(region.EndGps)).First();
+                regionEnds.Enqueue((end.Footage, region));
+                lastFoot = end.Footage;
+            }
+
             var extrapolatedData = new List<ExtrapolatedDataPointUpdated>();
-            HcaRegion curRegion;
+            var (regionEnd, curRegion) = regionEnds.Dequeue();
             ExtrapolatedDataPointUpdated curExtrapPoint;
             for (var i = 0; i < data.Count - 1; ++i)
             {
                 var (startFoot, startPoint) = data[i];
+                if(startFoot == regionEnd)
+                {
+                    (regionEnd, curRegion) = regionEnds.Dequeue();
+                }
                 var (endFoot, endPoint) = data[i + 1];
+                var shouldSkipExtrap = false;
+                HcaRegion skipRegion = null;
+                if (cisSkips != null && cisSkips.Footages.Any(f => f.Footage >= startFoot && f.Footage <= endFoot))
+                {
+                    var skip = cisSkips.Footages.First(f => f.Footage >= startFoot && f.Footage <= endFoot);
+                    shouldSkipExtrap = true;
+                    skipRegion = skip.Region;
+                }
                 curRegion = GetClosestRegionUpdated(startPoint.GPS);
                 curExtrapPoint = new ExtrapolatedDataPointUpdated(startFoot, CisFile.Type == FileType.OnOff, startPoint, curRegion);
                 extrapolatedData.Add(curExtrapPoint);
@@ -391,6 +422,8 @@ namespace AccurateReportSystem
                     var newLong = longPerFoot * offset + startPoint.GPS.Longitude;
                     var newGps = new BasicGeoposition() { Latitude = newLat, Longitude = newLong };
                     var extrapRegion = GetClosestRegionUpdated(newGps);
+                    if (shouldSkipExtrap && skipRegion != null)
+                        extrapRegion = skipRegion;
                     curExtrapPoint = new ExtrapolatedDataPointUpdated()
                     {
                         Footage = newFoot,
@@ -403,7 +436,8 @@ namespace AccurateReportSystem
                         Region = extrapRegion,
                         IsExtrapolated = true,
                         IsOnOff = CisFile.Type == FileType.OnOff,
-                        IsSkipped = dist > SkipDistance || curRegion.ShouldSkip
+                        IsSkipped = dist > SkipDistance || curRegion.ShouldSkip || shouldSkipExtrap,
+                        
                     };
                     extrapolatedData.Add(curExtrapPoint);
                 }

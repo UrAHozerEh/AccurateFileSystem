@@ -12,7 +12,9 @@ namespace AccurateFileSystem
     {
         public List<HcaRegion> Regions { get; set; }
         public HcaRegion StartBuffer { get; private set; }
+        public bool HasStartBuffer => StartBuffer != null;
         public HcaRegion EndBuffer { get; private set; }
+        public bool HasEndBuffer => EndBuffer != null;
         public string LineName { get; private set; }
         public string Name { get; private set; }
         public double StartBufferGpsLength => StartBuffer?.GpsLength ?? 0;

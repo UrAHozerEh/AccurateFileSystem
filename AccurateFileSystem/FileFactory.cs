@@ -53,7 +53,7 @@ namespace AccurateFileSystem
                                 return new TidalCsvData(File.DisplayName, lines);
                             if (lines[1].Contains("Observations:"))
                                 return new VivaxPcm(File.DisplayName, lines);
-                            if (lines[0].IndexOf("ID") != -1 && lines[0].IndexOf("Depth") != -1 && lines[0].IndexOf("Latitude") != -1)
+                            if (lines[0].IndexOf("ID") != -1 && (lines[0].IndexOf("Depth") != -1 || lines[0].IndexOf("Signal") != -1) && lines[0].IndexOf("Latitude") != -1)
                                 return new OtherPcm(File.DisplayName, lines);
                             return new GeneralCsv(File.DisplayName, lines);
                         }
@@ -196,7 +196,7 @@ namespace AccurateFileSystem
                 var isHeader = true;
                 var line = reader.ReadLine();
                 ++lineCount;
-                if (!line.Contains("Start survey:")) throw new Exception();
+                if (!line.Contains("Start", StringComparison.OrdinalIgnoreCase)) throw new Exception();
                 var extraCommasMatch = Regex.Match(line, ",,+");
                 var extraCommasShort = extraCommasMatch.Success ? extraCommasMatch.Value.Substring(1) : "";
                 double? startFoot = null;
@@ -236,9 +236,33 @@ namespace AccurateFileSystem
                                     type = FileType.DCVG;
                                 }
                             }
+                            if (header.ContainsKey("survey type"))
+                            {
+                                if (header["survey type"] == "DC Survey")
+                                {
+                                    if (header.ContainsKey("onoff"))
+                                    {
+                                        if (header["onoff"] == "T")
+                                            type = FileType.OnOff;
+                                        else
+                                            type = FileType.Native;
+                                    }
+                                }
+                                else if (header["survey type"] == "DCVG Survey")
+                                {
+                                    type = FileType.DCVG;
+                                }
+                            }
+                        }
+                        if (string.IsNullOrWhiteSpace(key) && string.IsNullOrWhiteSpace(value))
+                        {
+                            continue;
                         }
                         (key, value) = FixHeaderKeyValue(key, value);
-                        header.Add(key, value);
+                        if (header.ContainsKey(key))
+                            header[key] = value;
+                        else
+                            header.Add(key, value);
                     }
                     else
                     {
@@ -250,7 +274,7 @@ namespace AccurateFileSystem
                         if (headerDelimiter == "=")
                             point = ParseAllegroLineFromACI(pointId, line);
                         else
-                            point = ParseAllegroLineFromCSV(pointId, line);
+                            point = ParseAllegroLineFromCSV(pointId, line, type);
                         if (startFoot == null)
                             startFoot = point.Footage;
 
@@ -301,7 +325,7 @@ namespace AccurateFileSystem
             return (key, value);
         }
 
-        private AllegroDataPoint ParseAllegroLineFromCSV(int id, string line)
+        private AllegroDataPoint ParseAllegroLineFromCSV(int id, string line, FileType type)
         {
             var indicationMatch = Regex.Match(line, ",\"?[^\",]*\"?,\"?UN\"?,0,(\\d+\\.?\\d*),0");
             var indicationValue = double.NaN;
@@ -311,9 +335,15 @@ namespace AccurateFileSystem
                 line = line.Replace(indicationMatch.Value, "").Replace(commentIndicationMatch.Value, "");
                 indicationValue = double.Parse(indicationMatch.Groups[1].Value);
             }
+
             var split = line.Split(',');
             if (split.Length < 16)
                 return null;
+            if (type == FileType.DCVG && split.Length >= 20 && double.IsNaN(indicationValue) && !string.IsNullOrWhiteSpace(split[18]))
+            {
+                if (double.TryParse(split[18], out var rawIndication))
+                    indicationValue = rawIndication;
+            }
             var comment = split[15];
             var realDoC = double.NaN;
             if (split.Length > 16)
@@ -473,6 +503,7 @@ namespace AccurateFileSystem
 
         private DateTime ParseDateTime(string input)
         {
+
             var inputFormats = new string[]
             {
                 "MM/dd/yyyy, HH:mm:ss.fff",
@@ -480,11 +511,30 @@ namespace AccurateFileSystem
                 "MM/dd/yyyy, HH:mm:ss",
                 "MM/dd/yyyy,HH:mm:ss"
             };
+            var issueFormats = new string[]
+            {
+                "MM/dd/yyyy, mm:ss",
+                "MM/dd/yyyy,mm:ss",
+                "MM/dd/yyyy, mm:ss.f",
+                "MM/dd/yyyy,mm:ss.f",
+                "MM/d/yyyy, mm:ss",
+                "MM/d/yyyy,mm:ss",
+                "MM/d/yyyy, mm:ss.f",
+                "MM/d/yyyy,mm:ss.f",
+            };
 
             foreach (var format in inputFormats)
             {
                 if (DateTime.TryParseExact(input, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var output))
                 {
+                    return output;
+                }
+            }
+            foreach (var format in issueFormats)
+            {
+                if (DateTime.TryParseExact(input, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var output))
+                {
+                    var tempFileName = FileName;
                     return output;
                 }
             }
@@ -495,10 +545,15 @@ namespace AccurateFileSystem
             var time = split[1].Trim();
 
             var dateTime = DateTime.ParseExact(date, "M/d/yyyy", CultureInfo.InvariantCulture);
-            var excelTime = double.Parse(time);
-            var timeSpan = TimeSpan.FromDays(excelTime);
-            dateTime = dateTime.Add(timeSpan);
-            return dateTime;
+            if (double.TryParse(time, out var excelTime))
+            {
+                var timeSpan = TimeSpan.FromDays(excelTime);
+                dateTime = dateTime.Add(timeSpan);
+                return dateTime;
+            }
+            if (DateTime.TryParse(input, out var initialResult))
+                return initialResult;
+            throw new Exception();
         }
     }
 }

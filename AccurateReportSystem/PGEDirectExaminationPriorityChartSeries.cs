@@ -23,6 +23,7 @@ namespace AccurateReportSystem
         public CisSeries CisSeries { get; set; } = null;
         public DcvgSeries DcvgSeries { get; set; } = null;
         private List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool isReverse, string ReadDate)> AmpReads { get; set; } = null;
+        public Skips CisSkips { get; set; } = null;
         public List<string[]> SempraCISShapeFileOutput { get; set; }
         public List<string[]> CISShapeFileOutput { get; set; }
         public List<string[]> IndicationShapeFileOutput { get; set; }
