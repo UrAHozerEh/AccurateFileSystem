@@ -97,7 +97,7 @@ namespace AccurateReportSystem
         public List<DataPoint> Data { get; set; }
         public List<DataPointUpdated> DataUpdated { get; set; }
         public List<(double Footage, double Value)> Baselines { get; set; }
-        public List<(double Footage, double UsedBaselineFootage)> UsedBaselineFootages { get; set; } 
+        public List<(double Footage, double UsedBaselineFootage)> UsedBaselineFootages { get; set; }
         public List<(double Footage, double Value)> Averages { get; set; }
         public double SkipDistance { get; set; } = 20;
         public List<(double Footage, AllegroDataPoint Point)> RawData { get; set; }
@@ -358,7 +358,12 @@ namespace AccurateReportSystem
             List<HcaRegion> allRegions = new List<HcaRegion>();
             if (Hca.HasStartBuffer)
                 allRegions.Add(Hca.StartBuffer);
-            allRegions.AddRange(Hca.Regions);
+            for (int i = 0; i < Hca.Regions.Count; ++i)
+            {
+                if (i < Hca.Regions.Count - 1 && Hca.Regions[i].ReportQName == Hca.Regions[i + 1].ReportQName)
+                    continue;
+                allRegions.Add(Hca.Regions[i]);
+            }
             if (Hca.HasEndBuffer)
                 allRegions.Add(Hca.EndBuffer);
 
@@ -377,7 +382,7 @@ namespace AccurateReportSystem
             for (var i = 0; i < data.Count - 1; ++i)
             {
                 var (startFoot, startPoint) = data[i];
-                if(startFoot == regionEnd)
+                if (startFoot > regionEnd && regionEnds.Count > 0)
                 {
                     (regionEnd, curRegion) = regionEnds.Dequeue();
                 }
@@ -390,7 +395,6 @@ namespace AccurateReportSystem
                     shouldSkipExtrap = true;
                     skipRegion = skip.Region;
                 }
-                curRegion = GetClosestRegionUpdated(startPoint.GPS);
                 curExtrapPoint = new ExtrapolatedDataPointUpdated(startFoot, CisFile.Type == FileType.OnOff, startPoint, curRegion);
                 extrapolatedData.Add(curExtrapPoint);
                 var dist = endFoot - startFoot;
@@ -406,12 +410,6 @@ namespace AccurateReportSystem
                 var longDiff = endPoint.GPS.Longitude - startPoint.GPS.Longitude;
                 var longPerFoot = longDiff / dist;
 
-                if (dist > SkipDistance)
-                {
-                    var midGps = startPoint.GPS.MiddleTowards(endPoint.GPS);
-                    curRegion = GetClosestRegionUpdated(midGps);
-                }
-
                 for (var offset = 1; offset < dist; ++offset)
                 {
                     var newOn = onPerFoot * offset + startPoint.On;
@@ -421,7 +419,7 @@ namespace AccurateReportSystem
                     var newLat = latPerFoot * offset + startPoint.GPS.Latitude;
                     var newLong = longPerFoot * offset + startPoint.GPS.Longitude;
                     var newGps = new BasicGeoposition() { Latitude = newLat, Longitude = newLong };
-                    var extrapRegion = GetClosestRegionUpdated(newGps);
+                    var extrapRegion = curRegion;
                     if (shouldSkipExtrap && skipRegion != null)
                         extrapRegion = skipRegion;
                     curExtrapPoint = new ExtrapolatedDataPointUpdated()
@@ -437,13 +435,16 @@ namespace AccurateReportSystem
                         IsExtrapolated = true,
                         IsOnOff = CisFile.Type == FileType.OnOff,
                         IsSkipped = dist > SkipDistance || curRegion.ShouldSkip || shouldSkipExtrap,
-                        
                     };
-                    extrapolatedData.Add(curExtrapPoint);
+                    if(dist > SkipDistance || shouldSkipExtrap)
+                        extrapolatedData.Add(curExtrapPoint);
                 }
             }
             var (foot, point) = data.Last();
-            curRegion = GetClosestRegionUpdated(point.GPS);
+            if (foot > regionEnd && regionEnds.Count > 0)
+            {
+                (regionEnd, curRegion) = regionEnds.Dequeue();
+            }
             curExtrapPoint = new ExtrapolatedDataPointUpdated(foot, CisFile.Type == FileType.OnOff, point, curRegion);
             extrapolatedData.Add(curExtrapPoint);
             var output = new List<DataPointUpdated>(extrapolatedData.Count);
@@ -518,7 +519,7 @@ namespace AccurateReportSystem
                 var baseline = Baselines[center];
                 var baselineValue = useBaselines ? baseline.Value : centerExtrap.IsOnOff ? centerExtrap.Off : centerExtrap.On;
                 var (severity, reason) = centerExtrap.IsOnOff ? GetOnOffSeverity(centerExtrap.Off, baselineValue) : GetOnSeverity(centerExtrap.On, baselineValue);//GetSeverity(centerExtrap.Off, baseline.Value);
-                
+
                 if (centerExtrap.IsSkipped)
                 {
                     severity = PGESeverity.NRI;

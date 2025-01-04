@@ -209,6 +209,7 @@ namespace AccurateReportSystem
             var pcmSeverities = GetPcmSeverities();
 
             var lastStartFoot = 0;
+            var lastRealFoot = 0;
             var lastEndFoot = 0;
 
             var lastAmpSeverity = PGESeverity.NRI;
@@ -366,8 +367,11 @@ namespace AccurateReportSystem
                     (curAmpValue, curAmpSeverity, curAmpReason, curAmpgGps) = pcmSeverities[curFoot];
 
                 var (curOn, curOff, curPrimaryDes, curDate, curDepth, curIsExtrapolated, curCisSeverity, curCisReason, curGps, curRegion) = (0.0, 0.0, "", new DateTime(), (double?)null, true, PGESeverity.NRI, "", new BasicGeoposition(), new HcaRegion());
+                if (!cisSeverities.ContainsKey(curFoot))
+                    continue;
                 if (cisSeverities.ContainsKey(curFoot))
                     (curOn, curOff, curPrimaryDes, curDate, curDepth, curIsExtrapolated, curCisSeverity, curCisReason, curGps, curRegion) = cisSeverities[curFoot];
+                
 
                 var curPrio = GetPriority(curCisSeverity, curDcvgSeverity, curAmpSeverity);
                 if (!curIsExtrapolated && !curRegion.ShouldSkip)
@@ -513,8 +517,17 @@ namespace AccurateReportSystem
 
                         if (lastRegion.ShouldSkip)
                             fullReason = "SKIP.";
-                        output.Add((lastStartFoot, curFoot, lastCisSeverity, lastDcvgSeverity, lastAmpSeverity, lastRegion, lastPrio, fullReason.Trim()));
+                        var endFoot = curFoot;
+                        if (!lastRegion.ShouldSkip && curRegion.IsBuffer)
+                        {
+                            endFoot = lastRealFoot;
+                        }
+                        output.Add((lastStartFoot, endFoot, lastCisSeverity, lastDcvgSeverity, lastAmpSeverity, lastRegion, lastPrio, fullReason.Trim()));
                         lastStartFoot = curFoot;
+                        if (!lastRegion.ShouldSkip && curRegion.IsBuffer)
+                        {
+                            lastStartFoot = lastRealFoot;
+                        }
                         lastCisReason = curCisReason;
                         lastCisSeverity = curCisSeverity;
                         lastDcvgReason = curDcvgReason;
@@ -524,6 +537,8 @@ namespace AccurateReportSystem
                         lastRegion = curRegion;
                         lastPrio = GetPriority(lastCisSeverity, lastDcvgSeverity, lastAmpSeverity);
                     }
+                if(!curIsExtrapolated)
+                    lastRealFoot = curFoot;
                 lastEndFoot = curFoot;
             }
 

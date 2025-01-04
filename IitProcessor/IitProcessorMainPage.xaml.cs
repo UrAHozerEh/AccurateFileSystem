@@ -44,6 +44,7 @@ namespace IitProcessor
         public double MaxDepth { get; set; } = 120;
         public double MinDepth { get; set; } = 36;
         public bool BufferStartPlusOne { get; set; } = true;
+        public bool RawFilesNeedTwo { get; set; } = true;
         public MainPage()
         {
             this.InitializeComponent();
@@ -247,7 +248,7 @@ namespace IitProcessor
             }
 
             combinedCisFile.ReverseBasedOnHca(hca);
-            var (startHcaFootage, endHcaFootage, bufferStartFootage, bufferEndFootage) = AddHcaComments(combinedCisFile, hca, false);
+            var (startHcaFootage, endHcaFootage, bufferEndFootage, bufferStartFootage) = AddHcaComments(combinedCisFile, hca, false);
 
             //combinedCisFile.StraightenGps();
             if (IsPge)
@@ -268,7 +269,7 @@ namespace IitProcessor
             var hcaStartPoint = combinedCisFile.GetClosesetPoint(startHcaFootage);
             hca.Regions[0].StartGps = hcaStartPoint.Point.GPS;
             hca.Regions[0].GpsPoints[0] = hcaStartPoint.Point.GPS;
-            if (hca.StartBuffer != null && bufferEndFootage.HasValue)
+            if (hca.HasStartBuffer && bufferEndFootage.HasValue)
             {
                 var bufferEndPoint = combinedCisFile.GetClosesetPoint(bufferEndFootage.Value);
                 var startBufferGpsCount = hca.StartBuffer.GpsPoints.Count;
@@ -280,7 +281,7 @@ namespace IitProcessor
             hca.Regions.Last().EndGps = hcaEndPoint.Point.GPS;
             var endHcaRegionGpsCount = hca.Regions.Last().GpsPoints.Count;
             hca.Regions.Last().GpsPoints[endHcaRegionGpsCount - 1] = hcaEndPoint.Point.GPS;
-            if (hca.EndBuffer != null && bufferStartFootage.HasValue)
+            if (hca.HasEndBuffer && bufferStartFootage.HasValue)
             {
                 var bufferStartPoint = combinedCisFile.GetClosesetPoint(bufferStartFootage.Value);
                 hca.EndBuffer.StartGps = bufferStartPoint.Point.GPS;
@@ -399,7 +400,7 @@ namespace IitProcessor
             if (reportInfo.EcdaData.Count == 0)
                 reportInfo = reportInfo;
             reportQ += reportInfo.GetReportQ();
-            await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, isDcvg, displayName, hca, cisSkips, pcmSkips, outputFolder, pcmFiles.First().TxData, soilReads);
+            await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, isDcvg, displayName, hca, cisSkips, pcmSkips, outputFolder, pcmFiles.FirstOrDefault()?.TxData, soilReads);
         }
 
         private List<(BasicGeoposition Gps, double Value, double Percent)> GetAmpReads(List<CsvPcm> files)
@@ -734,7 +735,7 @@ namespace IitProcessor
                 MaxDrawDistance = maxDrawDistance,
                 SkipFootages = cisSkips?.Footages.Select(f => f.Footage).ToList()
             };
-            var off = new GraphSeries("Off", offData)
+            var off = new GraphSeries("Off", offData.Where(d => d.Value != 0).ToList())
             {
                 LineColor = Colors.Green,
                 PointShape = GraphSeries.Shape.Circle,
@@ -765,7 +766,7 @@ namespace IitProcessor
             onOffGraph.YAxesInfo.Y2MaximumValue = maxDepth;
             onOffGraph.CommentSeries = commentSeries;
             onOffGraph.Series.Add(on);
-            if (ecdaReport.CisFile.Type == FileType.OnOff)
+            if (ecdaReport.CisFile.Type == FileType.OnOff || ecdaReport.GetOffData().Any(d => d.Value != 0))
                 onOffGraph.Series.Add(off);
             onOffGraph.Series.Add(redLine);
             onOffGraph.DrawTopBorder = false;
@@ -942,6 +943,11 @@ namespace IitProcessor
             }
 
             var areas = ecdaClassSeries.GetUpdatedReportQ();
+            var lastArea = areas.Last();
+            if (lastArea.End == lastArea.Start && string.IsNullOrWhiteSpace(lastArea.Comments))
+            {
+                areas.RemoveAt(areas.Count - 1);
+            }
             var uniqueRegions = hca.GetUniqueRegions();
             uniqueRegions.Sort();
             var output = new StringBuilder();
