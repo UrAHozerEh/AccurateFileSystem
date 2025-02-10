@@ -49,6 +49,16 @@ namespace AccurateFileSystem
             return (int)output;
         }
 
+        public void ShiftGps(double latShift, double lonShift)
+        {
+            foreach (var region in Regions)
+            {
+                region.ShiftGps(latShift, lonShift);
+            }
+            StartBuffer?.ShiftGps(latShift, lonShift);
+            EndBuffer?.ShiftGps(latShift, lonShift);
+        }
+
         public BasicGeoposition GetStartGps()
         {
             var startRegion = StartBuffer ?? Regions.First();

@@ -123,6 +123,8 @@
     <Compile Include="AllegroCISFile.cs" />
     <Compile Include="AllegroDataPoint.cs" />
     <Compile Include="AllegroWaveformFile.cs" />
+    <Compile Include="CommentReplacement.cs" />
+    <Compile Include="GlobalGpsShift.cs" />
     <Compile Include="Skips.cs" />
     <Compile Include="CsvPcm.cs" />
     <Compile Include="Dbf\DbfFile.cs" />

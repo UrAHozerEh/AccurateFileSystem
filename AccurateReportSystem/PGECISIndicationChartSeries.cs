@@ -50,7 +50,7 @@ namespace AccurateReportSystem
             }
         }
 
-        public struct DataPointUpdated
+        public class DataPointUpdated
         {
             public double Footage;
             public double On;
@@ -117,6 +117,19 @@ namespace AccurateReportSystem
             Hca = hca;
             Skips = skips;
             DataUpdated = ExtrapolateDataUpdated(RawData, skips);
+        }
+
+        public void GpsShiftData(double latShift, double lonShift)
+        {
+            foreach (var point in DataUpdated)
+            {
+                var newPoint = new BasicGeoposition
+                {
+                    Latitude = point.Gps.Latitude + latShift,
+                    Longitude = point.Gps.Longitude + lonShift
+                };
+                point.Gps = newPoint;
+            }
         }
 
         //public PGECISIndicationChartSeries(List<(double, AllegroDataPoint)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo) : base(masterLegendInfo, masterYAxesInfo)
@@ -371,7 +384,10 @@ namespace AccurateReportSystem
             var lastFoot = double.MinValue;
             foreach (var region in allRegions)
             {
-                var end = data.Where(d => d.Footage > lastFoot).OrderBy(d => d.Point.GPS.Distance(region.EndGps)).First();
+                var remainingData = data.Where(d => d.Footage > lastFoot);
+                if (!remainingData.Any())
+                    continue;
+                var end = remainingData.OrderBy(d => d.Point.GPS.Distance(region.EndGps)).First();
                 regionEnds.Enqueue((end.Footage, region));
                 lastFoot = end.Footage;
             }
@@ -436,8 +452,9 @@ namespace AccurateReportSystem
                         IsOnOff = CisFile.Type == FileType.OnOff,
                         IsSkipped = dist > SkipDistance || curRegion.ShouldSkip || shouldSkipExtrap,
                     };
-                    if(dist > SkipDistance || shouldSkipExtrap)
-                        extrapolatedData.Add(curExtrapPoint);
+
+                    //if(dist > SkipDistance || shouldSkipExtrap)
+                    extrapolatedData.Add(curExtrapPoint);
                 }
             }
             var (foot, point) = data.Last();

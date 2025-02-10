@@ -39,12 +39,20 @@ namespace IitProcessor
     public sealed partial class MainPage : Page
     {
         public string ReportQ { get; set; } = "";
-        public bool BothAcvgDcvg = false;
+        public bool BothAcvgDcvg = true;
         public static bool IsPge { get; } = true;
         public double MaxDepth { get; set; } = 120;
         public double MinDepth { get; set; } = 36;
         public bool BufferStartPlusOne { get; set; } = true;
         public bool RawFilesNeedTwo { get; set; } = true;
+        public bool BufferComments { get; set; } = true;
+        public bool HcaComments { get; set; } = true;
+        public bool LongFileFollowReportQGps { get; set; } = false;
+        public bool ShortFileFollowReportQGps { get; set; } = false;
+
+        public bool GraphsInSubFolder { get; set; } = false;
+        public bool ReportsInSubFolder { get; set; } = false;
+
         public MainPage()
         {
             this.InitializeComponent();
@@ -140,7 +148,7 @@ namespace IitProcessor
             {
                 await ParseIitFolder(curFolder, regions, isDcvg, outputFolder, lineData);
             }
-            var outputFile = await outputFolder.CreateFileAsync($"{masterFolder.DisplayName} Report Q.xlsx", CreationCollisionOption.ReplaceExisting);
+            var outputFile = await outputFolder.CreateFileAsync($"Report Q {masterFolder.DisplayName} Raw.xlsx", CreationCollisionOption.ReplaceExisting);
             using (var outStream = await outputFile.OpenStreamForWriteAsync())
             using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
             {
@@ -171,6 +179,8 @@ namespace IitProcessor
             Skips cisSkips = null;
             Skips pcmSkips = null;
             Spacers cisSpacers = null;
+            CommentReplacements commentReplacements = null;
+            GlobalGpsShift gpsShift = null;
 
             foreach (var file in storageFiles)
             {
@@ -206,6 +216,14 @@ namespace IitProcessor
                 {
                     cisSpacers = newFile as Spacers;
                 }
+                if (newFile is CommentReplacements)
+                {
+                    commentReplacements = newFile as CommentReplacements;
+                }
+                if (newFile is GlobalGpsShift)
+                {
+                    gpsShift = newFile as GlobalGpsShift;
+                }
                 if (newFile == null && file.FileType.ToLower() == ".acvg")
                 {
                     acvgReads = ParseAcvgReads(await file.GetLines());
@@ -218,6 +236,10 @@ namespace IitProcessor
                 }
             }
             var hca = regions.GetHca(displayName);
+            if (gpsShift != null && gpsShift.HasReportD)
+            {
+                hca.ShiftGps(gpsShift.ReportDLatitudeShift, gpsShift.ReportDLongitudeShift);
+            }
             if (cisFiles.Count == 0)
             {
                 var (startMp, endMp) = hca.GetMpForHca();
@@ -241,6 +263,10 @@ namespace IitProcessor
             dcvgFiles = GetUniqueFiles(dcvgFiles);
             var combinedCisFile = CombinedAllegroCisFile.CombineFiles("Combined", cisFiles, 1500);
             combinedCisFile.FixGps();
+            if (gpsShift != null && gpsShift.HasPre)
+            {
+                combinedCisFile.ShiftGps(gpsShift.PreLatitudeShift, gpsShift.PreLongitudeShift);
+            }
             List<List<BasicGeoposition>> curLineData = null;
             if (lineData != null)
             {
@@ -248,7 +274,8 @@ namespace IitProcessor
             }
 
             combinedCisFile.ReverseBasedOnHca(hca);
-            var (startHcaFootage, endHcaFootage, bufferEndFootage, bufferStartFootage) = AddHcaComments(combinedCisFile, hca, false);
+            var curFileSetGps = combinedCisFile.Points.Count > 4 ? LongFileFollowReportQGps : ShortFileFollowReportQGps;
+            var (startHcaFootage, endHcaFootage, bufferEndFootage, bufferStartFootage) = AddHcaComments(combinedCisFile, hca, commentReplacements, curFileSetGps);
 
             //combinedCisFile.StraightenGps();
             if (IsPge)
@@ -256,53 +283,47 @@ namespace IitProcessor
                 if (curLineData != null)
                 {
                     combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
-                    combinedCisFile.StraightenGps();
+                    combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage);
                     combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
                 }
                 else
                 {
-                    combinedCisFile.StraightenGps();
+                    combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage);
                 }
             }
             combinedCisFile.RemoveComments("+");
 
             var hcaStartPoint = combinedCisFile.GetClosesetPoint(startHcaFootage);
             hca.Regions[0].StartGps = hcaStartPoint.Point.GPS;
-            hca.Regions[0].GpsPoints[0] = hcaStartPoint.Point.GPS;
             if (hca.HasStartBuffer && bufferEndFootage.HasValue)
             {
                 var bufferEndPoint = combinedCisFile.GetClosesetPoint(bufferEndFootage.Value);
                 var startBufferGpsCount = hca.StartBuffer.GpsPoints.Count;
                 hca.StartBuffer.EndGps = bufferEndPoint.Point.GPS;
-                hca.StartBuffer.GpsPoints[startBufferGpsCount - 1] = bufferEndPoint.Point.GPS;
             }
 
             var hcaEndPoint = combinedCisFile.GetClosesetPoint(endHcaFootage);
             hca.Regions.Last().EndGps = hcaEndPoint.Point.GPS;
-            var endHcaRegionGpsCount = hca.Regions.Last().GpsPoints.Count;
-            hca.Regions.Last().GpsPoints[endHcaRegionGpsCount - 1] = hcaEndPoint.Point.GPS;
             if (hca.HasEndBuffer && bufferStartFootage.HasValue)
             {
                 var bufferStartPoint = combinedCisFile.GetClosesetPoint(bufferStartFootage.Value);
                 hca.EndBuffer.StartGps = bufferStartPoint.Point.GPS;
-                hca.EndBuffer.GpsPoints[0] = bufferStartPoint.Point.GPS;
             }
             combinedCisFile.SetFootageFromGps();
             if (combinedCisFile.HasStartSkip)
             {
                 combinedCisFile.ShiftPoints(-combinedCisFile.Points[1].Footage);
             }
+
+            combinedCisFile.AddPcmDepthData(pcmFiles);
             if (cisSpacers != null)
             {
                 combinedCisFile.AddSpacerData(cisSpacers.Data);
             }
-            combinedCisFile.AddPcmDepthData(pcmFiles);
-
             var dcvgData = new List<(double, double, BasicGeoposition)>();
 
             var ampReads = combinedCisFile.AlignAmpReads(pcmFiles);
             var combinedFootages = new List<(double, BasicGeoposition)>();
-
             foreach (var (foot, _, point, _, _) in combinedCisFile.Points)
             {
                 if (point.HasGPS)
@@ -315,6 +336,12 @@ namespace IitProcessor
                 combinedFootages.RemoveAt(0);
             if (combinedCisFile.HasEndSkip)
                 combinedFootages.RemoveAt(combinedFootages.Count - 1);
+
+            if (gpsShift != null && gpsShift.HasPost)
+            {
+                combinedCisFile.ShiftGps(gpsShift.PostLatitudeShift, gpsShift.PostLongitudeShift);
+                hca.ShiftGps(gpsShift.PostLatitudeShift, gpsShift.PostLongitudeShift);
+            }
 
             if (isDcvg)
             {
@@ -400,7 +427,7 @@ namespace IitProcessor
             if (reportInfo.EcdaData.Count == 0)
                 reportInfo = reportInfo;
             reportQ += reportInfo.GetReportQ();
-            await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, isDcvg, displayName, hca, cisSkips, pcmSkips, outputFolder, pcmFiles.FirstOrDefault()?.TxData, soilReads);
+            await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, isDcvg, displayName, hca, cisSkips, pcmSkips, outputFolder, pcmFiles.FirstOrDefault()?.TxData, soilReads, gpsShift);
         }
 
         private List<(BasicGeoposition Gps, double Value, double Percent)> GetAmpReads(List<CsvPcm> files)
@@ -686,7 +713,7 @@ namespace IitProcessor
         }
 
 
-        private async Task MakeIITGraphsUpdated(CombinedAllegroCisFile file, PgeEcdaReportInformation ecdaReport, bool isDcvg, string folderName, Hca hca, Skips cisSkips, Skips pcmSkips, StorageFolder outputFolder = null, List<(BasicGeoposition, string)> txLocations = null, List<(BasicGeoposition, string)> soilRes = null)
+        private async Task MakeIITGraphsUpdated(CombinedAllegroCisFile file, PgeEcdaReportInformation ecdaReport, bool isDcvg, string folderName, Hca hca, Skips cisSkips, Skips pcmSkips, StorageFolder outputFolder = null, List<(BasicGeoposition, string)> txLocations = null, List<(BasicGeoposition, string)> soilRes = null, GlobalGpsShift gpsShift = null)
         {
             if (outputFolder == null)
                 outputFolder = ApplicationData.Current.LocalFolder;
@@ -842,18 +869,6 @@ namespace IitProcessor
             surveyDirectionChart.LegendInfo.NameFontSize = 14f;
             var cisClass = new Chart(report, "CIS Severity");
             var cisIndication = new PGECISIndicationChartSeries(file, cisClass, hca, cisSkips);
-            var cisIndicationExcelData = file.GetTabularData(new List<(string Name, List<(double Footage, double Value)>)>
-            {
-                ("200 (100 US & 100 DS) Foot Average", cisIndication.Averages),
-                ("Used Averge for Baseline Footage", cisIndication.UsedBaselineFootages),
-                ("Used Baseline", cisIndication.Baselines),
-                ("PCM Data (mA)", ampData)
-            });
-            await CreateExcelFile($"{folderName} CIS Baseline Data", new List<(string Name, string Data)>() { ("Baseline Data", cisIndicationExcelData) }, outputFolder);
-            if (ampData.Count > 0)
-                await CreateExcelFile($"{folderName} PCM Percent Change Data", file.PcmCalcOutput, outputFolder);
-
-
             cisClass.Series.Add(cisIndication);
 
             var dcvgClass = new Chart(report, "DCVG Severity");
@@ -924,9 +939,27 @@ namespace IitProcessor
             splitContainer.AddSelfSizedContainer(surveyDirectionChart);
             splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
             report.Container = splitContainer;
+
+            var cisIndicationExcelData = file.GetTabularData(new List<(string Name, List<(double Footage, double Value)>)>
+            {
+                ("200 (100 US & 100 DS) Foot Average", cisIndication.Averages),
+                ("Used Averge for Baseline Footage", cisIndication.UsedBaselineFootages),
+                ("Used Baseline", cisIndication.Baselines),
+                ("PCM Data (mA)", ampData)
+            });
+            var baselineFolder = await outputFolder.CreateFolderAsync("CIS Baseline Data", CreationCollisionOption.OpenIfExists);
+            await CreateExcelFile($"{folderName} CIS Baseline Data", new List<(string Name, string Data)>() { ("Baseline Data", cisIndicationExcelData) }, baselineFolder);
+            if (ampData.Count > 0)
+            {
+                var pcmFolder = await outputFolder.CreateFolderAsync("PCM Percent Change Data", CreationCollisionOption.OpenIfExists);
+                await CreateExcelFile($"{folderName} PCM Percent Change Data", file.PcmCalcOutput, pcmFolder);
+            }
+
             var surveyLength = onData.Last().Footage;
             var pages = report.PageSetup.GetAllPages(0, surveyLength);
-
+            var graphFolder = outputFolder;
+            if (GraphsInSubFolder)
+                graphFolder = await outputFolder.CreateFolderAsync("Graphs", CreationCollisionOption.OpenIfExists);
             for (var i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
@@ -935,7 +968,7 @@ namespace IitProcessor
                 var imageFileName = $"{folderName} Page {pageString}.png";
                 if (pages.Count == 1)
                     imageFileName = $"{folderName} Graph.png";
-                var imageFile = await outputFolder.CreateFileAsync(imageFileName, CreationCollisionOption.ReplaceExisting);
+                var imageFile = await graphFolder.CreateFileAsync(imageFileName, CreationCollisionOption.ReplaceExisting);
                 using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
                 {
                     await image.SaveAsync(stream, CanvasBitmapFileFormat.Png);
@@ -1027,7 +1060,7 @@ namespace IitProcessor
             }
             ReportQ += output.ToString();
             var shapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
-            var googleShapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles Google Earth", CreationCollisionOption.OpenIfExists);
+            var googleShapefileFolder = await outputFolder.CreateFolderAsync("Google Earth", CreationCollisionOption.OpenIfExists);
             var cisShapeFileStringBuilder = new StringBuilder();
             foreach (var line in ecdaClassSeries.CISShapeFileOutput)
             {
@@ -1226,7 +1259,10 @@ namespace IitProcessor
             //}
 
             //await FileIO.WriteTextAsync(outputFile, outputString);
-            var outputFile = await outputFolder.CreateFileAsync($"{folderName} Reports.xlsx", CreationCollisionOption.ReplaceExisting);
+            var reportsFolder = outputFolder;
+            if (ReportsInSubFolder)
+                reportsFolder = await outputFolder.CreateFolderAsync("Reports", CreationCollisionOption.OpenIfExists);
+            var outputFile = await reportsFolder.CreateFileAsync($"{folderName} Reports.xlsx", CreationCollisionOption.ReplaceExisting);
             using (var outStream = await outputFile.OpenStreamForWriteAsync())
             using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
             {
@@ -1322,7 +1358,7 @@ namespace IitProcessor
             return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
         }
 
-        private (double HcaStartFootage, double HcaEndFootage, double? BufferEndFootage, double? BufferStartFootage) AddHcaComments(CombinedAllegroCisFile file, Hca hca, bool setGps = true)
+        private (double HcaStartFootage, double HcaEndFootage, double? BufferEndFootage, double? BufferStartFootage) AddHcaComments(CombinedAllegroCisFile file, Hca hca, CommentReplacements replacements, bool setGps = true)
         {
             var startGap = hca.GetStartFootageGap();
             file.ShiftPoints(startGap);
@@ -1331,9 +1367,35 @@ namespace IitProcessor
             var hasStartBuffer = hca.StartBuffer != null;
             var hasEndBuffer = hca.EndBuffer != null;
             var (hcaStartPoint, hcaStartDistance) = file.GetClosestPoint(hcaStartGps);
+
+            var startBufferComment = " START OF BUFFER";
+            var startHcaComment = " START OF HCA";
+            var endBufferComment = " END OF BUFFER";
+            var endHcaComment = " END OF HCA";
+            if (replacements != null)
+            {
+                if (replacements.HasStartBufferReplacement)
+                {
+                    startBufferComment = " " + replacements.StartBufferReplacement.Trim();
+                }
+                if (replacements.HasStartHcaReplacement)
+                {
+                    startHcaComment = " " + replacements.StartHcaReplacement.Trim();
+                }
+                if (replacements.HasEndHcaReplacement)
+                {
+                    endHcaComment = " " + replacements.EndHcaReplacement.Trim();
+                }
+                if (replacements.HasEndBufferReplacement)
+                {
+                    endBufferComment = " " + replacements.EndBufferReplacement.Trim();
+                }
+            }
+
             if (hasStartBuffer)
             {
-                file.Points[file.HasStartSkip ? 1 : 0].Point.OriginalComment += " START OF BUFFER";
+                if (BufferComments)
+                    file.Points[file.HasStartSkip ? 1 : 0].Point.OriginalComment += startBufferComment;
             }
             else
             {
@@ -1343,19 +1405,29 @@ namespace IitProcessor
             //hcaStartPoint = file.AddExtrapolatedPoint(hcaStartGps, hcaStartComment);
             var bufferEndIndex = file.Points.IndexOf(hcaStartPoint) - 1;
             double? bufferEndFootage = null;
-            if(bufferEndIndex > 0)
+            if (bufferEndIndex > 0)
             {
-                file.Points[bufferEndIndex].Point.OriginalComment += " END OF BUFFER";
+                if (BufferComments)
+                {
+                    var tempEndBufferComment = endBufferComment;
+                    if (!string.IsNullOrWhiteSpace(file.Points[bufferEndIndex].Point.OriginalComment))
+                        tempEndBufferComment += "+";
+                    file.Points[bufferEndIndex].Point.OriginalComment += tempEndBufferComment;
+                }
                 bufferEndFootage = file.Points[bufferEndIndex].Footage;
             }
-            hcaStartPoint.Point.OriginalComment += " START OF HCA";
+            if (HcaComments)
+                hcaStartPoint.Point.OriginalComment += startHcaComment;
             if (setGps)
                 hcaStartPoint.Point.GPS = hcaStartGps;
 
             var (hcaEndPoint, hcaEndDistance) = file.GetClosestPoint(hcaEndGps);
             if (hasEndBuffer)
             {
-                file.Points[file.Points.Count - (file.HasEndSkip ? 2 : 1)].Point.OriginalComment += " END OF BUFFER";
+                if (BufferComments)
+                {
+                    file.Points[file.Points.Count - (file.HasEndSkip ? 2 : 1)].Point.OriginalComment += endBufferComment;
+                }
             }
             else
             {
@@ -1365,12 +1437,17 @@ namespace IitProcessor
             double? bufferStartFootage = null;
             if (bufferStartIndex < file.Points.Count - 1)
             {
-                file.Points[bufferStartIndex].Point.OriginalComment += " START OF BUFFER";
+                var tempStartBufferComment = startBufferComment;
+                if(!string.IsNullOrWhiteSpace(file.Points[bufferStartIndex].Point.OriginalComment))
+                    tempStartBufferComment += "+";
+                if (BufferComments)
+                    file.Points[bufferStartIndex].Point.OriginalComment += tempStartBufferComment;
                 bufferStartFootage = file.Points[bufferStartIndex].Footage;
             }
             if (setGps)
                 hcaEndPoint.Point.GPS = hcaEndGps;
-            hcaEndPoint.Point.OriginalComment += " END OF HCA";
+            if (HcaComments)
+                hcaEndPoint.Point.OriginalComment += endHcaComment;
             //var hcaEndComment = " END OF HCA" + (hasEndBuffer ? " START OF BUFFER" : "");
             //hcaEndPoint = file.AddExtrapolatedPoint(hcaEndGps, hcaEndComment);
             return (hcaStartPoint.Footage, hcaEndPoint.Footage, bufferEndFootage, bufferStartFootage);

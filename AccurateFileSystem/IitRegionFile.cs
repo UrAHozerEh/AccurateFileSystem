@@ -112,8 +112,8 @@ namespace AccurateFileSystem
 
                 var region = Data[i, RegionColumn].Trim();
                 region = region.Replace('–', '-');
-                if (region.Contains('-'))
-                    region = region.Substring(0, region.IndexOf('-')).Trim();
+                //if (region.Contains('-'))
+                //    region = region.Substring(0, region.IndexOf('-')).Trim();
                 
 
                 if (ThirdToolColumn != -1)

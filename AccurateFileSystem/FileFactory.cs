@@ -83,6 +83,10 @@ namespace AccurateFileSystem
                     return await Skips.GetSkips(File);
                 case ".spacers":
                     return await Spacers.GetSpacers(File);
+                case ".comments":
+                    return await CommentReplacements.GetReplacements(File);
+                case ".shifts":
+                    return await GlobalGpsShift.GetGpsShift(File);
                 default:
                     return null;
             }

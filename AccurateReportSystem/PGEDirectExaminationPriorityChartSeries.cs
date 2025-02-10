@@ -16,6 +16,7 @@ namespace AccurateReportSystem
     public class PGEDirectExaminationPriorityChartSeries : ExceptionsChartSeries
     {
         public bool IsPge { get; } = true;
+        public bool ReportQCanShowMidCis { get; set; } = false;
         public override int NumberOfValues => 3;
         public Color OneColor { get; set; } = Colors.Red;
         public Color TwoColor { get; set; } = Colors.Green;
@@ -169,6 +170,7 @@ namespace AccurateReportSystem
 
         private static (PGESeverity Severity, string Reason) GetAmpSeverity(double percent)
         {
+            return (PGESeverity.NRI, "");
             if (percent < 10)
                 return (PGESeverity.NRI, "");
             if (percent < 30)
@@ -208,23 +210,23 @@ namespace AccurateReportSystem
             }
             var pcmSeverities = GetPcmSeverities();
 
-            var lastStartFoot = 0;
-            var lastRealFoot = 0;
-            var lastEndFoot = 0;
+            var lastStartFoot = cisSeverities.First().Key;
+            var lastRealFoot = lastStartFoot;
+            var lastEndFoot = lastStartFoot;
 
             var lastAmpSeverity = PGESeverity.NRI;
             var lastAmpReason = "";
             var lastAmpValue = 0.0;
             var lastAmpGps = new BasicGeoposition();
-            if (pcmSeverities.ContainsKey(0))
-                (lastAmpValue, lastAmpSeverity, lastAmpReason, lastAmpGps) = pcmSeverities[0];
+            if (pcmSeverities.ContainsKey(lastStartFoot))
+                (lastAmpValue, lastAmpSeverity, lastAmpReason, lastAmpGps) = pcmSeverities[lastStartFoot];
 
             var lastDcvgSeverity = PGESeverity.NRI;
             var lastDcvgReason = "";
             var lastDcvgValue = 0.0;
             var lastDcvgGps = new BasicGeoposition();
-            if (dcvgSeverities.ContainsKey(0))
-                (lastDcvgValue, lastDcvgSeverity, lastDcvgReason, lastDcvgGps) = dcvgSeverities[0];
+            if (dcvgSeverities.ContainsKey(lastStartFoot))
+                (lastDcvgValue, lastDcvgSeverity, lastDcvgReason, lastDcvgGps) = dcvgSeverities[lastStartFoot];
 
             var lastCisSeverity = PGESeverity.NRI;
             var lastCisReason = "";
@@ -236,15 +238,15 @@ namespace AccurateReportSystem
             var lastPrimaryDes = "";
             var lastDate = new DateTime();
             double? lastDepth = null;
-            if (cisSeverities.ContainsKey(0))
-                (lastOn, lastOff, lastPrimaryDes, lastDate, lastDepth, lastIsExtrapolated, lastCisSeverity, lastCisReason, lastGps, lastRegion) = cisSeverities[0];
+            if (cisSeverities.ContainsKey(lastStartFoot))
+                (lastOn, lastOff, lastPrimaryDes, lastDate, lastDepth, lastIsExtrapolated, lastCisSeverity, lastCisReason, lastGps, lastRegion) = cisSeverities[lastStartFoot];
 
             var lastPrio = GetPriority(lastCisSeverity, lastDcvgSeverity, lastAmpSeverity);
             if (!lastIsExtrapolated)
             {
                 var firstSempra = new string[29];
                 firstSempra[0] = sempraControl.ToString();
-                firstSempra[1] = "0";
+                firstSempra[1] = $"{lastStartFoot}";
                 firstSempra[2] = lastDate.ToShortDateString();
                 firstSempra[3] = lastPrimaryDes;
                 firstSempra[7] = $"{lastOn:F3}";
@@ -253,7 +255,7 @@ namespace AccurateReportSystem
                 {
                     firstSempra[9] = "1";
                 }
-                if (pcmSeverities.ContainsKey(0) && !double.IsNaN(lastAmpValue))
+                if (pcmSeverities.ContainsKey(lastStartFoot) && !double.IsNaN(lastAmpValue))
                     firstSempra[10] = $"{lastAmpValue:F1}";
                 if (lastDepth.HasValue && lastDepth.Value != 0)
                     firstSempra[11] = $"{lastDepth.Value:F1}";
@@ -284,7 +286,7 @@ namespace AccurateReportSystem
 
                 var firstShapeValues = new string[34];
                 firstShapeValues[LABEL] = $"On: {lastOn}, Off: {lastOff}";
-                firstShapeValues[STATION] = "0";
+                firstShapeValues[STATION] = $"{lastStartFoot}";
                 firstShapeValues[DATE] = lastDate.ToShortDateString();
                 firstShapeValues[PRIMARYDES] = lastPrimaryDes;
                 if (lastDepth.HasValue && lastDepth.Value != 0)
@@ -297,7 +299,7 @@ namespace AccurateReportSystem
                 firstShapeValues[ON] = lastOn.ToString("F4");
                 firstShapeValues[OFF] = lastOff.ToString("F4");
                 CISShapeFileOutput.Add(firstShapeValues);
-                if (dcvgSeverities.ContainsKey(0) && DcvgSeries.IsDcvg)
+                if (dcvgSeverities.ContainsKey(lastStartFoot) && DcvgSeries.IsDcvg)
                 {
                     firstShapeValues = new string[34];
 
@@ -306,7 +308,7 @@ namespace AccurateReportSystem
                     firstShapeValues[OFF] = lastOff.ToString("F4");
 
                     firstShapeValues[LABEL] = IsPge ? $"DCVG: {lastDcvgValue:F1}%" : "DCVG Indication";
-                    firstShapeValues[STATION] = "0";
+                    firstShapeValues[STATION] = $"{lastStartFoot}";
                     firstShapeValues[DATE] = lastDate.ToShortDateString();
                     firstShapeValues[DCVGREMOTE] = IsPge ? lastDcvgValue.ToString("F1") : "";
                     firstShapeValues[ECDAREGION] = lastRegion.ReportQName;
@@ -316,7 +318,7 @@ namespace AccurateReportSystem
                     firstShapeValues[DCVGCAT] = IsPge ? lastDcvgSeverity.GetDisplayName() : "Indication";
                     IndicationShapeFileOutput.Add(firstShapeValues);
                 }
-                if (dcvgSeverities.ContainsKey(0) && !DcvgSeries.IsDcvg)
+                if (dcvgSeverities.ContainsKey(lastStartFoot) && !DcvgSeries.IsDcvg)
                 {
                     firstShapeValues = new string[34];
 
@@ -325,7 +327,7 @@ namespace AccurateReportSystem
                     firstShapeValues[OFF] = lastOff.ToString("F4");
 
                     firstShapeValues[LABEL] = $"ACVG: {lastDcvgValue:F2}";
-                    firstShapeValues[STATION] = "0";
+                    firstShapeValues[STATION] = $"{lastStartFoot}";
                     firstShapeValues[DATE] = lastDate.ToShortDateString();
                     firstShapeValues[ECDAREGION] = lastRegion.ReportQName;
                     firstShapeValues[LAT] = lastDcvgGps.Latitude.ToString("F8");
@@ -335,7 +337,7 @@ namespace AccurateReportSystem
                     firstShapeValues[ACVGCAT] = lastDcvgSeverity.GetDisplayName();
                     IndicationShapeFileOutput.Add(firstShapeValues);
                 }
-                if (pcmSeverities.ContainsKey(0) && !Double.IsNaN(lastAmpValue))
+                if (pcmSeverities.ContainsKey(lastStartFoot) && !Double.IsNaN(lastAmpValue))
                 {
                     firstShapeValues = new string[34];
 
@@ -344,7 +346,7 @@ namespace AccurateReportSystem
                     firstShapeValues[OFF] = lastOff.ToString("F4");
 
                     firstShapeValues[LABEL] = $"PCM: {lastAmpValue:F0} mA";
-                    firstShapeValues[STATION] = "0";
+                    firstShapeValues[STATION] = $"{lastStartFoot}";
                     firstShapeValues[DATE] = lastDate.ToShortDateString();
                     firstShapeValues[ECDAREGION] = lastRegion.ReportQName;
                     firstShapeValues[LAT] = lastAmpGps.Latitude.ToString("F8");
@@ -356,7 +358,7 @@ namespace AccurateReportSystem
                 }
             }
 
-            for (var curFoot = 1; curFoot <= lastFoot; ++curFoot)
+            for (var curFoot = lastStartFoot + 1; curFoot <= lastFoot; ++curFoot)
             {
                 var (curDcvgValue, curDcvgSeverity, curDcvgReason, curDcvgGps) = (0.0, PGESeverity.NRI, "", new BasicGeoposition());
                 if (dcvgSeverities.ContainsKey(curFoot))
@@ -367,39 +369,17 @@ namespace AccurateReportSystem
                     (curAmpValue, curAmpSeverity, curAmpReason, curAmpgGps) = pcmSeverities[curFoot];
 
                 var (curOn, curOff, curPrimaryDes, curDate, curDepth, curIsExtrapolated, curCisSeverity, curCisReason, curGps, curRegion) = (0.0, 0.0, "", new DateTime(), (double?)null, true, PGESeverity.NRI, "", new BasicGeoposition(), new HcaRegion());
-                if (!cisSeverities.ContainsKey(curFoot))
-                    continue;
                 if (cisSeverities.ContainsKey(curFoot))
                     (curOn, curOff, curPrimaryDes, curDate, curDepth, curIsExtrapolated, curCisSeverity, curCisReason, curGps, curRegion) = cisSeverities[curFoot];
-                
+                else
+                {
+                    var closestKey = cisSeverities.Keys.OrderBy(x => Math.Abs(x - curFoot)).First();
+                    (curOn, curOff, curPrimaryDes, curDate, curDepth, curIsExtrapolated, curCisSeverity, curCisReason, curGps, curRegion) = cisSeverities[closestKey];
+                }
+
 
                 var curPrio = GetPriority(curCisSeverity, curDcvgSeverity, curAmpSeverity);
-                if (!curIsExtrapolated && !curRegion.ShouldSkip)
-                {
-                    var shapeValues = new string[34];
-                    shapeValues[LABEL] = $"On: {curOn}, Off: {curOff}";
-                    shapeValues[STATION] = curFoot.ToString("F0");
-                    shapeValues[DATE] = curDate.ToShortDateString();
-                    shapeValues[PRIMARYDES] = curPrimaryDes;
-                    if (curDepth.HasValue && curDepth.Value != 0)
-                        shapeValues[DEPTH] = curDepth.Value.ToString("F0");
-                    shapeValues[ECDAREGION] = curRegion.ReportQName;
-                    if (!curIsExtrapolated || curDcvgGps.Equals(new BasicGeoposition()))
-                    {
-                        shapeValues[LAT] = curGps.Latitude.ToString("F8");
-                        shapeValues[LON] = curGps.Longitude.ToString("F8");
-                    }
-                    else
-                    {
-                        shapeValues[LAT] = curDcvgGps.Latitude.ToString("F8");
-                        shapeValues[LON] = curDcvgGps.Longitude.ToString("F8");
-                    }
-                    shapeValues[ECDACAT] = "Priority " + curPrio.ToString();
-                    shapeValues[CISCAT] = curCisSeverity.GetDisplayName();
-                    shapeValues[ON] = curOn.ToString("F4");
-                    shapeValues[OFF] = curOff.ToString("F4");
-                    CISShapeFileOutput.Add(shapeValues);
-                }
+
                 if (dcvgSeverities.ContainsKey(curFoot) && !curRegion.ShouldSkip)
                 {
                     var shapeValues = new string[34];
@@ -500,44 +480,90 @@ namespace AccurateReportSystem
                     sempraControl++;
                 }
 
-                if (!(curRegion.Name == lastRegion.Name && curRegion.ShouldSkip))
-                    if (curCisSeverity != lastCisSeverity || curCisReason != lastCisReason || curDcvgSeverity != lastDcvgSeverity || curDcvgReason != lastDcvgReason || curRegion.Name != lastRegion.Name || curAmpSeverity != lastAmpSeverity || curAmpReason != lastAmpReason)
+
+                if (!curIsExtrapolated && !curRegion.ShouldSkip)
+                {
+                    var shapeValues = new string[34];
+                    shapeValues[LABEL] = $"On: {curOn}, Off: {curOff}";
+                    shapeValues[STATION] = curFoot.ToString("F0");
+                    shapeValues[DATE] = curDate.ToShortDateString();
+                    shapeValues[PRIMARYDES] = curPrimaryDes;
+                    if (curDepth.HasValue && curDepth.Value != 0)
+                        shapeValues[DEPTH] = curDepth.Value.ToString("F0");
+                    shapeValues[ECDAREGION] = curRegion.ReportQName;
+                    if (!curIsExtrapolated || curDcvgGps.Equals(new BasicGeoposition()))
                     {
-                        var fullReason = lastCisReason;
-                        if (string.IsNullOrWhiteSpace(fullReason))
-                            fullReason = lastDcvgReason;
-                        else
-                            fullReason += ". " + lastDcvgReason;
-                        fullReason = fullReason.Trim();
-
-                        if (string.IsNullOrWhiteSpace(fullReason))
-                            fullReason = lastAmpReason;
-                        else
-                            fullReason += ". " + lastAmpReason;
-
-                        if (lastRegion.ShouldSkip)
-                            fullReason = "SKIP.";
-                        var endFoot = curFoot;
-                        if (!lastRegion.ShouldSkip && curRegion.IsBuffer)
-                        {
-                            endFoot = lastRealFoot;
-                        }
-                        output.Add((lastStartFoot, endFoot, lastCisSeverity, lastDcvgSeverity, lastAmpSeverity, lastRegion, lastPrio, fullReason.Trim()));
-                        lastStartFoot = curFoot;
-                        if (!lastRegion.ShouldSkip && curRegion.IsBuffer)
-                        {
-                            lastStartFoot = lastRealFoot;
-                        }
-                        lastCisReason = curCisReason;
-                        lastCisSeverity = curCisSeverity;
-                        lastDcvgReason = curDcvgReason;
-                        lastDcvgSeverity = curDcvgSeverity;
-                        lastAmpSeverity = curAmpSeverity;
-                        lastAmpReason = curAmpReason;
-                        lastRegion = curRegion;
-                        lastPrio = GetPriority(lastCisSeverity, lastDcvgSeverity, lastAmpSeverity);
+                        shapeValues[LAT] = curGps.Latitude.ToString("F8");
+                        shapeValues[LON] = curGps.Longitude.ToString("F8");
                     }
-                if(!curIsExtrapolated)
+                    else
+                    {
+                        shapeValues[LAT] = curDcvgGps.Latitude.ToString("F8");
+                        shapeValues[LON] = curDcvgGps.Longitude.ToString("F8");
+                    }
+                    shapeValues[ECDACAT] = "Priority " + curPrio.ToString();
+                    shapeValues[CISCAT] = curCisSeverity.GetDisplayName();
+                    shapeValues[ON] = curOn.ToString("F4");
+                    shapeValues[OFF] = curOff.ToString("F4");
+                    CISShapeFileOutput.Add(shapeValues);
+                }
+
+                var regionChange = curRegion.Name != lastRegion.Name;
+                var cisChange = curCisSeverity != lastCisSeverity || curCisReason != lastCisReason || regionChange;
+                var dcvgChange = curDcvgSeverity != lastDcvgSeverity || curDcvgReason != lastDcvgReason;
+                var ampChange = curAmpSeverity != lastAmpSeverity || curAmpReason != lastAmpReason;
+
+                var shouldReportQ = false;
+                if (cisChange && (!curIsExtrapolated || curRegion.ShouldSkip))
+                    shouldReportQ = true;
+                if (dcvgChange)
+                    shouldReportQ = true;
+                if (ampChange)
+                    shouldReportQ = true;
+
+                if (shouldReportQ)
+                {
+                    var fullReason = lastCisReason;
+                    if (string.IsNullOrWhiteSpace(fullReason))
+                        fullReason = lastDcvgReason;
+                    else
+                        fullReason += ". " + lastDcvgReason;
+                    fullReason = fullReason.Trim();
+
+                    if (string.IsNullOrWhiteSpace(fullReason))
+                        fullReason = lastAmpReason;
+                    else
+                        fullReason += ". " + lastAmpReason;
+
+                    if (lastRegion.ShouldSkip)
+                        fullReason = "SKIP.";
+                    var endFoot = curFoot;
+                    if (!lastRegion.ShouldSkip && curRegion.IsBuffer && cisChange)
+                    {
+                        endFoot = lastRealFoot;
+                    }
+                    if (curFoot == lastFoot)
+                        endFoot = lastRealFoot;
+                    output.Add((lastStartFoot, endFoot, lastCisSeverity, lastDcvgSeverity, lastAmpSeverity, lastRegion, lastPrio, fullReason.Trim()));
+                    if (curFoot != lastFoot)
+                        lastStartFoot = curFoot;
+                    else
+                        lastStartFoot = lastRealFoot;
+
+                    if (!lastRegion.ShouldSkip && curRegion.IsBuffer && cisChange)
+                    {
+                        lastStartFoot = lastRealFoot;
+                    }
+                    lastCisReason = curCisReason;
+                    lastCisSeverity = curCisSeverity;
+                    lastDcvgReason = curDcvgReason;
+                    lastDcvgSeverity = curDcvgSeverity;
+                    lastAmpSeverity = curAmpSeverity;
+                    lastAmpReason = curAmpReason;
+                    lastRegion = curRegion;
+                    lastPrio = GetPriority(lastCisSeverity, lastDcvgSeverity, lastAmpSeverity);
+                }
+                if (!curIsExtrapolated)
                     lastRealFoot = curFoot;
                 lastEndFoot = curFoot;
             }

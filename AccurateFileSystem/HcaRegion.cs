@@ -10,8 +10,30 @@ namespace AccurateFileSystem
     public class HcaRegion
     {
         public List<BasicGeoposition> GpsPoints { get; }
-        public BasicGeoposition StartGps { get; set; }
-        public BasicGeoposition EndGps { get; set; }
+        public BasicGeoposition StartGps
+        {
+            get
+            {
+                return GpsPoints.First();
+            }
+            set
+            {
+                GpsPoints.RemoveAt(0);
+                GpsPoints.Insert(0, value);
+            }
+        }
+        public BasicGeoposition EndGps
+        {
+            get
+            {
+                return GpsPoints.Last();
+            }
+            set
+            {
+                GpsPoints.RemoveAt(GpsPoints.Count - 1);
+                GpsPoints.Add(value);
+            }
+        }
         public double GpsLength { get; }
         public string Name { get; }
         public string StartMp { get; }
@@ -28,8 +50,6 @@ namespace AccurateFileSystem
         public HcaRegion(List<BasicGeoposition> gpsPoints, string name, string startMp, string endMp, bool? firstTime)
         {
             GpsPoints = gpsPoints;
-            StartGps = gpsPoints.First();
-            EndGps = gpsPoints.Last();
             GpsLength = gpsPoints.TotalDistance();
             Name = name;
             StartMp = startMp;
@@ -48,6 +68,22 @@ namespace AccurateFileSystem
         public HcaRegion()
         {
 
+        }
+
+        public void ShiftGps(double latitudeShift, double longitudeShift)
+        {
+            var updated = new List<BasicGeoposition>();
+            foreach (var gps in GpsPoints)
+            {
+                var newGps = new BasicGeoposition
+                {
+                    Latitude = gps.Latitude + latitudeShift,
+                    Longitude = gps.Longitude + longitudeShift
+                };
+                updated.Add(newGps);
+            }
+            GpsPoints.Clear();
+            GpsPoints.AddRange(updated);
         }
 
         private static (bool ShouldSkip, string ShortReason, string LongReason) CheckShouldSkip(string name)

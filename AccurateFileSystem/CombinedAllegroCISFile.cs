@@ -41,6 +41,8 @@ namespace AccurateFileSystem
                     point.Point.OriginalComment = point.Point.OriginalComment.Remove(0, comment.Length);
                 if (point.Point.OriginalComment == comment)
                     point.Point.OriginalComment = "";
+                if(point.Point.OriginalComment.EndsWith(comment))
+                    point.Point.OriginalComment = point.Point.OriginalComment.Remove(point.Point.OriginalComment.Length - comment.Length);
             }
         }
 
@@ -48,6 +50,11 @@ namespace AccurateFileSystem
         {
             foreach (var (footage, length) in spacers)
             {
+                if(footage == 0)
+                {
+                    ShiftPoints(length);
+                    continue;
+                }
                 for (int i = 0; i < Points.Count - 1; i++)
                 {
                     var curPoint = Points[i];
@@ -117,8 +124,8 @@ namespace AccurateFileSystem
             if (lineData == null || lineData.Count == 0) return;
             foreach (var point in Points)
             {
-                if (startFootage.HasValue && startFootage.Value >= point.Footage) continue;
-                if (endFootage.HasValue && endFootage.Value <= point.Footage) continue;
+                if (startFootage.HasValue && startFootage.Value > point.Footage) continue;
+                if (endFootage.HasValue && endFootage.Value < point.Footage) continue;
                 var gps = point.Point.GPS;
                 var (dist, newGps) = gps.DistanceToLines(lineData);
                 if (HasStartSkip && point.Footage == Points.First().Footage)
@@ -429,6 +436,17 @@ namespace AccurateFileSystem
             }
         }
 
+        public void ShiftGps(double latShift, double lonShift)
+        {
+            foreach (var point in Points)
+            {
+                var gps = point.Point.GPS;
+                gps.Latitude += latShift;
+                gps.Longitude += lonShift;
+                point.Point.GPS = gps;
+            }
+        }
+
         public List<int> GetAnchorPoints(int distance = 20)
         {
             var testStations = new List<int> { 0 };
@@ -560,7 +578,7 @@ namespace AccurateFileSystem
             Points[lastAnchor].Footage = lastFootage;
         }
 
-        public void StraightenGps(double maxAnchorDistance = 50)
+        public void StraightenGps(double maxAnchorDistance = 50, double? bufferStartFootage = null, double? bufferEndFootage = null)
         {
             CombinedDataPoint lastData = Points[0];
             var lastPointIndex = 0;
@@ -570,6 +588,15 @@ namespace AccurateFileSystem
                 var curPoint = curData.Point;
 
                 var distance = curData.Footage - lastData.Footage;
+
+                var isExplicitAnchor = curPoint.OriginalComment.Contains("+");
+                var skipEndBuffer = bufferEndFootage.HasValue && bufferEndFootage == curData.Footage;
+                var skipStartBuffer = bufferStartFootage.HasValue && bufferStartFootage == curData.Footage;
+
+                if (!isExplicitAnchor && (skipEndBuffer || skipStartBuffer))
+                {
+                    continue;
+                }
 
                 if ((!string.IsNullOrWhiteSpace(curPoint.OriginalComment) || curPoint.Depth.HasValue || distance > maxAnchorDistance) && curPoint.HasGPS)
                 {

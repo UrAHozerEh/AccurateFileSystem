@@ -20,6 +20,6 @@ namespace AccurateFileSystem
 
     public enum FileType
     {
-        OnOff, CISWaveform, RISWaveform, DCVG, ACVG, PCM, SoilRes, Native, Udl, Unknown, Skips, Spacers
+        OnOff, CISWaveform, RISWaveform, DCVG, ACVG, PCM, SoilRes, Native, Udl, Unknown, Skips, Spacers, CommentReplacements, GlobalGpsShift
     }
 }
