@@ -123,6 +123,7 @@
     <Compile Include="AllegroCISFile.cs" />
     <Compile Include="AllegroDataPoint.cs" />
     <Compile Include="AllegroWaveformFile.cs" />
+    <Compile Include="CisSettings.cs" />
     <Compile Include="CommentReplacement.cs" />
     <Compile Include="GlobalGpsShift.cs" />
     <Compile Include="Skips.cs" />

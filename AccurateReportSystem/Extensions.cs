@@ -33,6 +33,23 @@ namespace AccurateReportSystem
             return output;
         }
 
+        public static List<(double Footage, double Value)> Difference(this GraphSeries initialSeries,
+            List<(double Footage, double Value)> otherSeries, double maxDistance)
+        {
+            var output = new List<(double Footage, double Value)>();
+
+            foreach (var (foot, initialValue) in initialSeries.Values)
+            {
+                var closestValue = GetClosestValue(foot, otherSeries, maxDistance);
+                if (!closestValue.HasValue)
+                    continue;
+
+                output.Add((foot, initialValue - closestValue.Value));
+            }
+
+            return output;
+        }
+
         private static double? GetClosestValue(double findFoot, List<(double Footage, double Value)> values, double maxDist = 10)
         {
             double? prevValue = null;

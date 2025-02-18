@@ -32,6 +32,7 @@ using GraphSeries = AccurateReportSystem.GraphSeries;
 using DocumentFormat.OpenXml.Drawing.Charts;
 using Chart = AccurateReportSystem.Chart;
 using Orientation = Windows.UI.Xaml.Controls.Orientation;
+using Windows.Management.Policies;
 
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -44,11 +45,8 @@ namespace CisProcessor
     {
         private const double MaxDepth = 180;
         private const string _client = "SWG";
-        private const double MinPassingValue = -0.850;
         private const double MinPolPassingValue = -0.1;
         private const double ShallowCover = 36; //Usually 36
-        private const double MaxCisDistance = 20;
-        private const bool IncludeMir = false;
         private bool IncludeHardcodedAcvg { get; set; } = false;
         private bool IncludeHardcodedDcvg { get; set; } = false;
 
@@ -178,26 +176,6 @@ namespace CisProcessor
                 return null;
         }
 
-        private async void Do5716ButtonClick(object sender, RoutedEventArgs e)
-        {
-            var folderPicker = new FolderPicker();
-            folderPicker.FileTypeFilter.Add(".");
-            var masterFolder = await folderPicker.PickSingleFolderAsync();
-            if (masterFolder == null)
-                return;
-            var folders = await masterFolder.GetFoldersAsync();
-            var outputFolder = await masterFolder.CreateFolderAsync("0000 Processed Data", CreationCollisionOption.OpenIfExists);
-            var fileOrder = await masterFolder.CreateFolderAsync("0000 Files Orders", CreationCollisionOption.OpenIfExists);
-            var finishedFileNames = await GetFilesNames(fileOrder);
-            folders = folders.OrderBy(folder => folder.DisplayName).ToList().AsReadOnly();
-            foreach (var folder in folders)
-            {
-                if (folder.Name.Equals(outputFolder.Name) || folder.Name.Equals(fileOrder.Name))
-                    continue;
-                await ParseLineFolder(folder, outputFolder, fileOrder);
-            }
-        }
-
         private static async Task<List<CsvPcm>> GetPcm(IStorageFolder folder)
         {
             var output = new List<CsvPcm>();
@@ -246,169 +224,6 @@ namespace CisProcessor
             return output;
         }
 
-        private async Task ParseLineFolder(StorageFolder folder, StorageFolder outputFolder, StorageFolder filesOrder)
-        {
-
-            var folders = await folder.GetFoldersAsync();
-            var cisFolders = folders.Where(f => f.Name != "PCM" && f.Name != "DCVG");
-            var pcmFolder = folders.FirstOrDefault(f => f.Name.Equals("PCM", StringComparison.OrdinalIgnoreCase));
-            var dcvgFolder = folders.FirstOrDefault(f => f.Name.Equals("DCVG", StringComparison.OrdinalIgnoreCase));
-            var pcm = await GetPcm(pcmFolder);
-            var dcvg = await GetDcvg(dcvgFolder);
-            var lineName = folder.DisplayName;
-            foreach (var cisFolder in cisFolders)
-            {
-                await ParseCisFolder(lineName, cisFolder, dcvg, pcm, outputFolder);
-            }
-        }
-
-        private async Task ParseCisFolder(string lineName, StorageFolder cisFolder, List<GeneralCsv> dcvgData, List<CsvPcm> pcmData, StorageFolder outputFolder)
-        {
-            var report = new GraphicalReport();
-            var onOffGraph = new Graph(report)
-            {
-                YAxesInfo =
-                {
-                    Y1Title = "Pipe-to-Soil Potential (Volts)",
-                    Y2IsDrawn = true,
-                    Y2MaximumValue = MaxDepth,
-                    Y2Title = "Depth (inches)"
-                }
-            };
-
-            report.XAxisInfo.IsEnabled = false;
-            report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
-            report.LegendInfo.SeriesNameFontSize = report.YAxesInfo.Y1LabelFontSize;
-            var combinedName = $"{lineName} {cisFolder.DisplayName}";
-
-            var curOutputFolder = await outputFolder.CreateFolderAsync(combinedName, CreationCollisionOption.ReplaceExisting);
-
-            var bottomGlobalXAxis = new GlobalXAxis(report)
-            {
-                DrawPageInfo = true
-            };
-
-            var topGlobalXAxis = new GlobalXAxis(report, true)
-            {
-                Title = $"{_client} {combinedName}"
-            };
-
-            var combined = CombinedAllegroCisFile.CombineFiles(combinedName, await GetCis(cisFolder));
-            if (combined.HasStartSkip)
-            {
-                combined.ShiftPoints(-combined.Points[1].Footage);
-            }
-
-            foreach (var pcm in pcmData)
-                combined.AddPcmDepthData(pcm);
-
-            var pcmValues = combined.AlignAmpReads(pcmData);
-            var dcvgValues = GetAlignedDcvgData(dcvgData, combined);
-
-            await CreateStandardFiles(combinedName, combined, curOutputFolder);
-            var addedTabularData = new List<(string Name, List<(double Footage, double Value)>)>();
-            var pcmFootageData = pcmValues.Select((value) => (value.Footage, value.Value)).ToList();
-            addedTabularData.Add(("PCM (Amps)", pcmFootageData));
-            await CreateExcelFile(combinedName + " Tabular Data Extended", new List<(string Name, string Data)>() { ("Tabular Data", combined.GetTabularData(addedTabularData)) }, curOutputFolder);
-
-            var on = new GraphSeries("On", combined.GetDoubleData("On"))
-            {
-                LineColor = Colors.Blue,
-                PointShape = GraphSeries.Shape.Circle,
-                PointColor = Colors.Blue,
-                ShapeRadius = 2,
-                MaxDrawDistance = 19
-            };
-            var off = new GraphSeries("Off", combined.GetDoubleData("Off"))
-            {
-                LineColor = Colors.Green,
-                PointShape = GraphSeries.Shape.Circle,
-                PointColor = Colors.Green,
-                ShapeRadius = 2,
-                MaxDrawDistance = 19
-            };
-            var depth = new GraphSeries("Depth", combined.GetDoubleData("Depth"))
-            {
-                LineColor = Colors.Black,
-                PointColor = Colors.Orange,
-                IsY1Axis = false,
-                PointShape = GraphSeries.Shape.Circle,
-                GraphType = GraphSeries.Type.Point,
-                ShapeRadius = 4
-            };
-            var commentSeries = new CommentSeries
-            {
-                Values = combined.GetCommentData(ignoreStartEndSkips: true),
-                PercentOfGraph = 0.5f,
-                IsFlippedVertical = false,
-                BorderType = BorderType.Pegs,
-                BackdropOpacity = 0.75f
-            };
-            onOffGraph.Series.Add(on);
-            onOffGraph.Series.Add(off);
-            onOffGraph.Series.Add(depth);
-            onOffGraph.CommentSeries = commentSeries;
-            onOffGraph.DrawTopBorder = false;
-
-            if (dcvgValues != null && dcvgValues.Count != 0)
-            {
-                var dcvgIndication = new PointWithLabelGraphSeries("DCVG Indication", -0.2, dcvgValues.Select((value) => (value.Footage, "")).ToList())
-                {
-                    ShapeRadius = 3,
-                    PointColor = Colors.Red,
-                    BackdropOpacity = 1f
-                };
-                onOffGraph.Series.Add(dcvgIndication);
-            }
-
-            if (pcmValues.Count != 0)
-            {
-                var ampSeries = new PointWithLabelGraphSeries("PCM (mA)", -0.4, pcmValues.Select((value) => (value.Footage, value.Value.ToString("F0"))).ToList())
-                {
-                    ShapeRadius = 3,
-                    PointColor = Colors.Navy,
-                    BackdropOpacity = 1f,
-                    PointShape = GraphSeries.Shape.Square
-                };
-                onOffGraph.Series.Add(ampSeries);
-            }
-
-            var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
-
-            var surveyDirectionChart = new Chart(report, "Survey Direction With Survey Date")
-            {
-                LegendInfo =
-                {
-                    NameFontSize = 14f
-                }
-            };
-            var surveyDirectionSeries = new SurveyDirectionWithDateSeries(combined.GetDirectionWithDateData());
-            surveyDirectionChart.Series.Add(surveyDirectionSeries);
-
-            splitContainer.AddSelfSizedContainer(topGlobalXAxis);
-            splitContainer.AddContainer(onOffGraph);
-            splitContainer.AddSelfSizedContainer(surveyDirectionChart);
-            splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
-            report.Container = splitContainer;
-            var surveyLength = combined.Points.Last().Footage;
-            var pages = report.PageSetup.GetAllPages(0, surveyLength);
-
-            for (var i = 0; i < pages.Count; ++i)
-            {
-                var page = pages[i];
-                var pageString = $"{i + 1}".PadLeft(3, '0');
-                var image = report.GetImage(page);
-                var imageFileName = $"{combinedName} Page {pageString}.png";
-                if (pages.Count == 1)
-                    imageFileName = $"{combinedName} Graph.png";
-                var imageFile = await curOutputFolder.CreateFileAsync(imageFileName, CreationCollisionOption.ReplaceExisting);
-                using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
-                {
-                    await image.SaveAsync(stream, CanvasBitmapFileFormat.Png);
-                }
-            }
-        }
-
         private static List<(double Footage, string Comment)> GetAlignedDcvgData(List<GeneralCsv> dcvgFiles, CombinedAllegroCisFile cisCombinedData)
         {
             var output = new List<(double Footage, string Comment)>();
@@ -446,12 +261,12 @@ namespace CisProcessor
             var fileOrder = await masterFolder.CreateFolderAsync("0000 Files Orders", CreationCollisionOption.OpenIfExists);
             var finishedFileNames = await GetFilesNames(fileOrder);
             folders = folders.OrderBy(folder => folder.DisplayName).ToList().AsReadOnly();
+            CisSettings cisSettings = null;
             foreach (var folder in folders)
             {
                 if (folder.DisplayName == outputFolder.DisplayName || folder.DisplayName == fileOrder.DisplayName)
                     continue;
                 var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
-                const int maxGap = 3600;
                 var cisFiles = new List<AllegroCISFile>();
                 var docFiles = new List<CsvPcm>();
                 var fileNames = new HashSet<string>();
@@ -463,6 +278,12 @@ namespace CisProcessor
                     if (file is CsvPcm docFile)
                     {
                         docFiles.Add(docFile);
+                        continue;
+                    }
+                    if (file is CisSettings settings)
+                    {
+                        cisSettings = settings;
+                        continue;
                     }
                     if (!(file is AllegroCISFile allegroFile))
                         continue;
@@ -485,7 +306,10 @@ namespace CisProcessor
                 }
 
                 if (cisFiles.Count == 0) continue;
-
+                if (cisSettings == null)
+                {
+                    cisSettings = new CisSettings();
+                }
                 cisFiles.Sort((file1, file2) => string.Compare(file1.Name, file2.Name, StringComparison.Ordinal));
 
                 var onOffFiles = new List<AllegroCISFile>();
@@ -559,14 +383,14 @@ namespace CisProcessor
                 var finishedFinalName = finishedFileNames.GetValueOrDefault(folder.DisplayName, null);
                 if (combinedStaticFiles != null && combinedOnOffFiles != null)
                 {
-                    var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, outputFolder, pcmReads, finishedFinalName);
+                    var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, outputFolder, pcmReads, cisSettings, finishedFinalName);
                     await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedOnOffFiles.FileInfos.GetExcelData(0)) }, fileOrder);
                     await CreateExcelFile($"{folder.DisplayName} Static+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedStaticFiles.FileInfos.GetExcelData(0)) }, fileOrder);
                 }
                 else
                 {
                     var file = combinedOnOffFiles ?? combinedStaticFiles;
-                    var (text, isReversed) = await MakeOnOffGraphs(file, pcmReads, outputFolder, finishedFinalName);
+                    var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, null, outputFolder, pcmReads, cisSettings, finishedFinalName);
                     await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", file.FileInfos.GetExcelData(0)) }, fileOrder);
                 }
             }
@@ -590,7 +414,7 @@ namespace CisProcessor
             return output;
         }
 
-        private async Task<(string Text, bool IsReversed)> MakeOnOffStaticGraphs(CombinedAllegroCisFile onOffFile, CombinedAllegroCisFile staticFile, StorageFolder masterOutputFolder, List<(double Footage, double Read)> pcmReads, (string Text, bool IsReversed)? exact = null)
+        private async Task<(string Text, bool IsReversed)> MakeOnOffStaticGraphs(CombinedAllegroCisFile onOffFile, CombinedAllegroCisFile staticFile, StorageFolder masterOutputFolder, List<(double Footage, double Read)> pcmReads, CisSettings cisSettings, (string Text, bool IsReversed)? exact = null)
         {
             var testStationInitial = onOffFile.GetTestStationData();
             var firstPoint = onOffFile.Points.First();
@@ -608,7 +432,6 @@ namespace CisProcessor
             if (response.Value.Item2)
             {
                 onOffFile.Reverse();
-                staticFile?.Reverse();
             }
             var report = new GraphicalReport();
             var commentGraph = new Graph(report);
@@ -621,32 +444,22 @@ namespace CisProcessor
             var on = new GraphSeries("On", onOffFile.GetDoubleData("On"))
             {
                 LineColor = Colors.Blue,
-                MaxDrawDistance = MaxCisDistance
+                MaxDrawDistance = cisSettings.CisGap
             };
             var off = new GraphSeries("Off", onOffFile.GetDoubleData("Off"))
             {
                 LineColor = Colors.Green,
-                MaxDrawDistance = MaxCisDistance
+                MaxDrawDistance = cisSettings.CisGap
             };
             var onMir = new GraphSeries("On MIR Compensated", onOffFile.GetDoubleData("On Compensated"))
             {
                 LineColor = Colors.Purple,
-                MaxDrawDistance = MaxCisDistance
+                MaxDrawDistance = cisSettings.CisGap
             };
             var offMir = new GraphSeries("Off MIR Compensated", onOffFile.GetDoubleData("Off Compensated"))
             {
                 LineColor = Color.FromArgb(255, 57, 255, 20),
-                MaxDrawDistance = MaxCisDistance
-            };
-            var staticData = new GraphSeries("Static", staticFile.GetDoubleData("On"))
-            {
-                LineColor = Colors.Magenta,
-                MaxDrawDistance = MaxCisDistance
-            };
-            var polarizationData = new GraphSeries("Polarization", offMir.Difference(staticData, MaxCisDistance))
-            {
-                LineColor = Colors.Crimson,
-                MaxDrawDistance = MaxCisDistance
+                MaxDrawDistance = cisSettings.CisGap
             };
             var depth = new GraphSeries("Depth", onOffFile.GetDoubleData("Depth"))
             {
@@ -655,10 +468,6 @@ namespace CisProcessor
                 IsY1Axis = false,
                 PointShape = GraphSeries.Shape.Circle,
                 GraphType = GraphSeries.Type.Point
-            };
-            var redLine = new SingleValueGraphSeries($"{MinPassingValue:F3} Line", MinPassingValue)
-            {
-                IsDrawnInLegend = false
             };
             var commentSeries = new CommentSeries { Values = onOffFile.GetCommentData(ignoreStartEndSkips: true), PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs };
 
@@ -691,11 +500,32 @@ namespace CisProcessor
             graph1.YAxesInfo.Y2MaximumValue = MaxDepth;
 
             graph1.Series.Add(on);
+            if (cisSettings.UseMir)
+                graph1.Series.Add(onMir);
             if (onOffFile.Type == FileType.OnOff)
             {
                 graph1.Series.Add(off);
-                graph1.Series.Add(onMir);
-                graph1.Series.Add(offMir);
+                if (cisSettings.UseMir)
+                    graph1.Series.Add(offMir);
+            }
+            List<(double Footage, double Value)> polData = null;
+            if (staticFile != null)
+            {
+                if (response.Value.Item2)
+                {
+                    staticFile?.Reverse();
+                }
+                var staticData = new GraphSeries("Static", staticFile.GetDoubleData("On"))
+                {
+                    LineColor = Colors.Magenta,
+                    MaxDrawDistance = cisSettings.CisGap
+                };
+                polData = offMir.Difference(staticData, cisSettings.CisGap);
+                var polarizationData = new GraphSeries("Polarization", polData)
+                {
+                    LineColor = Colors.Crimson,
+                    MaxDrawDistance = cisSettings.CisGap
+                };
                 graph1.Series.Add(staticData);
                 graph1.Series.Add(polarizationData);
             }
@@ -704,12 +534,22 @@ namespace CisProcessor
                 graph1.Series.Add(depth);
                 graph1.YAxesInfo.Y2IsDrawn = true;
             } // DEPTH
-            if (onOffFile.Type != FileType.Native)
+            if (cisSettings.HasMinOffValue)
             {
+                var redLine = new SingleValueGraphSeries($"{cisSettings.MinOffValue:F3} Line", cisSettings.MinOffValue.Value)
+                {
+                    IsDrawnInLegend = false
+                };
                 graph1.Series.Add(redLine);
             }
-            else
-                on.Name = "Static";
+            if (cisSettings.HasMaxOffValue)
+            {
+                var redLine = new SingleValueGraphSeries($"{cisSettings.MaxOffValue:F3} Line", cisSettings.MaxOffValue.Value)
+                {
+                    IsDrawnInLegend = false
+                };
+                graph1.Series.Add(redLine);
+            }
             //graph1.XAxisInfo.IsEnabled = false;
             if (pcmReads.Count != 0)
             {
@@ -760,7 +600,7 @@ namespace CisProcessor
                     NameFontSize = 14f
                 }
             };
-            var chart2 = new Chart(report, $"{MinPassingValue:F3} Data")
+            var chart2 = new Chart(report, $"CIS Exception Data")
             {
                 LegendInfo =
                 {
@@ -768,14 +608,14 @@ namespace CisProcessor
                     NameFontSize = 16f
                 }
             };
-            ExceptionsChartSeries exceptions = new OnOffPassingRangeExceptionChartSeries(onOffFile.GetCombinedMirData(), chart2.LegendInfo, chart2.YAxesInfo)
+            ExceptionsChartSeries exceptions = new OnOffPassingRangeExceptionChartSeries(cisSettings.UseMir ? onOffFile.GetCombinedMirData() : onOffFile.GetCombinedData(), chart2.LegendInfo, chart2.YAxesInfo)
             {
                 LegendLabelSplit = 0.5f,
-                MinimumValue = MinPassingValue,
-                MaxDistance = MaxCisDistance
+                MinimumValue = cisSettings.MinOffValue,
+                MaximumValue = cisSettings.MaxOffValue,
+                MaxDistance = cisSettings.CisGap
             };
             chart2.Series.Add(exceptions);
-
 
             var chart3 = new Chart(report, "Polarization Data")
             {
@@ -785,12 +625,16 @@ namespace CisProcessor
                     NameFontSize = 12f
                 }
             };
-            ExceptionsChartSeries polExceptions = new PolarizationExceptionChartSeries(polarizationData.Values, chart3.LegendInfo, chart3.YAxesInfo, MinPolPassingValue)
+            if (staticFile != null)
             {
-                LegendLabelSplit = 0.5f,
-                MaxDistance = MaxCisDistance
-            };
-            chart3.Series.Add(polExceptions);
+
+                ExceptionsChartSeries polExceptions = new PolarizationExceptionChartSeries(polData, chart3.LegendInfo, chart3.YAxesInfo, MinPolPassingValue)
+                {
+                    LegendLabelSplit = 0.5f,
+                    MaxDistance = cisSettings.CisGap
+                };
+                chart3.Series.Add(polExceptions);
+            }
 
             var mirSeries = new MirDirection(onOffFile.GetReconnects());
 
@@ -815,21 +659,29 @@ namespace CisProcessor
             if (onOffFile.Type != FileType.Native)
             {
                 splitContainer.AddSelfSizedContainer(chart2);
-                splitContainer.AddSelfSizedContainer(chart3);
+                if (staticFile != null)
+                    splitContainer.AddSelfSizedContainer(chart3);
             }
             splitContainer.AddSelfSizedContainer(chart1);
             //splitContainer.AddContainer(graph2);
             //splitContainer.AddContainer(graph3);
             splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
             report.Container = splitContainer;
-            var lastFoot = Math.Max(onOffFile.Points.Last().Footage, staticFile.Points.Last().Footage);
+            var lastFoot = onOffFile.Points.Last().Footage;
+            if (staticFile != null && staticFile.Points.Last().Footage > lastFoot)
+            {
+                lastFoot = staticFile.Points.Last().Footage;
+            }
             var pages = report.PageSetup.GetAllPages(0, lastFoot);
             var curFileName = $"{topGlobalXAxis.Title}";
             var addedPcmValues = new List<(string, List<(double, double)>)>
             {
                 ("PCM Values", pcmReads),
-                ("Polarization", polarizationData.Values)
             };
+            if (polData != null)
+            {
+                addedPcmValues.Add(("Polarizaion", polData));
+            }
             var curOutputName = response.Value.Text;
             var foundHyphenGap = curOutputName.IndexOf(" - ");
             if (foundHyphenGap > 0)
@@ -844,7 +696,7 @@ namespace CisProcessor
                 outputFolder = masterOutputFolder;
             }
 
-            await CreateStandardFiles(curFileName, onOffFile, outputFolder, addedPcmValues, staticFile);
+            await CreateStandardFiles(curFileName, onOffFile, outputFolder, cisSettings, addedPcmValues, staticFile);
 
             var shapefileFolder = await masterOutputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
             var cisShapeFile = new ShapefileData($"{response.Value.Text}", onOffFile.GetShapeFile());
@@ -889,296 +741,6 @@ namespace CisProcessor
             //await dialog.ShowAsync();
         }
 
-        private async Task<(string Text, bool IsReversed)> MakeOnOffGraphs(CombinedAllegroCisFile allegroFile, List<(double Footage, double Read)> pcmReads, StorageFolder masterOutputFolder, (string Text, bool IsReversed)? exact = null)
-        {
-            var testStationInitial = allegroFile.GetTestStationData();
-            var firstPoint = allegroFile.Points.First();
-            var startComment = firstPoint.Footage + " -> " + firstPoint.Point.StrippedComment;
-            var lastPoint = allegroFile.Points.Last();
-            var endComment = lastPoint.Footage + " -> " + lastPoint.Point.StrippedComment;
-            (string Text, bool IsReversed)? response;
-            if (!exact.HasValue)
-                response = await InputTextDialogAsync($"{_client} LS {allegroFile.Name.Replace("ls", "", StringComparison.OrdinalIgnoreCase).Replace("line", "", StringComparison.OrdinalIgnoreCase).Trim()} MP START to MP END", testStationInitial, startComment, endComment);
-            else
-                response = (exact.Value.Text, exact.Value.IsReversed);//await InputTextDialogAsync(exact, testStationInitial, startComment, endComment);
-
-            if (response == null)
-                return (null, false);
-            if (response.Value.Item2)
-            {
-                allegroFile.Reverse();
-            }
-            var report = new GraphicalReport();
-            var commentGraph = new Graph(report);
-            var graph1 = new Graph(report);
-            var graph2 = new Graph(report);
-            var graph3 = new Graph(report);
-            //var mirFilterData = "Start Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tReason\n" + ((MirFilter.IsChecked ?? false) ? allegroFile.FilterMir(new List<string>() { "anode", "rectifier" }) : "");
-
-            var on = new GraphSeries("On", allegroFile.GetDoubleData("On"))
-            {
-                LineColor = Colors.Blue
-            };
-            var off = new GraphSeries("Off", allegroFile.GetDoubleData("Off"))
-            {
-                LineColor = Colors.Green
-            };
-            GraphSeries onMir = null;
-            GraphSeries offMir = null;
-            if (IncludeMir)
-            {
-                onMir = new GraphSeries("On MIR Compensated", allegroFile.GetDoubleData("On Compensated"))
-                {
-                    LineColor = Colors.Purple
-                };
-                offMir = new GraphSeries("Off MIR Compensated", allegroFile.GetDoubleData("Off Compensated"))
-                {
-                    LineColor = Color.FromArgb(255, 57, 255, 20)
-                };
-            }
-            var depth = new GraphSeries("Depth", allegroFile.GetDoubleData("Depth"))
-            {
-                LineColor = Colors.Black,
-                PointColor = Colors.Orange,
-                IsY1Axis = false,
-                PointShape = GraphSeries.Shape.Circle,
-                GraphType = GraphSeries.Type.Point
-            };
-            var redLine = new SingleValueGraphSeries("850 Line", -0.85)
-            {
-                IsDrawnInLegend = false
-            };
-            var commentSeries = new CommentSeries { Values = allegroFile.GetCommentData(ignoreStartEndSkips: true), PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs };
-            var separateComment = false;
-            if (separateComment)
-            {
-                commentSeries.PercentOfGraph = 1f;
-                commentSeries.IsFlippedVertical = true;
-                commentSeries.BorderType = BorderType.Full;
-            }
-
-            commentGraph.CommentSeries = commentSeries;
-            commentGraph.LegendInfo.Name = "CIS Comments";
-            commentGraph.DrawTopBorder = false;
-
-            commentGraph.XAxisInfo.MajorGridline.IsEnabled = false;
-            commentGraph.YAxesInfo.MinorGridlines.IsEnabled = false;
-            commentGraph.YAxesInfo.MajorGridlines.IsEnabled = false;
-            commentGraph.YAxesInfo.Y1IsDrawn = false;
-
-            if (IncludeHardcodedDcvg)
-            {
-                var dcvgIndication = new PointWithLabelGraphSeries($"DCVG Indication", -0.2, new List<(double, string)>())
-                {
-                    ShapeRadius = 3,
-                    PointColor = Colors.Red,
-                    BackdropOpacity = 1f
-                };
-                graph1.Series.Add(dcvgIndication);
-            }
-            if (depth.Values.Count != 0)
-            {
-                graph1.Series.Add(depth);
-                graph1.YAxesInfo.Y2IsDrawn = true;
-            }
-            if (!separateComment)
-                graph1.CommentSeries = commentSeries;
-
-            if (allegroFile.Type != FileType.OnOff)
-            {
-                graph1.YAxesInfo.Y1MinimumValue = -0.75;
-                graph1.YAxesInfo.MajorGridlines.Offset = 0.125;
-                graph1.YAxesInfo.MinorGridlines.Offset = 0.025;
-            }
-            graph1.YAxesInfo.Y2MaximumValue = MaxDepth;
-            var y1Min = -3;
-            var autoMin = false;
-            var cisValueMin = Math.Min(on.Values.Select(v => v.value).Min(), off.Values.Select(v => v.value).Min());
-            var y1ActualMin = ((int)(cisValueMin / 0.5) - 1) * 0.5;
-            graph1.YAxesInfo.Y1MinimumValue = autoMin ? Math.Min(y1Min, y1ActualMin) : y1Min;
-            graph1.YAxesInfo.MajorGridlines.Offset = 0.5;
-            graph1.YAxesInfo.MinorGridlines.Offset = 0.1;
-
-            graph1.Series.Add(on);
-            if (allegroFile.Type == FileType.OnOff)
-            {
-                graph1.Series.Add(off);
-                if (IncludeMir)
-                {
-                    graph1.Series.Add(onMir);
-                    graph1.Series.Add(offMir);
-                }
-            }
-            if (allegroFile.Type != FileType.Native)
-            {
-                graph1.Series.Add(redLine);
-            }
-            else
-                on.Name = "Static";
-            //graph1.XAxisInfo.IsEnabled = false;
-            graph1.DrawTopBorder = false;
-            if (IncludeHardcodedAcvg)
-            {
-                var acvgLabels = new List<(double Footage, double, string)>()
-                {
-                    (7830, -0.2, "55DB")
-                };
-                var acvgSeries = new PointWithLabelGraphSeries("ACVG Indication", acvgLabels)
-                {
-                    PointColor = Colors.Navy,
-                };
-                graph1.Series.Add(acvgSeries);
-            }
-            if (pcmReads.Count != 0)
-            {
-                var pcmSeriesLabels = pcmReads.Select(values => (values.Footage, -0.2, values.Read.ToString("F0"))).ToList();
-                var pcmSeries = new PointWithLabelGraphSeries("PCM (Milliamps)", pcmSeriesLabels)
-                {
-                    PointColor = Colors.Navy
-                };
-                graph1.Series.Add(pcmSeries);
-            }
-
-            graph2.Series.Add(depth);
-            graph2.YAxesInfo.Y2IsDrawn = true;
-            graph2.YAxesInfo.Y1IsDrawn = false;
-            //graph2.XAxisInfo.IsEnabled = false;
-
-            graph3.Series.Add(on);
-            graph3.Series.Add(off);
-            //graph3.XAxisInfo.IsEnabled = false;
-            graph3.DrawBottomBorder = false;
-
-            report.XAxisInfo.IsEnabled = false;
-            report.LegendInfo.HorizontalAlignment = Microsoft.Graphics.Canvas.Text.CanvasHorizontalAlignment.Left;
-            report.LegendInfo.SeriesNameFontSize = report.YAxesInfo.Y1LabelFontSize;
-
-            var bottomGlobalXAxis = new GlobalXAxis(report)
-            {
-                DrawPageInfo = true
-            };
-
-            var topGlobalXAxis = new GlobalXAxis(report, true)
-            {
-                Title = response.Value.Text
-            };
-
-            var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
-
-            //var graph1Measurement = new SplitContainerMeasurement(graph1)
-            //{
-            //    RequestedPercent = 0.5
-            //};
-            var chart1 = new Chart(report, "Survey Direction and Survey Date");
-            chart1.LegendInfo.NameFontSize = 14f;
-            var chart2 = new Chart(report, "850 Data");
-            chart2.LegendInfo.SeriesNameFontSize = 8f;
-            chart2.LegendInfo.NameFontSize = 16f;
-
-            var mirSeries = new MirDirection(allegroFile.GetReconnects());
-            ExceptionsChartSeries exceptions = new OnOff850ExceptionChartSeries(allegroFile.GetCombinedMirData(), chart2.LegendInfo, chart2.YAxesInfo)
-            {
-                LegendLabelSplit = 0.5f
-            };
-            //if (IsSempra.IsChecked ?? false)
-            //{
-            //    chart2.LegendInfo.Name = "Exception Data";
-            //    chart2.LegendInfo.NameFontSize = 14f;
-            //    exceptions = new Sempra850ExceptionChartSeries(allegroFile.GetCombinedMirData(), chart2.LegendInfo, chart2.YAxesInfo)
-            //    {
-            //        LegendLabelSplit = 0.5f
-            //    };
-            //    chart1.YAxesInfo.Y2IsDrawn = false;
-            //}
-            chart2.Series.Add(exceptions);
-            //chart1.LegendInfo.NameFontSize = 18f;
-
-            var chart1Series = new SurveyDirectionWithDateSeries(allegroFile.GetDirectionWithDateData());
-            chart1.Series.Add(chart1Series);
-
-            splitContainer.AddSelfSizedContainer(topGlobalXAxis);
-            if (separateComment)
-            {
-                var commentGraphMeasurement = new SplitContainerMeasurement(commentGraph)
-                {
-                    FixedInchSize = 1f
-                };
-                splitContainer.AddContainer(commentGraphMeasurement);
-            }
-            splitContainer.AddContainer(graph1);
-            if (allegroFile.Type != FileType.Native)
-            {
-                splitContainer.AddSelfSizedContainer(chart2);//On
-            }
-            splitContainer.AddSelfSizedContainer(chart1);
-            //splitContainer.AddContainer(graph3);
-            splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
-            report.Container = splitContainer;
-            var pages = report.PageSetup.GetAllPages(0, allegroFile.Points.Last().Footage);
-            var curFileName = $"{topGlobalXAxis.Title}";
-            var addedPcmValues = new List<(string, List<(double, double)>)>
-            {
-                ("PCM Values", pcmReads)
-            };
-            var curOutputName = response.Value.Text;
-            var foundHyphenGap = curOutputName.IndexOf(" - ");
-            if (foundHyphenGap > 0)
-            {
-                curOutputName = curOutputName.Substring(0, foundHyphenGap).Trim();
-            }
-            var outputFolder = await masterOutputFolder.CreateFolderAsync(curOutputName, CreationCollisionOption.FailIfExists);
-            const bool nestOutput = false;
-
-            if (!nestOutput)
-            {
-                outputFolder = masterOutputFolder;
-            }
-
-            await CreateStandardFiles(curFileName, allegroFile, outputFolder, addedPcmValues);
-
-            var shapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
-            var cisShapeFile = new ShapefileData($"{response.Value.Text}", allegroFile.GetShapeFile(pcmValues: pcmReads));
-            await cisShapeFile.WriteToFolder(shapefileFolder);
-
-            var passShapefileFolder = await outputFolder.CreateFolderAsync("Passing Shapefiles", CreationCollisionOption.OpenIfExists);
-            var passingCisShapefileData = allegroFile.GetPassingShapeFile();
-            if (!string.IsNullOrEmpty(passingCisShapefileData))
-            {
-                var passingCisShapeFile = new ShapefileData($"{response.Value.Text}", passingCisShapefileData);
-                await passingCisShapeFile.WriteToFolder(passShapefileFolder);
-            }
-
-            var failingShapefileFolder = await outputFolder.CreateFolderAsync("Failing Shapefiles", CreationCollisionOption.OpenIfExists);
-            var failingCisShapefileData = allegroFile.GetFailingShapeFile();
-            if (!string.IsNullOrEmpty(failingCisShapefileData))
-            {
-                var failingCisShapeFile = new ShapefileData($"{response.Value.Text}", failingCisShapefileData);
-                await failingCisShapeFile.WriteToFolder(failingShapefileFolder);
-            }
-
-            //if (MirFilter.IsChecked ?? false)
-            //    await CreateExcelFile($"{curFileName} MIR Skips", new List<(string Name, string Data)>() { ("MIR Skips", mirFilterData) });
-            var imageFiles = new List<StorageFile>();
-            for (var i = 0; i < pages.Count; ++i)
-            {
-                var page = pages[i];
-                var pageString = $"{i + 1}".PadLeft(3, '0');
-                var fileName = $"{topGlobalXAxis.Title} Page {pageString}.png";
-                if (pages.Count == 1)
-                    fileName = $"{topGlobalXAxis.Title} Graph.png";
-                var imageFile = await outputFolder.CreateFileAsync($"{response.Value.Item1}\\{fileName}", CreationCollisionOption.ReplaceExisting);
-                using (var image = report.GetImage(page, 300))
-                using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
-                {
-                    await image.SaveAsync(stream, CanvasBitmapFileFormat.Png);
-                }
-                imageFiles.Add(imageFile);
-            }
-            var dialog = new MessageDialog($"Finished making {topGlobalXAxis.Title}");
-            return response.Value;
-            //await dialog.ShowAsync();
-        }
-
         private (List<(double Footage, string Value)> Values, List<(double Footage, string Value)> Dates) AlignDepolTabular(CombinedAllegroCisFile cisFile, CombinedAllegroCisFile depolFile)
         {
             var depolValues = new List<(double Footage, string Value)>();
@@ -1196,7 +758,7 @@ namespace CisProcessor
             return (depolValues, depolDates);
         }
 
-        private async Task CreateStandardFiles(string fileName, CombinedAllegroCisFile allegroFile, StorageFolder outputFolder, List<(string, List<(double, double)>)> addedValues = null, CombinedAllegroCisFile depolFile = null)
+        private async Task CreateStandardFiles(string fileName, CombinedAllegroCisFile allegroFile, StorageFolder outputFolder, CisSettings cisSettings, List<(string, List<(double, double)>)> addedValues = null, CombinedAllegroCisFile depolFile = null)
         {
             var tabular = allegroFile.GetTabularData(addedValues: addedValues);
             if (depolFile != null)
@@ -1216,12 +778,12 @@ namespace CisProcessor
                 tabular = allegroFile.GetTabularData(addedValues: stringAddedValues);
             }
             await CreateExcelFile($"{fileName} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) }, outputFolder);
-            var dataMetrics = new DataMetrics(allegroFile.GetPoints(), IncludeMir);
+            var dataMetrics = new DataMetrics(allegroFile.GetPoints(), cisSettings.UseMir);
             if (depolFile != null)
             {
                 await CreateExcelFile($"{fileName} Depol Tabular Data", new List<(string Name, string Data)>() { ("Depol Tabular Data", depolFile.GetTabularData()) }, outputFolder);
                 var polData = addedValues.First(val => val.Item1 == "Polarization");
-                dataMetrics = new DataMetrics(allegroFile.GetPoints(), IncludeMir, polData.Item2);
+                dataMetrics = new DataMetrics(allegroFile.GetPoints(), cisSettings.UseMir, polData.Item2);
             }
 
             await CreateExcelFile($"{fileName} Data Metrics", dataMetrics.GetSheets(), outputFolder);
