@@ -170,7 +170,6 @@ namespace AccurateReportSystem
 
         private static (PGESeverity Severity, string Reason) GetAmpSeverity(double percent)
         {
-            return (PGESeverity.NRI, "");
             if (percent < 10)
                 return (PGESeverity.NRI, "");
             if (percent < 30)

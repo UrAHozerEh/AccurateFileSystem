@@ -77,6 +77,8 @@ namespace AccurateFileSystem
         {
             gps = gps.Replace(',', ' ');
             gps = gps.Replace(';', ' ').Trim();
+            gps = gps.Replace('/', ' ').Trim();
+            gps = gps.Replace('\\', ' ').Trim();
             var lat = "";
             var lon = "";
             var split = gps.Split(' ');

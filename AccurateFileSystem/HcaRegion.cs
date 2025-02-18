@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
+using Windows.Devices.Lights.Effects;
 
 namespace AccurateFileSystem
 {
@@ -52,6 +53,10 @@ namespace AccurateFileSystem
             GpsPoints = gpsPoints;
             GpsLength = gpsPoints.TotalDistance();
             Name = name;
+            if (double.TryParse(startMp, out var startMpDouble))
+                startMp = startMpDouble.ToString("F4");
+            if (double.TryParse(endMp, out var endMpDouble))
+                endMp = endMpDouble.ToString("F4");
             StartMp = startMp;
             EndMp = endMp;
             FirstTime = firstTime;

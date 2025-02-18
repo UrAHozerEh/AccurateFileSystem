@@ -48,8 +48,7 @@ namespace IitProcessor
         public bool BufferComments { get; set; } = true;
         public bool HcaComments { get; set; } = true;
         public bool LongFileFollowReportQGps { get; set; } = false;
-        public bool ShortFileFollowReportQGps { get; set; } = false;
-
+        public bool ShortFileFollowReportQGps { get; set; } = true;
         public bool GraphsInSubFolder { get; set; } = false;
         public bool ReportsInSubFolder { get; set; } = false;
 
@@ -283,12 +282,12 @@ namespace IitProcessor
                 if (curLineData != null)
                 {
                     combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
-                    combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage);
+                    combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage, maxAnchorDistance: double.MaxValue);
                     combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
                 }
                 else
                 {
-                    combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage);
+                    combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage, maxAnchorDistance: double.MaxValue);
                 }
             }
             combinedCisFile.RemoveComments("+");

@@ -174,6 +174,10 @@ namespace AccurateFileSystem.EsriShapefile
                     {
                         value = value.PadLeft(1, '0');
                     }
+                    if(field.Type == "C" && value.Length > field.Length)
+                    {
+                        value = value.Substring(0, field.Length);
+                    }
 
                     values.Add(field.Name, value);
                 }
