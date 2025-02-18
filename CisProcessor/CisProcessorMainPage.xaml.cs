@@ -251,8 +251,8 @@ namespace CisProcessor
 
             var folders = await folder.GetFoldersAsync();
             var cisFolders = folders.Where(f => f.Name != "PCM" && f.Name != "DCVG");
-            var pcmFolder = folders.FirstOrDefault(f => f.Name == "PCM");
-            var dcvgFolder = folders.FirstOrDefault(f => f.Name == "DCVG");
+            var pcmFolder = folders.FirstOrDefault(f => f.Name.Equals("PCM", StringComparison.OrdinalIgnoreCase));
+            var dcvgFolder = folders.FirstOrDefault(f => f.Name.Equals("DCVG", StringComparison.OrdinalIgnoreCase));
             var pcm = await GetPcm(pcmFolder);
             var dcvg = await GetDcvg(dcvgFolder);
             var lineName = folder.DisplayName;
