@@ -8,8 +8,8 @@
 
   <Identity
     Name="002be0f0-15d8-416a-a6f6-6f13eb1923d7"
-    Publisher="CN=kcron"
-    Version="1.0.0.0" />
+    Publisher="CN=Kevin Cronk"
+    Version="1.0.1.0" />
 
   <mp:PhoneIdentity PhoneProductId="002be0f0-15d8-416a-a6f6-6f13eb1923d7" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 

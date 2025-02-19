@@ -171,79 +171,6 @@ namespace CisProcessor
                 return null;
         }
 
-        private static async Task<List<CsvPcm>> GetPcm(IStorageFolder folder)
-        {
-            var output = new List<CsvPcm>();
-            if (folder == null)
-                return output;
-            var files = await folder.GetFilesAsync();
-            foreach (var file in files)
-            {
-                var fileFactory = new FileFactory(file);
-                var curFile = await fileFactory.GetFile();
-                if (curFile is OtherPcm curPCm)
-                    output.Add(curPCm);
-            }
-            return output;
-        }
-
-        private static async Task<List<GeneralCsv>> GetDcvg(IStorageFolder folder)
-        {
-            var output = new List<GeneralCsv>();
-            if (folder == null)
-                return output;
-            var files = await folder.GetFilesAsync();
-            foreach (var file in files)
-            {
-                var fileFactory = new FileFactory(file);
-                var curFile = await fileFactory.GetFile();
-                if (curFile is GeneralCsv curCsv)
-                    output.Add(curCsv);
-            }
-            return output;
-        }
-
-        private static async Task<List<AllegroCISFile>> GetCis(IStorageFolder folder)
-        {
-            var output = new List<AllegroCISFile>();
-            if (folder == null)
-                return output;
-            var files = await folder.GetFilesAsync();
-            foreach (var file in files)
-            {
-                var fileFactory = new FileFactory(file);
-                var curFile = await fileFactory.GetFile();
-                if (curFile is AllegroCISFile curCis)
-                    output.Add(curCis);
-            }
-            return output;
-        }
-
-        private static List<(double Footage, string Comment)> GetAlignedDcvgData(List<GeneralCsv> dcvgFiles, CombinedAllegroCisFile cisCombinedData)
-        {
-            var output = new List<(double Footage, string Comment)>();
-            foreach (var dcvgFile in dcvgFiles)
-            {
-                var lonCol = dcvgFile.GetColumn("Longitude");
-                var latCol = dcvgFile.GetColumn("Latitude");
-                var commentCol = dcvgFile.GetColumn("Comments");
-                for (var row = 0; row < dcvgFile.Data.GetLength(0); ++row)
-                {
-                    var lat = double.Parse(dcvgFile.Data[row, latCol]);
-                    var lon = double.Parse(dcvgFile.Data[row, lonCol]);
-                    var comment = dcvgFile.Data[row, commentCol];
-                    var curGps = new BasicGeoposition()
-                    {
-                        Latitude = lat,
-                        Longitude = lon
-                    };
-                    var (footage, _) = cisCombinedData.GetClosestFootage(curGps);
-                    output.Add((footage, comment));
-                }
-            }
-            return output;
-        }
-
         private async void DoWorkButtonClick(object sender, RoutedEventArgs e)
         {
             var folderPicker = new FolderPicker();
@@ -608,14 +535,17 @@ namespace CisProcessor
                     NameFontSize = 16f
                 }
             };
-            ExceptionsChartSeries exceptions = new OnOffPassingRangeExceptionChartSeries(cisSettings.UseMir ? onOffFile.GetCombinedMirData() : onOffFile.GetCombinedData(), chart2.LegendInfo, chart2.YAxesInfo)
+            if (cisSettings.HasCisExceptions)
             {
-                LegendLabelSplit = 0.5f,
-                MinimumValue = cisSettings.MinOffValue,
-                MaximumValue = cisSettings.MaxOffValue,
-                MaxDistance = cisSettings.CisGap
-            };
-            chart2.Series.Add(exceptions);
+                ExceptionsChartSeries exceptions = new OnOffPassingRangeExceptionChartSeries(cisSettings.UseMir ? onOffFile.GetCombinedMirData() : onOffFile.GetCombinedData(), chart2.LegendInfo, chart2.YAxesInfo)
+                {
+                    LegendLabelSplit = 0.5f,
+                    MinimumValue = cisSettings.MinOffValue,
+                    MaximumValue = cisSettings.MaxOffValue,
+                    MaxDistance = cisSettings.CisGap
+                };
+                chart2.Series.Add(exceptions);
+            }
 
             var chart3 = new Chart(report, "Polarization Data")
             {
@@ -658,7 +588,8 @@ namespace CisProcessor
             splitContainer.AddContainer(graph1);
             if (onOffFile.Type != FileType.Native)
             {
-                splitContainer.AddSelfSizedContainer(chart2);
+                if (cisSettings.HasCisExceptions)
+                    splitContainer.AddSelfSizedContainer(chart2);
                 if (staticFile != null)
                     splitContainer.AddSelfSizedContainer(chart3);
             }

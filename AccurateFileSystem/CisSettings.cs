@@ -12,6 +12,7 @@ namespace AccurateFileSystem
         public double? MinOffValue { get; set; } = null;
         public bool HasMaxOffValue => MaxOffValue.HasValue;
         public double? MaxOffValue { get; set; } = -0.850;
+        public bool HasCisExceptions => HasMaxOffValue || HasMinOffValue;
         public double MinDepolValue { get; set; } = -0.1;
         public double DepthGraphMaxValue { get; set; } = 180;
         public double CisGraphMinValue { get; set; } = -3;
