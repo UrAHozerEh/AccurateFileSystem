@@ -43,12 +43,7 @@ namespace CisProcessor
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        private const double MaxDepth = 180;
-        private const string _client = "SWG";
-        private const double MinPolPassingValue = -0.1;
         private const double ShallowCover = 36; //Usually 36
-        private bool IncludeHardcodedAcvg { get; set; } = false;
-        private bool IncludeHardcodedDcvg { get; set; } = false;
 
         public MainPage()
         {
@@ -330,9 +325,9 @@ namespace CisProcessor
                 var combinedOnOffFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + type, onOffFiles, 5);
                 var combinedStaticFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + " Depol CIS", staticFiles, 5);
                 combinedStaticFiles?.AddPcmDepthData(docFiles);
-                combinedStaticFiles?.AddMaxDepthComment(MaxDepth);
+                combinedStaticFiles?.AddMaxDepthComment(cisSettings.DepthGraphMaxValue);
                 combinedOnOffFiles?.AddPcmDepthData(docFiles);
-                combinedOnOffFiles?.AddMaxDepthComment(MaxDepth);
+                combinedOnOffFiles?.AddMaxDepthComment(cisSettings.DepthGraphMaxValue);
                 var pcmReads = new List<(double Footage, double Read)>();
                 if (docFiles.Count != 0)
                 {
@@ -358,16 +353,20 @@ namespace CisProcessor
                 combinedOnOffFiles?.FixContactSpikes();
                 combinedStaticFiles?.FixContactSpikes();
                 combinedStaticFiles?.FixGps();
-                //combinedStaticFiles?.StraightenGps();
-                //combinedStaticFiles?.SetFootageFromGps();
+                if (cisSettings.StraightenGps)
+                    combinedStaticFiles?.StraightenGps(cisSettings.StraightenGpsCommentsDistance.Value);
+                if (cisSettings.SetFootageFromGps)
+                    combinedStaticFiles?.SetFootageFromGps();
                 combinedOnOffFiles?.FixGps();
-                //combinedOnOffFiles?.StraightenGps();
-                //combinedOnOffFiles.SetFootageFromGps();
+                if (cisSettings.StraightenGps)
+                    combinedOnOffFiles?.StraightenGps(cisSettings.StraightenGpsCommentsDistance.Value);
+                if (cisSettings.SetFootageFromGps)
+                    combinedOnOffFiles.SetFootageFromGps();
                 combinedOnOffFiles?.RemoveComments("+");
-                //if (combinedOnOffFiles.HasStartSkip)
-                //{
-                //    combinedOnOffFiles.ShiftPoints(-combinedOnOffFiles.Points[1].Footage);
-                //}
+                if (combinedOnOffFiles.HasStartSkip)
+                {
+                    combinedOnOffFiles.ShiftPoints(-combinedOnOffFiles.Points[1].Footage);
+                }
                 if (staticFiles.Count > 0 && onOffFiles.Count > 0)
                 {
                     var onOffStart = combinedOnOffFiles.Points.First().Point.GPS;
@@ -423,7 +422,7 @@ namespace CisProcessor
             var endComment = lastPoint.Footage + " -> " + lastPoint.Point.StrippedComment;
             (string Text, bool IsReversed)? response;
             if (!exact.HasValue)
-                response = await InputTextDialogAsync($"{_client} {onOffFile.Name.Trim()} MP START to MP END", testStationInitial, startComment, endComment);
+                response = await InputTextDialogAsync($"{onOffFile.Name.Trim()} MP START to MP END", testStationInitial, startComment, endComment);
             else
                 response = (exact.Value.Text, exact.Value.IsReversed);//await InputTextDialogAsync(exact, testStationInitial, startComment, endComment);
 
@@ -434,6 +433,18 @@ namespace CisProcessor
                 onOffFile.Reverse();
             }
             var report = new GraphicalReport();
+            if (cisSettings.HasFeetPerPage)
+                report.PageSetup.FootagePerPage = cisSettings.FeetPerPage.Value;
+            else
+            {
+                var lastFootage = lastPoint.Footage;
+                if (staticFile != null)
+                {
+                    lastFootage = Math.Max(lastFootage, staticFile.Points.Last().Footage);
+                }
+                report.PageSetup.FootagePerPage = lastFootage;
+            }
+            report.PageSetup.Overlap = cisSettings.FeetOverlap;
             var commentGraph = new Graph(report);
             var graph1 = new Graph(report);
 
@@ -481,23 +492,12 @@ namespace CisProcessor
             commentGraph.YAxesInfo.Y1IsDrawn = false;
 
             graph1.CommentSeries = commentSeries;
-            /*
-            graph1.YAxesInfo.Y1MaximumValue = 150;
-            graph1.YAxesInfo.Y1MinimumValue = 0;
-            graph1.YAxesInfo.Y1IsInverted = false;
-            graph1.Gridlines[(int)GridlineName.MajorHorizontal].Offset = 15;
-            graph1.Gridlines[(int)GridlineName.MinorHorizontal].Offset = 5;
-            */
-            if (onOffFile.Type != FileType.OnOff)
-            {
-                graph1.YAxesInfo.Y1MinimumValue = -0.75;
-                graph1.YAxesInfo.MajorGridlines.Offset = 0.125;
-                graph1.YAxesInfo.MinorGridlines.Offset = 0.025;
-            }
-            graph1.YAxesInfo.Y1MinimumValue = -4;
-            graph1.YAxesInfo.MajorGridlines.Offset = 0.5;
-            graph1.YAxesInfo.MinorGridlines.Offset = 0.1;
-            graph1.YAxesInfo.Y2MaximumValue = MaxDepth;
+            graph1.YAxesInfo.Y1MinimumValue = cisSettings.CisGraphMinValue;
+            graph1.YAxesInfo.Y1MaximumValue = cisSettings.CisGraphMaxValue;
+            graph1.YAxesInfo.MajorGridlines.Offset = cisSettings.CisGraphMajorGridStep;
+            graph1.YAxesInfo.MinorGridlines.Offset = cisSettings.CisGraphMinorGridStep;
+            graph1.YAxesInfo.Y2MaximumValue = cisSettings.DepthGraphMaxValue;
+            graph1.YAxesInfo.Y1IsInverted = cisSettings.InvertGraph;
 
             graph1.Series.Add(on);
             if (cisSettings.UseMir)
@@ -520,7 +520,7 @@ namespace CisProcessor
                     LineColor = Colors.Magenta,
                     MaxDrawDistance = cisSettings.CisGap
                 };
-                polData = offMir.Difference(staticData, cisSettings.CisGap);
+                polData = (cisSettings.UseMir ? offMir : off).Difference(staticData, cisSettings.CisGap);
                 var polarizationData = new GraphSeries("Polarization", polData)
                 {
                     LineColor = Colors.Crimson,
@@ -628,7 +628,7 @@ namespace CisProcessor
             if (staticFile != null)
             {
 
-                ExceptionsChartSeries polExceptions = new PolarizationExceptionChartSeries(polData, chart3.LegendInfo, chart3.YAxesInfo, MinPolPassingValue)
+                ExceptionsChartSeries polExceptions = new PolarizationExceptionChartSeries(polData, chart3.LegendInfo, chart3.YAxesInfo, cisSettings.MinDepolValue)
                 {
                     LegendLabelSplit = 0.5f,
                     MaxDistance = cisSettings.CisGap
