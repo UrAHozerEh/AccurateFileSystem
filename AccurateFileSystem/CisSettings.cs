@@ -9,9 +9,9 @@ namespace AccurateFileSystem
     public class CisSettings : File
     {
         public bool HasMinOffValue => MinOffValue.HasValue;
-        public double? MinOffValue { get; set; } = -0.850;
+        public double? MinOffValue { get; set; } = null;
         public bool HasMaxOffValue => MaxOffValue.HasValue;
-        public double? MaxOffValue { get; set; } = null;
+        public double? MaxOffValue { get; set; } = -0.850;
         public double MinDepolValue { get; set; } = -0.1;
         public double DepthGraphMaxValue { get; set; } = 180;
         public double CisGraphMinValue { get; set; } = -3;
@@ -41,10 +41,15 @@ namespace AccurateFileSystem
             }
         }
 
+        public static string RemoveWhitespace(string input)
+        {
+            return new string(input.ToCharArray().Where(c => !char.IsWhiteSpace(c)).ToArray());
+        }
+
         private void ParseLine(string line)
         {
             var split = line.Split(',');
-            var curLabel = split[0].ToLower().Remove(' ');
+            var curLabel = RemoveWhitespace(split[0].ToLower());
             var hasDouble = false;
             var hasBool = false;
             var isBlank = string.IsNullOrWhiteSpace(split[1]);
