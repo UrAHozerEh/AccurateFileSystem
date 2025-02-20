@@ -527,6 +527,14 @@ namespace AccurateFileSystem
                 "MM/d/yyyy,mm:ss",
                 "MM/d/yyyy, mm:ss.f",
                 "MM/d/yyyy,mm:ss.f",
+                "M/dd/yyyy, mm:ss",
+                "M/dd/yyyy,mm:ss",
+                "M/dd/yyyy, mm:ss.f",
+                "M/dd/yyyy,mm:ss.f",
+                "M/d/yyyy, mm:ss",
+                "M/d/yyyy,mm:ss",
+                "M/d/yyyy, mm:ss.f",
+                "M/d/yyyy,mm:ss.f",
             };
 
             foreach (var format in inputFormats)
