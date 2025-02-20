@@ -39,7 +39,7 @@ namespace IitProcessor
     public sealed partial class MainPage : Page
     {
         public string ReportQ { get; set; } = "";
-        public bool BothAcvgDcvg = true;
+        public bool BothAcvgDcvg = false;
         public static bool IsPge { get; } = true;
         public double MaxDepth { get; set; } = 120;
         public double MinDepth { get; set; } = 36;
