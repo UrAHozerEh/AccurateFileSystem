@@ -224,7 +224,10 @@ namespace AccurateReportSystem
                 Off = point.Off;
                 IsOnOff = isOnOff;
                 Comment = point.OriginalComment;
-                Date = point.Times[0];
+                if (point.Times.Count == 0)
+                    throw new Exception("No times in point with comment: " + point.OriginalComment);
+                else
+                    Date = point.Times[0];
                 Depth = point.Depth;
                 Gps = point.GPS;
                 Region = region;

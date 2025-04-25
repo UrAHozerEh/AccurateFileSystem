@@ -66,7 +66,8 @@ namespace AccurateFileSystem
 
                     }
                 case ".txt":
-                    return await GetAllegroWaveform();
+                    return null;
+                    //return await GetAllegroWaveform();
                 case ".regions2":
                     return await IitRegionFile.GetIitRegion(File);
                 case ".xlsx":

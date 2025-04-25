@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Graphics.Canvas;
@@ -24,6 +25,8 @@ namespace AccurateReportSystem
         public List<ChartSeries> Series { get; set; } = new List<ChartSeries>();
         public bool DrawTopBorder { get; set; } = true;
         public bool DrawBottomBorder { get; set; } = false;
+        public double StartBufferEnd { get; set; } = double.NaN;
+        public double EndBufferStart { get; set; } = double.NaN;
 
         public Chart(GraphicalReport report, string name)
         {
@@ -89,6 +92,38 @@ namespace AccurateReportSystem
             {
                 session.FillRectangle(startRect, color);
                 session.FillRectangle(endRect, color);
+            }
+            var bufferOpacityMult = 0.6f;
+            if(!double.IsNaN(StartBufferEnd) && StartBufferEnd > page.StartFootage && StartBufferEnd < page.EndFootage)
+            {
+                var startBufferStart = transform.ToDrawArea(StartBufferEnd);
+                var startBufferWidth = Math.Abs(startShadowStart + startShadowWidth - startBufferStart);
+                var startBufferRect = new Rect(startShadowStart + startShadowWidth, drawArea.Y, startBufferWidth, drawArea.Height);
+                using (var layer = session.CreateLayer(opacity * bufferOpacityMult))
+                {
+                    session.FillRectangle(startBufferRect, color);
+                }
+            }
+            if(!double.IsNaN(EndBufferStart) && EndBufferStart > page.StartFootage && EndBufferStart < page.EndFootage)
+            {
+                var endBufferStart = transform.ToDrawArea(EndBufferStart);
+                var endBufferWidth = Math.Abs(endShadowStart - endBufferStart);
+                var endBufferRect = new Rect(endShadowStart - endBufferWidth, drawArea.Y, endBufferWidth, drawArea.Height);
+                using (var layer = session.CreateLayer(opacity * bufferOpacityMult))
+                {
+                    session.FillRectangle(endBufferRect, color);
+                }
+            }
+            if(!double.IsNaN(EndBufferStart) && EndBufferStart < page.StartFootage)
+            {
+                var endBufferStart = transform.ToDrawArea(page.StartFootage + page.Overlap);
+                var endBufferEnd = transform.ToDrawArea(page.EndFootage - page.Overlap);
+                var endBufferWidth = Math.Abs(endBufferEnd - endBufferStart);
+                var endBufferRect = new Rect(startShadowStart + startShadowWidth, drawArea.Y, endBufferWidth, drawArea.Height);
+                using (var layer = session.CreateLayer(opacity * bufferOpacityMult))
+                {
+                    session.FillRectangle(endBufferRect, color);
+                }
             }
         }
 

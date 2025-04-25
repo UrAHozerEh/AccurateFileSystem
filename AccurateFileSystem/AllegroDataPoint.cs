@@ -211,8 +211,17 @@ namespace AccurateFileSystem
             StrippedComment = Regex.Replace(StrippedComment, @",", ", ");
 
             StrippedComment = Regex.Replace(StrippedComment, @"\s\s+", " ");
+            string startComment;
+            do
+            {
+                startComment = StrippedComment;
+                StrippedComment.Trim(',');
+                StrippedComment.Trim();
+            } while (startComment != StrippedComment);
+
             StrippedComment.Trim(',');
             StrippedComment.Trim();
+            
         }
 
         public bool Equals(AllegroDataPoint other)

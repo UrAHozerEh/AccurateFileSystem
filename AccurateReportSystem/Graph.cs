@@ -30,6 +30,8 @@ namespace AccurateReportSystem
         private double TotalYValueShift => XAxisInfo.IsFlippedVertical ? XAxisInfo.TotalHeight : 0;
         public bool DrawTopBorder { get; set; } = true;
         public bool DrawBottomBorder { get; set; } = true;
+        public double StartBufferEnd { get; set; } = double.NaN;
+        public double EndBufferStart { get; set; } = double.NaN;
 
         public Graph(GraphicalReport report)
         {
@@ -103,14 +105,14 @@ namespace AccurateReportSystem
                     var curTransform = series.IsY1Axis ? y1Transform : y2Transform;
                     series.Draw(session, page, curTransform);
                 }
-                
+
                 //TODO: Comment should draw itself. Should have a way to order drawing of everything (gridlines, series, shadow, comments, comment backdrop, etc.)
                 if (CommentSeries != null)
                 {
                     var (commentGeoInfo, lineGeoInfo, backdropGeo) = CommentSeries.GetGeometry(page, graphBodyDrawArea, session);
                     var style = new CanvasStrokeStyle
                     {
-                        
+
                     };
                     if (backdropGeo != null)
                     {
@@ -121,7 +123,7 @@ namespace AccurateReportSystem
                         session.DrawGeometry(lineGeoInfo.Geometry, lineGeoInfo.Color, 1, style);
                     if (commentGeoInfo != null)
                         session.FillGeometry(commentGeoInfo.Geometry, commentGeoInfo.Color);
-                    
+
                     //TODO: Canvas Stroke Style should be in Geo Info. Also should have different styles for text and the indicators.
                 }
 
@@ -135,14 +137,14 @@ namespace AccurateReportSystem
 
             //DrawAxisLabels(page, session, graphBodyDrawArea);
             //DrawAxisTitles(session, graphBodyDrawArea);
-            
+
             var legendWidth = LegendInfo.Width + (YAxesInfo.Y1IsDrawn ? 0 : YAxesInfo.Y1TotalHeight);
             var legendDrawArea = new Rect(DrawArea.X, DrawArea.Y, legendWidth, graphBodyDrawArea.Height);
             LegendInfo.Draw(session, Series, legendDrawArea);
 
             if (DrawTopBorder)
                 session.DrawLine((float)DrawArea.Left, (float)DrawArea.Top, (float)DrawArea.Right, (float)DrawArea.Top, Colors.Black, 1);
-            if(DrawBottomBorder)
+            if (DrawBottomBorder)
                 session.DrawLine((float)DrawArea.Left, (float)DrawArea.Bottom, (float)DrawArea.Right, (float)DrawArea.Bottom, Colors.Black, 1);
         }
 
@@ -158,6 +160,35 @@ namespace AccurateReportSystem
             {
                 session.FillRectangle(startRect, color);
                 session.FillRectangle(endRect, color);
+            }
+            var bufferOpacityMult = 0.6f;
+            if (!double.IsNaN(StartBufferEnd) && StartBufferEnd > (page.StartFootage + page.Overlap) && StartBufferEnd < (page.EndFootage - page.Overlap))
+            {
+                var startBufferWidth = (float)Math.Round(pixelToFootRatio * (StartBufferEnd - (page.StartFootage + page.Overlap)), GraphicalReport.DIGITS_TO_ROUND);
+                startBufferWidth = Math.Max(startBufferWidth, 1);
+                var startBufferRect = new Rect(graphBodyDrawArea.X + shadowWidth, graphBodyDrawArea.Y, startBufferWidth, graphBodyDrawArea.Height);
+                using (var layer = session.CreateLayer(opacity * bufferOpacityMult))
+                {
+                    session.FillRectangle(startBufferRect, color);
+                }
+            }
+            if (!double.IsNaN(EndBufferStart) && EndBufferStart > page.StartFootage && EndBufferStart < page.EndFootage)
+            {
+                var endBufferWidth = (float)Math.Round(pixelToFootRatio * ((page.EndFootage - page.Overlap) - EndBufferStart), GraphicalReport.DIGITS_TO_ROUND);
+                endBufferWidth = Math.Max(endBufferWidth, 1);
+                var endBufferRect = new Rect(graphBodyDrawArea.Right - shadowWidth - endBufferWidth, graphBodyDrawArea.Y, endBufferWidth, graphBodyDrawArea.Height);
+                using (var layer = session.CreateLayer(opacity * bufferOpacityMult))
+                {
+                    session.FillRectangle(endBufferRect, color);
+                }
+            }
+            if (!double.IsNaN(EndBufferStart) && EndBufferStart < page.StartFootage)
+            {
+                var endBufferRect = new Rect(graphBodyDrawArea.X + shadowWidth, graphBodyDrawArea.Y, graphBodyDrawArea.Width - (shadowWidth * 2), graphBodyDrawArea.Height);
+                using (var layer = session.CreateLayer(opacity * bufferOpacityMult))
+                {
+                    session.FillRectangle(endBufferRect, color);
+                }
             }
         }
 

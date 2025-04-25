@@ -39,7 +39,7 @@ namespace IitProcessor
     public sealed partial class MainPage : Page
     {
         public string ReportQ { get; set; } = "";
-        public bool BothAcvgDcvg = false;
+        public bool BothAcvgDcvg { get; set; } = false;
         public static bool IsPge { get; } = true;
         public double MaxDepth { get; set; } = 120;
         public double MinDepth { get; set; } = 36;
@@ -48,9 +48,10 @@ namespace IitProcessor
         public bool BufferComments { get; set; } = true;
         public bool HcaComments { get; set; } = true;
         public bool LongFileFollowReportQGps { get; set; } = false;
-        public bool ShortFileFollowReportQGps { get; set; } = true;
+        public bool ShortFileFollowReportQGps { get; set; } = false;
         public bool GraphsInSubFolder { get; set; } = false;
         public bool ReportsInSubFolder { get; set; } = false;
+        public bool DrawBufferShadow { get; set; } = true;
 
         public MainPage()
         {
@@ -59,7 +60,19 @@ namespace IitProcessor
 
         private async void buttonDoWork_Click(object sender, RoutedEventArgs e)
         {
+#if DEBUG
             await DoWork();
+#else
+            try
+            {
+                await DoWork();
+            }
+            catch (Exception ex)
+            {
+                var dialog = new MessageDialog($"Error: {ex.Message}");
+                _ = await dialog.ShowAsync();
+            }
+#endif
         }
 
         private async Task DoWork()
@@ -169,7 +182,18 @@ namespace IitProcessor
                 displayName = displayName.Substring(plusIndex + 1).Trim();
             }
 
-            var storageFiles = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
+            var storageFiles = new List<StorageFile>();
+            var test = await folder.GetItemsAsync();
+            foreach (var item in test)
+            {
+                if (item.IsOfType(StorageItemTypes.File))
+                {
+                    if (item is StorageFile file)
+                    {
+                        storageFiles.Add(file);
+                    }
+                }
+            }
             var cisFiles = new List<AllegroCISFile>();
             var dcvgFiles = new List<AllegroCISFile>();
             var pcmFiles = new List<CsvPcm>();
@@ -234,7 +258,18 @@ namespace IitProcessor
                     soilReads = splitLines.Select(s => (new BasicGeoposition() { Latitude = double.Parse(s[1]), Longitude = double.Parse(s[2]) }, s[0])).ToList();
                 }
             }
-            var hca = regions.GetHca(displayName);
+            Hca hca;
+            var isDuplicateSurvey = false;
+            if (displayName.EndsWith(" Duplicate Survey"))
+            {
+                var tempDisplayName = displayName.Substring(0, displayName.Length - " Duplicate Survey".Length);
+                hca = regions.GetHca(tempDisplayName);
+                isDuplicateSurvey = true;
+            }
+            else
+            {
+                hca = regions.GetHca(displayName);
+            }
             if (gpsShift != null && gpsShift.HasReportD)
             {
                 hca.ShiftGps(gpsShift.ReportDLatitudeShift, gpsShift.ReportDLongitudeShift);
@@ -245,9 +280,12 @@ namespace IitProcessor
                 var region = hca.Regions[0];
                 var startGps = region.StartGps;
                 var endGps = region.EndGps;
-                ReportQ += $"{hca.Name.TrimEnd('a')}\t{hca.LineName}\t{startMp}\t{endMp}\tNT\tNT\t{region.Name}\t";
-                ReportQ += $"{hca.HcaGpsLength:F0}\tNT\t{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t";
-                ReportQ += $"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{hca.Regions.First().FirstTimeString}\tNT\tNT\tNT\tNT\t{hca.Regions[0].LongSkipReason}\n";
+                if (!isDuplicateSurvey)
+                {
+                    ReportQ += $"{hca.Name.TrimEnd('a')}\t{hca.LineName}\t{startMp}\t{endMp}\tNT\tNT\t{region.Name}\t";
+                    ReportQ += $"{hca.HcaGpsLength:F0}\tNT\t{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t";
+                    ReportQ += $"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{hca.Regions.First().FirstTimeString}\tNT\tNT\tNT\tNT\t{hca.Regions[0].LongSkipReason}\n";
+                }
                 return;
             }
             cisFiles = GetUniqueFiles(cisFiles);
@@ -308,6 +346,10 @@ namespace IitProcessor
                 var bufferStartPoint = combinedCisFile.GetClosesetPoint(bufferStartFootage.Value);
                 hca.EndBuffer.StartGps = bufferStartPoint.Point.GPS;
             }
+            var startBufferShadowEnd = bufferEndFootage == null ? 0 : startHcaFootage;
+            var endBufferShadowStart = bufferStartFootage == null ? 0 : endHcaFootage;
+            var startBufferShadowEndPoint = combinedCisFile.GetClosesetPoint(startBufferShadowEnd);
+            var endBufferShadowStartPoint = combinedCisFile.GetClosesetPoint(endBufferShadowStart);
             combinedCisFile.SetFootageFromGps();
             if (combinedCisFile.HasStartSkip)
             {
@@ -426,7 +468,9 @@ namespace IitProcessor
             if (reportInfo.EcdaData.Count == 0)
                 reportInfo = reportInfo;
             reportQ += reportInfo.GetReportQ();
-            await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, isDcvg, displayName, hca, cisSkips, pcmSkips, outputFolder, pcmFiles.FirstOrDefault()?.TxData, soilReads, gpsShift);
+            var startShadowEnd = bufferEndFootage == null ? double.NaN : startBufferShadowEndPoint.Footage;
+            var endShadowStart = bufferStartFootage == null ? double.NaN : endBufferShadowStartPoint.Footage;
+            await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, isDcvg, displayName, hca, cisSkips, pcmSkips, startShadowEnd, endShadowStart, isDuplicateSurvey, outputFolder, pcmFiles.FirstOrDefault()?.TxData, soilReads, gpsShift);
         }
 
         private List<(BasicGeoposition Gps, double Value, double Percent)> GetAmpReads(List<CsvPcm> files)
@@ -712,7 +756,7 @@ namespace IitProcessor
         }
 
 
-        private async Task MakeIITGraphsUpdated(CombinedAllegroCisFile file, PgeEcdaReportInformation ecdaReport, bool isDcvg, string folderName, Hca hca, Skips cisSkips, Skips pcmSkips, StorageFolder outputFolder = null, List<(BasicGeoposition, string)> txLocations = null, List<(BasicGeoposition, string)> soilRes = null, GlobalGpsShift gpsShift = null)
+        private async Task MakeIITGraphsUpdated(CombinedAllegroCisFile file, PgeEcdaReportInformation ecdaReport, bool isDcvg, string folderName, Hca hca, Skips cisSkips, Skips pcmSkips, double startBufferEnd, double endBufferStart, bool isDuplicateSurvey, StorageFolder outputFolder = null, List<(BasicGeoposition, string)> txLocations = null, List<(BasicGeoposition, string)> soilRes = null, GlobalGpsShift gpsShift = null)
         {
             if (outputFolder == null)
                 outputFolder = ApplicationData.Current.LocalFolder;
@@ -722,7 +766,7 @@ namespace IitProcessor
             var curDepth = 50.0;
             var maxDrawDistance = 20.0;
             var shortGraphLength = 200.0;
-            var medGraphLength = 600.0;
+            var medGraphLength = 800.0;
             var directionData = new List<(double, bool, string)>();
             AddMaxDepthComment(file, maxDepth);
 
@@ -752,6 +796,11 @@ namespace IitProcessor
             }
 
             var onOffGraph = new Graph(report);
+            if (DrawBufferShadow)
+            {
+                onOffGraph.StartBufferEnd = startBufferEnd;
+                onOffGraph.EndBufferStart = endBufferStart;
+            }
             var on = new GraphSeries("On", onData)
             {
                 LineColor = Colors.Blue,
@@ -865,17 +914,37 @@ namespace IitProcessor
             var splitContainer = new SplitContainer(SplitContainerOrientation.Vertical);
 
             var surveyDirectionChart = new Chart(report, "CIS Survey Direction With Survey Date");
+            if (DrawBufferShadow)
+            {
+                surveyDirectionChart.StartBufferEnd = startBufferEnd;
+                surveyDirectionChart.EndBufferStart = endBufferStart;
+            }
             surveyDirectionChart.LegendInfo.NameFontSize = 14f;
             var cisClass = new Chart(report, "CIS Severity");
+            if (DrawBufferShadow)
+            {
+                cisClass.StartBufferEnd = startBufferEnd;
+                cisClass.EndBufferStart = endBufferStart;
+            }
             var cisIndication = new PGECISIndicationChartSeries(file, cisClass, hca, cisSkips);
             cisClass.Series.Add(cisIndication);
 
             var dcvgClass = new Chart(report, "DCVG Severity");
+            if (DrawBufferShadow)
+            {
+                dcvgClass.StartBufferEnd = startBufferEnd;
+                dcvgClass.EndBufferStart = endBufferStart;
+            }
             var dcvgIndicationSeries = new PgeDcvgIndicationChartSeries(dcvgData, dcvgClass, isDcvg);
             dcvgClass.Series.Add(dcvgIndicationSeries);
             dcvgClass.LegendInfo.NameFontSize = 13f;
 
             var ecdaClassChart = new Chart(report, "ECDA Clas.");
+            if (DrawBufferShadow)
+            {
+                ecdaClassChart.StartBufferEnd = startBufferEnd;
+                ecdaClassChart.EndBufferStart = endBufferStart;
+            }
             var ecdaClassSeries = new PGEDirectExaminationPriorityChartSeries(ecdaClassChart, cisIndication, dcvgIndicationSeries, ecdaReport.GetFullAmpData());
             ecdaClassChart.Series.Add(ecdaClassSeries);
 
@@ -887,6 +956,11 @@ namespace IitProcessor
             if (ampData.Count > 0)
             {
                 var ampGraph = new Graph(report);
+                if (DrawBufferShadow)
+                {
+                    ampGraph.StartBufferEnd = startBufferEnd;
+                    ampGraph.EndBufferStart = endBufferStart;
+                }
 
                 var minAmp = ampData.Min(v => v.Value);
                 var maxAmp = ampData.Max(v => v.Value);
@@ -923,6 +997,11 @@ namespace IitProcessor
                 ampGraph.Series.Add(ampsLine);
                 splitContainer.AddContainerPercent(ampGraph, 0.15);
                 var pcmDirectionChart = new Chart(report, "PCM Direction Away From TX With Survey Date");
+                if (DrawBufferShadow)
+                {
+                    pcmDirectionChart.StartBufferEnd = startBufferEnd;
+                    pcmDirectionChart.EndBufferStart = endBufferStart;
+                }
                 pcmDirectionChart.LegendInfo.NameFontSize = 14f;
                 var pcmDirectionSeries = new SurveyDirectionWithDateSeries(ecdaReport.GetAmpDirectionData());
                 pcmDirectionChart.Series.Add(pcmDirectionSeries);
@@ -1057,7 +1136,8 @@ namespace IitProcessor
                     }
                 }
             }
-            ReportQ += output.ToString();
+            if (!isDuplicateSurvey)
+                ReportQ += output.ToString();
             var shapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
             var googleShapefileFolder = await outputFolder.CreateFolderAsync("Google Earth", CreationCollisionOption.OpenIfExists);
             var cisShapeFileStringBuilder = new StringBuilder();
@@ -1437,7 +1517,7 @@ namespace IitProcessor
             if (bufferStartIndex < file.Points.Count - 1)
             {
                 var tempStartBufferComment = startBufferComment;
-                if(!string.IsNullOrWhiteSpace(file.Points[bufferStartIndex].Point.OriginalComment))
+                if (!string.IsNullOrWhiteSpace(file.Points[bufferStartIndex].Point.OriginalComment))
                     tempStartBufferComment += "+";
                 if (BufferComments)
                     file.Points[bufferStartIndex].Point.OriginalComment += tempStartBufferComment;
