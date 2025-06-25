@@ -18,8 +18,6 @@ namespace AccurateReportSystem
         public List<PgeEcdaDataPoint> EcdaData { get; set; }
         public HcaInfo HcaInfo { get; set; }
         public Hca Hca { get; set; }
-        public bool IsDcvg { get; private set; }
-        public bool IsAcvg => !IsDcvg;
         public bool UseMir { get; set; }
         public double MaxSpacing { get; set; }
         public GpsInfo? GpsInfo { get; set; }
@@ -46,19 +44,20 @@ namespace AccurateReportSystem
             public string AmpReadDate { get; set; } = null;
             public BasicGeoposition? AmpGps { get; set; } = null;
             public BasicGeoposition CisGps { get; set; }
-            public BasicGeoposition? IndicationGps { get; set; } = null;
+            public BasicGeoposition? DcvgGps { get; set; } = null;
+            public BasicGeoposition? AcvgGps { get; set; } = null;
             public bool IsCisExtrapolated { get; set; }
             public bool IsCisSkipped { get; set; }
-            public bool IsDcvg { get; set; }
             public bool IsOnOff { get; set; }
             public double On { get; set; }
             public double Off { get; set; }
             public double Baseline { get; set; } = double.NaN;
-            public double IndicationValue { get; set; } = double.NaN;
+            public double DcvgValue { get; set; } = double.NaN;
+            public double AcvgValue { get; set; } = double.NaN;
             public string Region { get; set; }
             public HcaRegion RegionUpdated { get; set; }
 
-            public PgeEcdaDataPoint(double footage, double on, double off, bool isOnOff, double? depth, bool isSkipped, bool isExtrapolated, BasicGeoposition gps, bool isDcvg, string region, HcaRegion regionUpdated = null)
+            public PgeEcdaDataPoint(double footage, double on, double off, bool isOnOff, double? depth, bool isSkipped, bool isExtrapolated, BasicGeoposition gps, string region, HcaRegion regionUpdated = null)
             {
                 Footage = footage;
                 On = on;
@@ -68,7 +67,6 @@ namespace AccurateReportSystem
                 IsCisSkipped = isSkipped;
                 IsCisExtrapolated = isExtrapolated;
                 CisGps = gps;
-                IsDcvg = isDcvg;
                 Region = region;
                 RegionUpdated = regionUpdated;
             }
@@ -77,25 +75,26 @@ namespace AccurateReportSystem
             {
                 get
                 {
-                    if (CisSeverity == PGESeverity.Moderate && IndicationSeverity == PGESeverity.Severe)
+                    var worseSeverity = (PGESeverity)Math.Max((int)DcvgSeverity, (int)AcvgSeverity);
+                    if (CisSeverity == PGESeverity.Moderate && worseSeverity == PGESeverity.Severe)
                         return 1;
-                    if (CisSeverity == PGESeverity.Severe && (IndicationSeverity == PGESeverity.Severe || IndicationSeverity == PGESeverity.Moderate))
+                    if (CisSeverity == PGESeverity.Severe && (worseSeverity == PGESeverity.Severe || worseSeverity == PGESeverity.Moderate))
                         return 1;
 
-                    if (CisSeverity == PGESeverity.NRI && IndicationSeverity == PGESeverity.Severe)
+                    if (CisSeverity == PGESeverity.NRI && worseSeverity == PGESeverity.Severe)
                         return 2;
-                    if (CisSeverity == PGESeverity.Minor && IndicationSeverity == PGESeverity.Severe)
+                    if (CisSeverity == PGESeverity.Minor && worseSeverity == PGESeverity.Severe)
                         return 2;
-                    if (CisSeverity == PGESeverity.Moderate && (IndicationSeverity == PGESeverity.Moderate || IndicationSeverity == PGESeverity.Minor))
+                    if (CisSeverity == PGESeverity.Moderate && (worseSeverity == PGESeverity.Moderate || worseSeverity == PGESeverity.Minor))
                         return 2;
-                    if (CisSeverity == PGESeverity.Severe && (IndicationSeverity == PGESeverity.Minor || IndicationSeverity == PGESeverity.NRI))
+                    if (CisSeverity == PGESeverity.Severe && (worseSeverity == PGESeverity.Minor || worseSeverity == PGESeverity.NRI))
                         return 2;
 
-                    if (CisSeverity == PGESeverity.NRI && IndicationSeverity == PGESeverity.Moderate)
+                    if (CisSeverity == PGESeverity.NRI && worseSeverity == PGESeverity.Moderate)
                         return 3;
                     if (CisSeverity == PGESeverity.Minor)
                         return 3;
-                    if (CisSeverity == PGESeverity.Moderate && IndicationSeverity == PGESeverity.NRI)
+                    if (CisSeverity == PGESeverity.Moderate && worseSeverity == PGESeverity.NRI)
                         return 3;
 
                     return 4;
@@ -134,18 +133,32 @@ namespace AccurateReportSystem
                     return GetCisSeverity().Item2;
                 }
             }
-            public PGESeverity IndicationSeverity
+            public PGESeverity DcvgSeverity
             {
                 get
                 {
-                    return GetIndicationSeverity().Item1;
+                    return GetDcvgSeverity().Severity;
                 }
             }
-            public string IndicationReason
+            public string DcvgReason
             {
                 get
                 {
-                    return GetIndicationSeverity().Item2;
+                    return GetDcvgSeverity().Reason;
+                }
+            }
+            public PGESeverity AcvgSeverity
+            {
+                get
+                {
+                    return GetAcvgSeverity().Severity;
+                }
+            }
+            public string AcvgReason
+            {
+                get
+                {
+                    return GetAcvgSeverity().Reason;
                 }
             }
 
@@ -194,61 +207,58 @@ namespace AccurateReportSystem
                 }
             }
 
-            private (PGESeverity, string) GetIndicationSeverity()
+            private (PGESeverity Severity, string Reason) GetDcvgSeverity()
             {
                 if (IsCisSkipped)
                     return (PGESeverity.NRI, "Skip");
-                if (double.IsNaN(IndicationValue))
+                if (double.IsNaN(DcvgValue))
                     return (PGESeverity.NRI, "");
-                if(!IsPge)
+                //DCVG
+                var severity = PGESeverity.NRI;
+                var reason = "DCVG % IR is greater than 0 and less than or equal to 15";
+                if (DcvgValue > 60)
                 {
-                    var indicationType = IsDcvg ? "DCVG" : "ACVG";
-                    return (PGESeverity.NRI, $"{indicationType} indication exists.");
+                    severity = PGESeverity.Severe;
+                    reason = "DCVG % IR is greater than 60";
                 }
-                if (!IsDcvg)
+                else if (DcvgValue > 35)
                 {
-                    //ACVG
-                    var severity = PGESeverity.NRI;
-                    var reason = "Individual normalized ACVG indications are less than 25";
-                    if (IndicationValue >= 75)
-                    {
-                        severity = PGESeverity.Severe;
-                        reason = "Individual normalized ACVG indications are greater than or equal to 75";
-                    }
-                    else if (IndicationValue >= 50)
-                    {
-                        severity = PGESeverity.Moderate;
-                        reason = "Individual normalized ACVG indications are greater than or equal to 50 and less than 75";
-                    }
-                    else if (IndicationValue >= 25)
-                    {
-                        severity = PGESeverity.Minor;
-                        reason = "Individual normalized ACVG indications are greater than or equal to 25 and less than 50";
-                    }
-                    return (severity, reason);
+                    severity = PGESeverity.Moderate;
+                    reason = "DCVG % IR is greater than 35 and less than or equal to 60";
                 }
-                else
+                else if (DcvgValue > 15)
                 {
-                    //DCVG
-                    var severity = PGESeverity.NRI;
-                    var reason = "DCVG % IR is greater than 0 and less than or equal to 15";
-                    if (IndicationValue > 60)
-                    {
-                        severity = PGESeverity.Severe;
-                        reason = "DCVG % IR is greater than 60";
-                    }
-                    else if (IndicationValue > 35)
-                    {
-                        severity = PGESeverity.Moderate;
-                        reason = "DCVG % IR is greater than 35 and less than or equal to 60";
-                    }
-                    else if (IndicationValue > 15)
-                    {
-                        severity = PGESeverity.Minor;
-                        reason = "DCVG % IR is greater than 15 and less than or equal to 35";
-                    }
-                    return (severity, reason);
+                    severity = PGESeverity.Minor;
+                    reason = "DCVG % IR is greater than 15 and less than or equal to 35";
                 }
+                return (severity, reason);
+            }
+
+            private (PGESeverity Severity, string Reason) GetAcvgSeverity()
+            {
+                if (IsCisSkipped)
+                    return (PGESeverity.NRI, "Skip");
+                if (double.IsNaN(AcvgValue))
+                    return (PGESeverity.NRI, "");
+                //ACVG
+                var severity = PGESeverity.NRI;
+                var reason = "Individual normalized ACVG indications are less than 25";
+                if (AcvgValue >= 75)
+                {
+                    severity = PGESeverity.Severe;
+                    reason = "Individual normalized ACVG indications are greater than or equal to 75";
+                }
+                else if (AcvgValue >= 50)
+                {
+                    severity = PGESeverity.Moderate;
+                    reason = "Individual normalized ACVG indications are greater than or equal to 50 and less than 75";
+                }
+                else if (AcvgValue >= 25)
+                {
+                    severity = PGESeverity.Minor;
+                    reason = "Individual normalized ACVG indications are greater than or equal to 25 and less than 50";
+                }
+                return (severity, reason);
             }
 
             public bool IsEquivalent(PgeEcdaDataPoint other)
@@ -258,9 +268,14 @@ namespace AccurateReportSystem
                 if (CisReason != other.CisReason)
                     return false;
 
-                if (IndicationSeverity != other.IndicationSeverity)
+                if (DcvgSeverity != other.DcvgSeverity)
                     return false;
-                if (IndicationReason != other.IndicationReason)
+                if (DcvgReason != other.DcvgReason)
+                    return false;
+
+                if (AcvgSeverity != other.AcvgSeverity)
+                    return false;
+                if (AcvgReason != other.AcvgReason)
                     return false;
 
                 if (Region != other.Region)
@@ -273,19 +288,6 @@ namespace AccurateReportSystem
             {
                 return $"{Footage} {Region}{(IsCisSkipped ? "Skipped" : "")}";
             }
-        }
-
-        public PgeEcdaReportInformation(CombinedAllegroCisFile cisFile, List<AllegroCISFile> dcvgFiles, List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)> ampReads, Hca hca, double maxSpacing, bool useMir = false, GpsInfo? gpsInfo = null)
-        {
-            GpsInfo = gpsInfo;
-            MaxSpacing = maxSpacing;
-            IsDcvg = true;
-            UseMir = useMir;
-            CisFile = cisFile;
-            Hca = hca;
-            ExtrapolateCisDataUpdated();
-            AlignDcvgIndications(dcvgFiles);
-            AlignAmpReads(ampReads);
         }
 
         private void AlignDcvgIndications(List<AllegroCISFile> dcvgFiles)
@@ -317,9 +319,10 @@ namespace AccurateReportSystem
                         }
                         if (closestPoint == null)
                             throw new Exception();
-                        closestPoint.IndicationValue = point.IndicationPercent;
-                        var middleGps = closestPoint.CisGps.MiddleTowards(gps);
-                        closestPoint.IndicationGps = middleGps;
+                        closestPoint.DcvgValue = point.IndicationPercent;
+                        //var date = point.HasTime ? point.Times[0].ToString("MM/dd/yyyy") : "";
+                        //closestPoint.DcvgDate = date;
+                        closestPoint.DcvgGps = closestPoint.CisGps;
                     }
                     if (point.HasGPS)
                         lastGpsPoint = point;
@@ -352,48 +355,17 @@ namespace AccurateReportSystem
             }
         }
 
-        public PgeEcdaReportInformation(CombinedAllegroCisFile cisFile, List<(BasicGeoposition, double)> acvgIndications, HcaInfo hcaInfo, double maxSpacing, bool useMir = false)
+        public PgeEcdaReportInformation(CombinedAllegroCisFile cisFile, List<AllegroCISFile> dcvgFiles, List<(BasicGeoposition Gps, string Date, double dB)> acvgIndications, List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)> ampReads, Hca hca, double maxSpacing, bool useMir = false)
         {
             MaxSpacing = maxSpacing;
-            IsDcvg = false;
-            UseMir = useMir;
-            CisFile = cisFile;
-            HcaInfo = hcaInfo;
-            ExtrapolateCisData();
-
-            foreach (var (gps, value) in acvgIndications)
-            {
-                var closestDistance = double.MaxValue;
-                PgeEcdaDataPoint closestPoint = null;
-                foreach (var surveyPoint in EcdaData)
-                {
-                    if (surveyPoint.IsCisSkipped)
-                        continue;
-                    var curDistance = surveyPoint.CisGps.Distance(gps);
-                    if (curDistance < closestDistance)
-                    {
-                        closestDistance = curDistance;
-                        closestPoint = surveyPoint;
-                    }
-                }
-                if (closestPoint == null)
-                    throw new Exception();
-                closestPoint.IndicationValue = value;
-                closestPoint.IndicationGps = gps;
-            }
-        }
-
-        public PgeEcdaReportInformation(CombinedAllegroCisFile cisFile, List<(BasicGeoposition, double)> acvgIndications, List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)> ampReads, Hca hca, double maxSpacing, bool useMir = false)
-        {
-            MaxSpacing = maxSpacing;
-            IsDcvg = false;
             UseMir = useMir;
             CisFile = cisFile;
             Hca = hca;
             ExtrapolateCisDataUpdated();
+            AlignDcvgIndications(dcvgFiles);
             AlignAmpReads(ampReads);
 
-            foreach (var (gps, value) in acvgIndications)
+            foreach (var (gps, date, value) in acvgIndications)
             {
                 var closestDistance = double.MaxValue;
                 PgeEcdaDataPoint closestPoint = null;
@@ -410,18 +382,32 @@ namespace AccurateReportSystem
                 }
                 if (closestPoint == null)
                     throw new Exception();
-                closestPoint.IndicationValue = value;
-                closestPoint.IndicationGps = gps;
+                closestPoint.AcvgValue = value;
+                //closestPoint.AcvgDate = date;
+                closestPoint.AcvgGps = gps;
             }
         }
-        public List<(double, double, BasicGeoposition)> GetIndicationData()
+        public List<(double, double, BasicGeoposition)> GetDcvgData()
         {
             var output = new List<(double, double, BasicGeoposition)>();
             foreach (var point in EcdaData)
             {
-                if (!double.IsNaN(point.IndicationValue))
+                if (!double.IsNaN(point.DcvgValue))
                 {
-                    output.Add((point.Footage, point.IndicationValue, point.IndicationGps.Value));
+                    output.Add((point.Footage, point.DcvgValue, point.DcvgGps.Value));
+                }
+            }
+            return output;
+        }
+
+        public List<(double, double, BasicGeoposition)> GetAcvgData()
+        {
+            var output = new List<(double, double, BasicGeoposition)>();
+            foreach (var point in EcdaData)
+            {
+                if (!double.IsNaN(point.AcvgValue))
+                {
+                    output.Add((point.Footage, point.AcvgValue, point.AcvgGps.Value));
                 }
             }
             return output;
@@ -518,7 +504,7 @@ namespace AccurateReportSystem
                 var curDepth = curPoint.Depth;
                 if (!curDepth.HasValue)
                     curDepth = lastDepth;
-                var newPoint = new PgeEcdaDataPoint(curFootage, curOn, curOff, CisFile.Type == FileType.OnOff, curDepth, false, false, curGps, IsDcvg, HcaInfo.ClosestRegion(curGps));
+                var newPoint = new PgeEcdaDataPoint(curFootage, curOn, curOff, CisFile.Type == FileType.OnOff, curDepth, false, false, curGps, HcaInfo.ClosestRegion(curGps));
                 EcdaData.Add(newPoint);
 
                 if (lastPoint == null)
@@ -552,7 +538,7 @@ namespace AccurateReportSystem
                     var fakeOn = lastOn + onFactor * j;
                     var fakeOff = lastOff + offFactor * j;
                     var fakeDepth = depthFactor.HasValue ? lastDepth.Value + depthFactor.Value * j : (double?)null;
-                    newPoint = new PgeEcdaDataPoint(fakeFoot, fakeOn, fakeOff, CisFile.Type == FileType.OnOff, fakeDepth, isSkipped, true, fakeGps, IsDcvg, HcaInfo.ClosestRegion(fakeGps));
+                    newPoint = new PgeEcdaDataPoint(fakeFoot, fakeOn, fakeOff, CisFile.Type == FileType.OnOff, fakeDepth, isSkipped, true, fakeGps, HcaInfo.ClosestRegion(fakeGps));
                     EcdaData.Add(newPoint);
                 }
 
@@ -664,7 +650,7 @@ namespace AccurateReportSystem
                 if (!curDepth.HasValue)
                     curDepth = lastDepth;
                 var closeRegion = Hca.GetClosestRegion(curGps);
-                var newPoint = new PgeEcdaDataPoint(curFootage, curOn, curOff, CisFile.Type == FileType.OnOff, curDepth, closeRegion.ShouldSkip, false, curGps, IsDcvg, closeRegion.ReportQName, closeRegion);
+                var newPoint = new PgeEcdaDataPoint(curFootage, curOn, curOff, CisFile.Type == FileType.OnOff, curDepth, closeRegion.ShouldSkip, false, curGps, closeRegion.ReportQName, closeRegion);
                 EcdaData.Add(newPoint);
 
                 if (lastPoint == null)
@@ -699,7 +685,7 @@ namespace AccurateReportSystem
                     var fakeOff = lastOff + offFactor * j;
                     var fakeDepth = depthFactor.HasValue ? lastDepth.Value + depthFactor.Value * j : (double?)null;
                     closeRegion = Hca.GetClosestRegion(curGps);
-                    newPoint = new PgeEcdaDataPoint(fakeFoot, fakeOn, fakeOff, CisFile.Type == FileType.OnOff, fakeDepth, isSkipped, true, fakeGps, IsDcvg, closeRegion.ReportQName, closeRegion);
+                    newPoint = new PgeEcdaDataPoint(fakeFoot, fakeOn, fakeOff, CisFile.Type == FileType.OnOff, fakeDepth, isSkipped, true, fakeGps, closeRegion.ReportQName, closeRegion);
                     EcdaData.Add(newPoint);
                 }
 
@@ -758,95 +744,6 @@ namespace AccurateReportSystem
                     }
                 }
                 var baseline = curBaselines[center];
-            }
-        }
-
-        public string GetReportQ()
-        {
-            var output = new StringBuilder();
-
-            var areas = new List<ReportQArea>();
-            var curArea = new ReportQArea(EcdaData.First());
-            for (var i = 1; i < EcdaData.Count; ++i)
-            {
-                var curPoint = EcdaData[i];
-                curArea.End = curPoint;
-                if (!curArea.IsEquivalent(curPoint))
-                {
-                    areas.Add(curArea);
-                    curArea = new ReportQArea(curPoint);
-                }
-            }
-            areas.Add(curArea);
-            var hcaInfo = $"{HcaInfo.HcaId}\t{HcaInfo.Route}\t{HcaInfo.StartMilepost}\t{HcaInfo.EndMilepost}\t";
-            foreach (var area in areas)
-            {
-                output.Append(hcaInfo);
-                output.Append($"{ToStationing(area.Start.Footage)}\t");
-                output.Append($"{ToStationing(area.End.Footage)}\t");
-                if (area.Start.RegionUpdated != null)
-                    output.Append($"{area.Start.RegionUpdated.Name}\t");
-                else
-                    output.Append($"{area.Start.Region}\t");
-                var dist = area.End.Footage - area.Start.Footage;
-                output.Append($"{dist.ToString("F0")}\t");
-                var depthString = area.MinDepth.HasValue ? area.MinDepth.Value.ToString("F0") : "N/A";
-                output.Append($"{depthString}\t");
-                output.Append($"{area.Start.CisGps.Latitude:F8)}\t");
-                output.Append($"{area.Start.CisGps.Longitude:F8)}\t");
-                output.Append($"{area.End.CisGps.Latitude:F8)}\t");
-                output.Append($"{area.End.CisGps.Longitude:F8)}\t");
-
-                output.Append($"{area.Start.CisSeverity}\t");
-                output.Append($"{area.Start.IndicationSeverity}\t");
-                output.Append($"{area.Start.Priority}\t");
-                var reason = area.Start.CisReason + " " + area.Start.IndicationReason;
-                output.AppendLine($"{reason.Trim().Replace("..", ".")}\t");
-            }
-            return output.ToString();
-        }
-
-        private string ToStationing(double footage)
-        {
-            var hundred = (int)footage / 100;
-            var tens = (int)footage % 100;
-            return hundred.ToString().PadLeft(1, '0') + "+" + tens.ToString().PadLeft(2, '0');
-        }
-
-        public struct ReportQArea
-        {
-            public PgeEcdaDataPoint Start { get; set; }
-            private PgeEcdaDataPoint end;
-            public PgeEcdaDataPoint End
-            {
-                get { return end; }
-                set
-                {
-                    CompareDepth(value.Depth);
-                    end = value;
-                }
-            }
-            public double? MinDepth { get; set; }
-
-            public ReportQArea(PgeEcdaDataPoint point)
-            {
-                Start = point;
-                end = point;
-                MinDepth = point.Depth;
-            }
-
-            public void CompareDepth(double? newDepth)
-            {
-                if (newDepth.HasValue)
-                {
-                    if ((MinDepth ?? double.MaxValue) > newDepth.Value)
-                        MinDepth = newDepth;
-                }
-            }
-
-            public bool IsEquivalent(PgeEcdaDataPoint other)
-            {
-                return Start.IsEquivalent(other);
             }
         }
     }

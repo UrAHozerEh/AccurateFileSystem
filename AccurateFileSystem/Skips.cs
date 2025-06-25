@@ -3,49 +3,79 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
+using Windows.Devices.Geolocation;
 using Windows.Storage;
 
 namespace AccurateFileSystem
 {
     public class Skips : File
     {
-        public List<Skip> Footages { get; set; }
+        public List<Skip> Locations { get; set; }
 
-        public Skips(string name, List<Skip> footages) : base(name, FileType.Skips)
+        public Skips(string name, List<Skip> locations) : base(name, FileType.Skips)
         {
-            Footages = footages;
+            Locations = locations;
         }
 
         public static async Task<Skips> GetSkips(StorageFile file)
         {
-            var footages = new List<Skip>();
+            var locations = new List<Skip>();
             var lines = await file.GetLines();
             foreach (var line in lines)
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 var split = line.Split(',');
-                var footage = double.Parse(split[0].Trim());
-                var name = "";
-                bool? firstTime = null;
-                if (split.Length > 1)
+                if (double.TryParse(split[0], out _) && double.TryParse(split[1], out _))
                 {
-                    name = split[1].Trim();
-                }
-                if (split.Length > 2)
-                {
-                    firstTime = split[2].Trim().Contains("y", StringComparison.OrdinalIgnoreCase);
-                }
-
-                if(split.Length > 1)
-                {
-                    footages.Add(new Skip(footage, new HcaRegion(name, firstTime)));
+                    var skip = ParseGpsSkip(split);
+                    if (skip != null)
+                    {
+                        locations.Add(skip);
+                    }
                 }
                 else
                 {
-                    footages.Add(new Skip(footage));
+                    var skip = ParseFootageSkip(split);
+                    if (skip != null)
+                    {
+                        locations.Add(skip);
+                    }
                 }
             }
-            return new Skips(file.DisplayName, footages);
+            return new Skips(file.DisplayName, locations);
+        }
+
+        private static Skip ParseFootageSkip(string[] split)
+        {
+            if (split.Length < 3) return null;
+            var foot = double.Parse(split[0]);
+            var name = split[1].Trim();
+            var firstTime = split[2].Trim().Contains("y", StringComparison.OrdinalIgnoreCase);
+            if (split.Length > 3)
+            {
+                var shortSkip = split[3].Trim();
+                var longSkip = split[4].Trim();
+                return new Skip(foot, new HcaRegion(name, firstTime, shortSkip, longSkip));
+            }
+            return new Skip(foot, new HcaRegion(name, firstTime));
+        }
+
+        private static Skip ParseGpsSkip(string[] split)
+        {
+            if (split.Length < 4) return null;
+            var lat = double.Parse(split[0]);
+            var lon = double.Parse(split[1]);
+            var name = split[2].Trim();
+            var firstTime = split[3].Trim().Contains("y", StringComparison.OrdinalIgnoreCase);
+            var gps = new BasicGeoposition { Latitude = lat, Longitude = lon };
+            if(split.Length > 4)
+            {
+                var shortSkip = split[4].Trim();
+                var longSkip = split[5].Trim();
+                return new Skip(gps, new HcaRegion(name, firstTime, shortSkip, longSkip));
+            }
+            return new Skip(gps, new HcaRegion(name, firstTime));
         }
 
         public override bool IsEquivalent(File otherFile)
@@ -57,13 +87,24 @@ namespace AccurateFileSystem
     public class Skip
     {
         public double Footage { get; }
+        public BasicGeoposition Gps { get; }
         public bool HasRegion => Region != null;
         public HcaRegion Region { get; } = null;
+        public bool HasFootage { get; }
+        public bool HasGps => !HasFootage;
 
-        public Skip(double footage, HcaRegion region = null)
+        public Skip(double footage, HcaRegion region)
         {
             Footage = footage;
             Region = region;
+            HasFootage = true;
+        }
+
+        public Skip(BasicGeoposition gps, HcaRegion region)
+        {
+            Gps = gps;
+            Region = region;
+            HasFootage = false;
         }
     }
 }

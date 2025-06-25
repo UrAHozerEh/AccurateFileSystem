@@ -12,6 +12,7 @@ namespace AccurateFileSystem
         public List<(BasicGeoposition Gps, double Depth, string Date)> DepthData { get; set; } = new List<(BasicGeoposition Gps, double Depth, string Date)>();
         public List<(BasicGeoposition Gps, double Amps, string Date)> AmpData { get; set; } = new List<(BasicGeoposition Gps, double Amps, string Date)>();
         public List<(BasicGeoposition Gps, string Date)> TxData { get; set; } = new List<(BasicGeoposition Gps, string Date)>();
+        public List<(BasicGeoposition Gps, string Date, double dB)> AcvgData { get; set; } = new List<(BasicGeoposition Gps, string Date, double dB)>();
 
         protected CsvPcm(string name, List<string> lines) : base(name, lines, FileType.PCM)
         {
@@ -51,6 +52,26 @@ namespace AccurateFileSystem
                 if (depth == 0)
                     continue;
                 DepthData.Add((gps, depth, Data[r, dateColumn]));
+            }
+        }
+
+        protected void GetAcvgData(int latColumn, int lonColumn, int dbColumn, int dateColumn)
+        {
+            AcvgData = new List<(BasicGeoposition Gps, string Date, double Depth)>();
+            if (Data.GetLength(0) == 0)
+                Data = Data;
+            for (var r = 0; r < Data.GetLength(0); ++r)
+            {
+                var lat = GetDecimalDegree(Data[r, latColumn]);
+                var lon = GetDecimalDegree(Data[r, lonColumn]);
+                var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+                var dbString = Data[r, dbColumn];
+                var dB = 0.0;
+                if (!string.IsNullOrWhiteSpace(dbString))
+                    dB = double.Parse(dbString);
+                if (dB == 0)
+                    continue;
+                AcvgData.Add((gps, Data[r, dateColumn], dB));
             }
         }
 

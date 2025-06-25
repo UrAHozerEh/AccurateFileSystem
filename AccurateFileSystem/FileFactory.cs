@@ -55,6 +55,8 @@ namespace AccurateFileSystem
                                 return new VivaxPcm(File.DisplayName, lines);
                             if (lines[0].IndexOf("ID") != -1 && (lines[0].IndexOf("Depth") != -1 || lines[0].IndexOf("Signal") != -1) && lines[0].IndexOf("Latitude") != -1)
                                 return new OtherPcm(File.DisplayName, lines);
+                            if (lines[0].IndexOf("ID") != -1 && (lines[0].IndexOf("db", StringComparison.OrdinalIgnoreCase) != -1 || lines[0].IndexOf("Trans") != -1) && lines[0].IndexOf("Latitude") != -1)
+                                return new OtherPcm(File.DisplayName, lines);
                             if (lines[0].StartsWith("CIS Settings", StringComparison.OrdinalIgnoreCase))
                                 return new CisSettings(File.DisplayName, lines);
                             return new GeneralCsv(File.DisplayName, lines);
@@ -67,7 +69,7 @@ namespace AccurateFileSystem
                     }
                 case ".txt":
                     return null;
-                    //return await GetAllegroWaveform();
+                //return await GetAllegroWaveform();
                 case ".regions2":
                     return await IitRegionFile.GetIitRegion(File);
                 case ".xlsx":

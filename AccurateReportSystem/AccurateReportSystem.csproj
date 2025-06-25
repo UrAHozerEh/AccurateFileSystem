@@ -145,6 +145,7 @@
     <Compile Include="PointWithLabelGraphSeries.cs" />
     <Compile Include="PolarizationChartSeries.cs" />
     <Compile Include="PolarizationExceptionChartSeries.cs" />
+    <Compile Include="ReportQRow.cs" />
     <Compile Include="Sempra850ExceptionChartSeries.cs" />
     <Compile Include="Series.cs" />
     <Compile Include="SingleValueGraphSeries.cs" />

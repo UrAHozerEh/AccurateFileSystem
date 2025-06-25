@@ -376,41 +376,74 @@ namespace AccurateReportSystem
                 allRegions.Add(Hca.StartBuffer);
             for (int i = 0; i < Hca.Regions.Count; ++i)
             {
-                if (i < Hca.Regions.Count - 1 && Hca.Regions[i].ReportQName == Hca.Regions[i + 1].ReportQName)
-                    continue;
                 allRegions.Add(Hca.Regions[i]);
             }
             if (Hca.HasEndBuffer)
                 allRegions.Add(Hca.EndBuffer);
 
-            Queue<(double Footage, HcaRegion Region)> regionEnds = new Queue<(double Footage, HcaRegion Region)>();
-            var lastFoot = double.MinValue;
+            List<(double Footage, HcaRegion Region)> regionEnds = new List<(double Footage, HcaRegion Region)>();
+            var lastFoot = double.MinValue + 2;
+            var lastRegionMulti = false;
             foreach (var region in allRegions)
             {
-                var remainingData = data.Where(d => d.Footage > lastFoot);
+                var remainingData = data.Where(d => d.Footage >= lastFoot);
                 if (!remainingData.Any())
                     continue;
                 var end = remainingData.OrderBy(d => d.Point.GPS.Distance(region.EndGps)).First();
-                regionEnds.Enqueue((end.Footage, region));
-                lastFoot = end.Footage;
+                var endFootage = end.Footage;
+                var endDistance = Math.Round(end.Point.GPS.Distance(region.EndGps), 2);
+                var next = endFootage;
+                if (remainingData.Count() > 1 && endDistance != 0)
+                {
+                    var nextFoot = remainingData.OrderBy(d => d.Footage).Skip(1).First().Footage;
+                    if (nextFoot < endFootage)
+                        endFootage -= 1;
+                }
+                var takenData = remainingData.Where(d => d.Footage <= endFootage).ToList();
+                if (!lastRegionMulti || takenData.Count > 1)
+                {
+                    remainingData.Where(d => d.Footage != lastFoot);
+                    end = remainingData.OrderBy(d => d.Point.GPS.Distance(region.EndGps)).First();
+                    endFootage = end.Footage;
+                    endDistance = Math.Round(end.Point.GPS.Distance(region.EndGps), 2);
+                    if (remainingData.Count() > 1 && endDistance != 0)
+                    {
+                        var nextFoot = remainingData.OrderBy(d => d.Footage).Skip(1).First().Footage;
+                        if (nextFoot < endFootage)
+                            endFootage -= 1;
+                    }
+                    takenData = remainingData.Where(d => d.Footage <= endFootage).ToList();
+                }
+
+                if (endFootage == lastFoot)
+                {
+                    var lastRegion = regionEnds[regionEnds.Count - 1].Region;
+                    regionEnds[regionEnds.Count - 1] = (lastFoot - 1, lastRegion);
+                }
+
+                regionEnds.Add((endFootage, region));
+                lastFoot = endFootage;
+                lastRegionMulti = takenData.Count > 1;
             }
 
             var extrapolatedData = new List<ExtrapolatedDataPointUpdated>();
-            var (regionEnd, curRegion) = regionEnds.Dequeue();
+            var (regionEnd, curRegion) = regionEnds.First();
+            regionEnds.RemoveAt(0);
             ExtrapolatedDataPointUpdated curExtrapPoint;
             for (var i = 0; i < data.Count - 1; ++i)
             {
                 var (startFoot, startPoint) = data[i];
                 if (startFoot > regionEnd && regionEnds.Count > 0)
                 {
-                    (regionEnd, curRegion) = regionEnds.Dequeue();
+                    (regionEnd, curRegion) = regionEnds.First();
+                    regionEnds.RemoveAt(0);
                 }
                 var (endFoot, endPoint) = data[i + 1];
                 var shouldSkipExtrap = false;
                 HcaRegion skipRegion = null;
-                if (cisSkips != null && cisSkips.Footages.Any(f => f.Footage >= startFoot && f.Footage <= endFoot))
+                if (cisSkips != null && cisSkips.Locations.Any(f => f.HasFootage && f.Footage >= startFoot && f.Footage <= endFoot))
                 {
-                    var skip = cisSkips.Footages.First(f => f.Footage >= startFoot && f.Footage <= endFoot);
+                    var skip = cisSkips.Locations.First(f => f.HasFootage && f.Footage >= startFoot && f.Footage <= endFoot);
                     shouldSkipExtrap = true;
                     skipRegion = skip.Region;
                 }
@@ -463,7 +496,8 @@ namespace AccurateReportSystem
             var (foot, point) = data.Last();
             if (foot > regionEnd && regionEnds.Count > 0)
             {
-                (regionEnd, curRegion) = regionEnds.Dequeue();
+                (regionEnd, curRegion) = regionEnds.First();
+                regionEnds.RemoveAt(0);
             }
             curExtrapPoint = new ExtrapolatedDataPointUpdated(foot, CisFile.Type == FileType.OnOff, point, curRegion);
             extrapolatedData.Add(curExtrapPoint);
@@ -513,26 +547,28 @@ namespace AccurateReportSystem
                 var start = Math.Max(center - 105, 0);
                 var end = Math.Min(center + 105, extrapolatedData.Count - 1);
                 var centerExtrap = extrapolatedData[center];
-                var centerAverage = Averages[center];
+                var centerFoot = centerExtrap.Footage;
+                var centerRead = centerExtrap.IsOnOff ? centerExtrap.Off : centerExtrap.On;
                 for (var i = start; i <= end; ++i)
                 {
-                    var curFoot = extrapolatedData[i].Footage;
-                    var curAverage = Averages[i];
-                    if (Within100(centerExtrap.Footage, curFoot))
+                    var curData = extrapolatedData[i];
+                    var curFoot = curData.Footage;
+                    var (_, curAverage) = Averages[i];
+                    if (Within100(centerFoot, curFoot) && !curData.IsExtrapolated)
                     {
-                        var curBaseline = Baselines[center];
-                        if (double.IsNaN(curBaseline.Value))
+                        var (_, curBaseline) = Baselines[center];
+                        if (double.IsNaN(curBaseline))
                         {
-                            Baselines[center] = (centerExtrap.Footage, curAverage.Value);
-                            UsedBaselineFootages[center] = (centerExtrap.Footage, curFoot);
+                            Baselines[center] = (centerFoot, curAverage);
+                            UsedBaselineFootages[center] = (centerFoot, curFoot);
                             continue;
                         }
-                        var diffFromBaseline = Math.Abs(curExtrapPoint.IsOnOff ? centerExtrap.Off : centerExtrap.On - curAverage.Value);
-                        var diffFromCurBaseline = Math.Abs(curExtrapPoint.IsOnOff ? centerExtrap.Off : centerExtrap.On - Baselines[center].Value);
+                        var diffFromBaseline = Math.Abs(centerRead - curAverage);
+                        var diffFromCurBaseline = Math.Abs(centerRead - curBaseline);
                         if (diffFromBaseline > diffFromCurBaseline)
                         {
-                            Baselines[center] = (centerExtrap.Footage, curAverage.Value);
-                            UsedBaselineFootages[center] = (centerExtrap.Footage, curFoot);
+                            Baselines[center] = (centerFoot, curAverage);
+                            UsedBaselineFootages[center] = (centerFoot, curFoot);
                         }
                     }
                 }

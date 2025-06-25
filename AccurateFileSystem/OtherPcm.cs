@@ -21,9 +21,10 @@ namespace AccurateFileSystem
             var ampColumn = -1;
             var dateColumn = -1;
             var txColumn = -1;
+            var acvgColumn = -1;
             for (var i = 0; i < Headers.Count; ++i)
             {
-                var header = Headers[i];
+                var header = Headers[i].Trim();
                 switch (header)
                 {
                     case "Latitude":
@@ -47,6 +48,9 @@ namespace AccurateFileSystem
                     case "Transmitte":
                         txColumn = i;
                         break;
+                    case "dB":
+                        acvgColumn = i;
+                        break;
                 }
             }
             if(depthColumn != -1)
@@ -55,6 +59,8 @@ namespace AccurateFileSystem
                 GetAmpData(latColumn, lonColumn, ampColumn, dateColumn);
             if (txColumn != -1)
                 GetTxData(latColumn, lonColumn, txColumn, dateColumn);
+            if (acvgColumn != -1)
+                GetAcvgData(latColumn, lonColumn, acvgColumn, dateColumn);
         }
     }
 }

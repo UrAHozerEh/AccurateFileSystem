@@ -173,13 +173,15 @@ namespace AccurateReportSystem
             }
         }
 
-        public static PGESeverity GetWorseOf(this PGESeverity cur, PGESeverity other)
+        public static PGESeverity GetWorseOf(this PGESeverity cur, params PGESeverity[] others)
         {
-            if (cur == PGESeverity.Severe || other == PGESeverity.Severe)
+            if (others == null || others.Length == 0)
+                return cur;
+            if (cur == PGESeverity.Severe || others.Any(o => o == PGESeverity.Severe))
                 return PGESeverity.Severe;
-            if (cur == PGESeverity.Moderate || other == PGESeverity.Moderate)
+            if (cur == PGESeverity.Moderate || others.Any(o => o == PGESeverity.Moderate))
                 return PGESeverity.Moderate;
-            if (cur == PGESeverity.Minor || other == PGESeverity.Minor)
+            if (cur == PGESeverity.Minor || others.Any(o => o == PGESeverity.Minor))
                 return PGESeverity.Minor;
             return PGESeverity.NRI;
         }

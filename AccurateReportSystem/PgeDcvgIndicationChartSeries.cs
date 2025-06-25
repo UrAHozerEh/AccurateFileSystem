@@ -15,7 +15,6 @@ namespace AccurateReportSystem
         public Color ModerateColor { get; set; } = Colors.Green;
         public Color SevereColor { get; set; } = Colors.Red;
         public double MinimumFeet { get; set; } = 3;
-        public bool IsDcvg { get; set; }
 
         public PgeDcvgIndicationChartSeries(List<(double, double, BasicGeoposition)> data, Chart chart, bool isDcvg) : this(data, chart.LegendInfo, chart.YAxesInfo, isDcvg)
         {
@@ -25,7 +24,6 @@ namespace AccurateReportSystem
         public PgeDcvgIndicationChartSeries(List<(double, double, BasicGeoposition)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo, bool isDcvg) : base(masterLegendInfo, masterYAxesInfo)
         {
             Data = new List<(double Footage, double ActualFoot, double Percent, PGESeverity Severity, string, BasicGeoposition)>();
-            IsDcvg = isDcvg;
             foreach (var (foot, percent, gps) in data)
             {
                 if (!isDcvg)

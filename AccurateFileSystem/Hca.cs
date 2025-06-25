@@ -21,6 +21,9 @@ namespace AccurateFileSystem
         public double EndBufferGpsLength => EndBuffer?.GpsLength ?? 0;
         public double HcaGpsLength => Regions.Sum(region => region.GpsLength);
         public double TotalGpsLength => StartBufferGpsLength + HcaGpsLength + EndBufferGpsLength;
+        public bool HasDcvg => Regions.Where(r => !r.ShouldSkip).Any(r => r.HasDcvg) || (StartBuffer?.HasDcvg ?? false) || (EndBuffer?.HasDcvg ?? false);
+        public bool HasAcvg => Regions.Where(r => !r.ShouldSkip).Any(r => r.HasAcvg) || (StartBuffer?.HasAcvg ?? false) || (EndBuffer?.HasAcvg ?? false);
+        public bool HasPcm => Regions.Where(r => !r.ShouldSkip).Any(r => r.HasPcm) || (StartBuffer?.HasPcm ?? false) || (EndBuffer?.HasPcm ?? false);
 
 
         public Hca(string name, string lineName, List<string[]> lines)
@@ -92,17 +95,46 @@ namespace AccurateFileSystem
 
         public (string StartMp, string EndMp) GetMpForRegion(HcaRegion region)
         {
+            var startMp = region.StartMp;
+            var endMp = region.EndMp;
+            var isBuffer = false;
             if (region.Equals(StartBuffer))
-                return (StartBuffer.StartMp, StartBuffer.EndMp);
+            {
+                startMp = StartBuffer.StartMp;
+                endMp = StartBuffer.EndMp;
+                isBuffer = true;
+            }
             if (region.Equals(EndBuffer))
-                return (EndBuffer.StartMp, EndBuffer.EndMp);
-            return GetMpForHca();
+            {
+                startMp = EndBuffer.StartMp;
+                endMp = EndBuffer.EndMp;
+                isBuffer = true;
+            }
+            if (!isBuffer)
+                return GetMpForHca();
+            if (double.TryParse(startMp, out var hcaStartMpDouble))
+            {
+                startMp = $"{hcaStartMpDouble:F4}";
+            }
+            if (double.TryParse(endMp, out var hcaEndMpDouble))
+            {
+                endMp = $"{hcaEndMpDouble:F4}";
+            }
+            return (startMp, endMp);
         }
 
         public (string StartMp, string EndMp) GetMpForHca()
         {
             var startMp = Regions.First().StartMp;
             var endMp = Regions.Last().EndMp;
+            if (double.TryParse(startMp, out var hcaStartMpDouble))
+            {
+                startMp = $"{hcaStartMpDouble:F4}";
+            }
+            if (double.TryParse(endMp, out var hcaEndMpDouble))
+            {
+                endMp = $"{hcaEndMpDouble:F4}";
+            }
             return (startMp, endMp);
         }
 
@@ -149,6 +181,7 @@ namespace AccurateFileSystem
         private HcaRegion GetNextRegion(int startIndex, List<string[]> lines, out int endIndex)
         {
             var line = lines[startIndex];
+            var route = line[1].Trim();
             var name = line[8].Trim();
             var lat = double.Parse(line[4]);
             var lon = double.Parse(line[5]);
@@ -165,6 +198,22 @@ namespace AccurateFileSystem
                 isFirstTime = line[9].Contains("y", StringComparison.OrdinalIgnoreCase);
 
             var middleGps = new List<BasicGeoposition>();
+            var regionHasAcvg = false;
+            var regionHasDcvg = false;
+            var regionHasPcm = false;
+            var tools = string.Join(" ", line.Skip(11).Take(4)).Trim();
+            if (tools.Contains("acvg", StringComparison.OrdinalIgnoreCase))
+            {
+                regionHasAcvg = true;
+            }
+            if (tools.Contains("dcvg", StringComparison.OrdinalIgnoreCase))
+            {
+                regionHasDcvg = true;
+            }
+            if (tools.Contains("pcm", StringComparison.OrdinalIgnoreCase))
+            {
+                regionHasPcm = true;
+            }
 
             for (var i = startIndex + 1; i < lines.Count; ++i)
             {
@@ -174,7 +223,26 @@ namespace AccurateFileSystem
                 bool? curIsFirstTime = null;
                 if (!line[9].Contains("n/a", StringComparison.OrdinalIgnoreCase))
                     curIsFirstTime = line[9].Contains("y", StringComparison.OrdinalIgnoreCase);
-                if (line[8].Trim() == name && IsSameFirstTime(isFirstTime, curIsFirstTime))
+                var curRoute = line[1].Trim();
+                var curTools = string.Join(" ", line.Skip(11).Take(4)).Trim();
+                var curHasAcvg = false;
+                var curHasDcvg = false;
+                var curHasPcm = false;
+                if (curTools.Contains("acvg", StringComparison.OrdinalIgnoreCase))
+                {
+                    curHasAcvg = true;
+                }
+                if (curTools.Contains("dcvg", StringComparison.OrdinalIgnoreCase))
+                {
+                    curHasDcvg = true;
+                }
+                if (curTools.Contains("pcm", StringComparison.OrdinalIgnoreCase))
+                {
+                    curHasPcm = true;
+                }
+
+                if (line[8].Trim() == name && curRoute == route && IsSameFirstTime(isFirstTime, curIsFirstTime) &&
+                    (regionHasAcvg == curHasAcvg) && (regionHasDcvg == curHasDcvg) && (regionHasPcm == curHasPcm))
                 {
                     lat = double.Parse(line[6]);
                     lon = double.Parse(line[7]);
@@ -190,15 +258,15 @@ namespace AccurateFileSystem
             var allGps = new List<BasicGeoposition>() { startGps };
             allGps.AddRange(middleGps);
             allGps.Add(endGps);
-            return new HcaRegion(allGps, name, startMp, endMp, isFirstTime);
+            return new HcaRegion(allGps, name, route, startMp, endMp, isFirstTime, regionHasDcvg, regionHasAcvg, regionHasPcm);
         }
 
         private bool IsSameFirstTime(bool? first, bool? second)
         {
-            if (first.HasValue ^ second.HasValue)
-                return false;
             if (!first.HasValue && !second.HasValue)
                 return true;
+            if (!first.HasValue || !second.HasValue)
+                return false;
             return first.Value == second.Value;
         }
 

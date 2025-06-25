@@ -20,7 +20,10 @@ namespace AccurateFileSystem
         private int EndGpsColumn = -1;
         private int RegionColumn = -1;
         private int FirstTimeColumn = -1;
+        private int FirstToolColumn = -1;
+        private int SecondToolColumn = -1;
         private int ThirdToolColumn = -1;
+        private int FourthToolColumn = -1;
 
         public IitRegionFile(string name, List<string> lines) : base(name, lines)
         {
@@ -54,8 +57,14 @@ namespace AccurateFileSystem
                     RouteColumn = i;
                 if (header.Contains("1st time", StringComparison.OrdinalIgnoreCase))
                     FirstTimeColumn = i;
+                if (header.Contains("1st iit", StringComparison.OrdinalIgnoreCase))
+                    FirstToolColumn = i;
+                if (header.Contains("2nd iit", StringComparison.OrdinalIgnoreCase))
+                    SecondToolColumn = i;
                 if (header.Contains("3rd iit", StringComparison.OrdinalIgnoreCase))
                     ThirdToolColumn = i;
+                if (header.Contains("4th iit", StringComparison.OrdinalIgnoreCase))
+                    FourthToolColumn = i;
                 if (header.Contains("begin", StringComparison.OrdinalIgnoreCase))
                 {
                     if (header.Contains("mp", StringComparison.OrdinalIgnoreCase))
@@ -70,6 +79,7 @@ namespace AccurateFileSystem
                     if (header.Contains("lat", StringComparison.OrdinalIgnoreCase))
                         EndGpsColumn = i;
                 }
+
             }
         }
 
@@ -99,7 +109,7 @@ namespace AccurateFileSystem
             var startName = "";
             var startLineName = "";
             List<string[]> curLines = null;
-            bool? isFirstTime = null;
+            
             for (var i = 0; i < Data.GetLength(0); ++i)
             {
                 var curName = Data[i, HcaColumn].Trim();
@@ -114,20 +124,36 @@ namespace AccurateFileSystem
 
                 var region = Data[i, RegionColumn].Trim();
                 region = region.Replace('–', '-');
+                string isFirstTime = "n/a";
+                string firstTool = "";
+                string secondTool = "";
+                string thirdTool = "";
+                string fourthTool = "";
                 //if (region.Contains('-'))
                 //    region = region.Substring(0, region.IndexOf('-')).Trim();
-                
 
-                if (ThirdToolColumn != -1)
+                if (FirstTimeColumn >= 0)
                 {
-                    var thirdToolValue = Data[i, ThirdToolColumn].Trim();
-                    if (thirdToolValue.Contains("pcm", StringComparison.OrdinalIgnoreCase))
-                    {
-                        region += "P";
-                    }
+                    isFirstTime = Data[i,FirstTimeColumn];
+                }
+                if (FirstToolColumn >= 0)
+                {
+                    firstTool = Data[i, FirstToolColumn].Trim();
+                }
+                if (SecondToolColumn >= 0)
+                {
+                    secondTool = Data[i, SecondToolColumn].Trim();
+                }
+                if (ThirdToolColumn >= 0)
+                {
+                    thirdTool = Data[i, ThirdToolColumn].Trim();
+                }
+                if (FourthToolColumn >= 0)
+                {
+                    fourthTool = Data[i, FourthToolColumn].Trim();
                 }
 
-                var line = new string[] { curName, route, beginMp, endMp, beginGps.Latitude, beginGps.Longitude, endGps.Latitude, endGps.Longitude, region, Data[i, FirstTimeColumn] };
+                var line = new string[] { curName, route, beginMp, endMp, beginGps.Latitude, beginGps.Longitude, endGps.Latitude, endGps.Longitude, region, isFirstTime, firstTool, secondTool, thirdTool, fourthTool };
                 if (startName == "")
                 {
                     startName = curName;

@@ -37,22 +37,27 @@ namespace AccurateFileSystem
         }
         public double GpsLength { get; }
         public string Name { get; }
+        public string Route { get; }
         public string StartMp { get; }
         public string EndMp { get; }
         public string ReportQName => IsBuffer ? "Non-HCA" : Name.Replace("P", "");
         public bool ShouldSkip { get; }
-        public bool IsBuffer => Name == "0" || Name == "0P";
+        public bool IsBuffer => Name == "0" || Name == "Non-HCA" || Name == "0P";
         private static (string Value, string ShortReason, string LongReason)[] SkipRegions { get; } = { ("6A", "Atmospheric", "Atmospheric Corrosion Inspection"), ("3", "Casing", "Casing Inspection") };
         public string ShortSkipReason { get; }
         public string LongSkipReason { get; }
         public bool? FirstTime { get; }
         public string FirstTimeString => FirstTime.HasValue ? (FirstTime.Value ? "Y" : "N") : "N/A";
+        public bool HasDcvg { get; }
+        public bool HasAcvg { get; }
+        public bool HasPcm { get; }
 
-        public HcaRegion(List<BasicGeoposition> gpsPoints, string name, string startMp, string endMp, bool? firstTime)
+        public HcaRegion(List<BasicGeoposition> gpsPoints, string name, string route, string startMp, string endMp, bool? firstTime, bool hasDcvg, bool hasAcvg, bool hasPcm)
         {
             GpsPoints = gpsPoints;
             GpsLength = gpsPoints.TotalDistance();
             Name = name;
+            Route = route;
             if (double.TryParse(startMp, out var startMpDouble))
                 startMp = startMpDouble.ToString("F4");
             if (double.TryParse(endMp, out var endMpDouble))
@@ -61,6 +66,9 @@ namespace AccurateFileSystem
             EndMp = endMp;
             FirstTime = firstTime;
             (ShouldSkip, ShortSkipReason, LongSkipReason) = CheckShouldSkip(name);
+            HasDcvg = hasDcvg;
+            HasAcvg = hasAcvg;
+            HasPcm = hasPcm;
         }
 
         public HcaRegion(string name, bool? firstTime)
@@ -68,6 +76,13 @@ namespace AccurateFileSystem
             Name = name;
             FirstTime = firstTime;
             (ShouldSkip, ShortSkipReason, LongSkipReason) = CheckShouldSkip(name);
+        }
+
+        public HcaRegion(string name, bool? firstTime, string shortSkipReason, string longSkipReason)
+        {
+            Name = name;
+            FirstTime = firstTime;
+            (ShouldSkip, ShortSkipReason, LongSkipReason) = (true, shortSkipReason, longSkipReason);
         }
 
         public HcaRegion()

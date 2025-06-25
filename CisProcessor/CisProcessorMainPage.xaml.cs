@@ -171,6 +171,35 @@ namespace CisProcessor
                 return null;
         }
 
+        private List<(BasicGeoposition Gps, double Read)> ParseAcvgReads(List<string> lines)
+        {
+            //var correction = 15.563025007672872650175335959592166719366374913056088;
+            var output = new List<(BasicGeoposition Gps, double Read)>();
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+                var splitLine = line.Split(',');
+                var lat = double.Parse(splitLine[0]);
+                var lon = double.Parse(splitLine[1]);
+                var read = double.Parse(splitLine[2]); //- correction;
+                var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+                output.Add((gps, read));
+            }
+            return output;
+        }
+
+        private List<(double, string)> GetAlignedAcvgData(List<(BasicGeoposition, double)> acvgReads, CombinedAllegroCisFile cisCombinedData)
+        {
+            var output = new List<(double, string)>();
+            foreach (var (readGps, read) in acvgReads)
+            {
+                var (acvgExtrapFoot, _) = cisCombinedData.GetClosestFootage(readGps);
+                output.Add((acvgExtrapFoot, read.ToString("F1")));
+            }
+            return output;
+        }
+
         private async void DoWorkButtonClick(object sender, RoutedEventArgs e)
         {
             try
@@ -194,11 +223,18 @@ namespace CisProcessor
                     var cisFiles = new List<AllegroCISFile>();
                     var docFiles = new List<CsvPcm>();
                     var fileNames = new HashSet<string>();
+                    var acvgReads = new List<(BasicGeoposition, double)>();
+                    var hasAcvgFiles = false;
 
                     foreach (var storageFile in files)
                     {
                         var fileFactory = new FileFactory(storageFile);
                         var file = await fileFactory.GetFile();
+                        if (file == null && storageFile.FileType.ToLower() == ".acvg")
+                        {
+                            acvgReads = ParseAcvgReads(await storageFile.GetLines());
+                            hasAcvgFiles = true;
+                        }
                         if (file is CsvPcm docFile)
                         {
                             docFiles.Add(docFile);
@@ -308,17 +344,19 @@ namespace CisProcessor
                         }
                         combinedStaticFiles.AlignTo(combinedOnOffFiles);
                     }
+                    if (!hasAcvgFiles)
+                        acvgReads = null;
                     var finishedFinalName = finishedFileNames.GetValueOrDefault(folder.DisplayName, null);
                     if (combinedStaticFiles != null && combinedOnOffFiles != null)
                     {
-                        var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, outputFolder, pcmReads, cisSettings, finishedFinalName);
+                        var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, outputFolder, pcmReads, cisSettings, acvgReads, finishedFinalName);
                         await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedOnOffFiles.FileInfos.GetExcelData(0)) }, fileOrder);
                         await CreateExcelFile($"{folder.DisplayName} Static+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedStaticFiles.FileInfos.GetExcelData(0)) }, fileOrder);
                     }
                     else
                     {
                         var file = combinedOnOffFiles ?? combinedStaticFiles;
-                        var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, null, outputFolder, pcmReads, cisSettings, finishedFinalName);
+                        var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, null, outputFolder, pcmReads, cisSettings, acvgReads, finishedFinalName);
                         await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", file.FileInfos.GetExcelData(0)) }, fileOrder);
                     }
                 }
@@ -348,7 +386,7 @@ namespace CisProcessor
             return output;
         }
 
-        private async Task<(string Text, bool IsReversed)> MakeOnOffStaticGraphs(CombinedAllegroCisFile onOffFile, CombinedAllegroCisFile staticFile, StorageFolder masterOutputFolder, List<(double Footage, double Read)> pcmReads, CisSettings cisSettings, (string Text, bool IsReversed)? exact = null)
+        private async Task<(string Text, bool IsReversed)> MakeOnOffStaticGraphs(CombinedAllegroCisFile onOffFile, CombinedAllegroCisFile staticFile, StorageFolder masterOutputFolder, List<(double Footage, double Read)> pcmReads, CisSettings cisSettings, List<(BasicGeoposition Gps, double Read)> acvgReads, (string Text, bool IsReversed)? exact = null)
         {
             var testStationInitial = onOffFile.GetTestStationData();
             var firstPoint = onOffFile.Points.First();
@@ -442,6 +480,18 @@ namespace CisProcessor
                 graph1.Series.Add(off);
                 if (cisSettings.UseMir)
                     graph1.Series.Add(offMir);
+            }
+            List<(double, string)> acvgLabels = null;
+            if (acvgReads != null) // Has ACVG
+            {
+                acvgLabels = GetAlignedAcvgData(acvgReads, onOffFile);
+                var acvgIndication = new PointWithLabelGraphSeries($"ACVG Indication", -0.2, acvgLabels)
+                {
+                    ShapeRadius = 3,
+                    PointColor = Colors.Red,
+                    BackdropOpacity = 1f
+                };
+                graph1.Series.Add(acvgIndication);
             }
             List<(double Footage, double Value)> polData = null;
             if (staticFile != null)
@@ -620,6 +670,11 @@ namespace CisProcessor
             if (polData != null)
             {
                 addedPcmValues.Add(("Polarizaion", polData));
+            }
+            if (acvgLabels != null)
+            {
+                var acvgData = acvgLabels.Select(values => (values.Item1, double.Parse(values.Item2))).ToList();
+                addedPcmValues.Add(("ACVG (db corrected)", acvgData));
             }
             var curOutputName = response.Value.Text;
             var foundHyphenGap = curOutputName.IndexOf(" - ");

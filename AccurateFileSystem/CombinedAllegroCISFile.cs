@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
 using Windows.Globalization.NumberFormatting;
+using Windows.Media.Streaming.Adaptive;
 using Windows.UI.Xaml.Media.Animation;
 using static AccurateFileSystem.Spacers;
 
@@ -41,7 +42,7 @@ namespace AccurateFileSystem
                     point.Point.OriginalComment = point.Point.OriginalComment.Remove(0, comment.Length);
                 if (point.Point.OriginalComment == comment)
                     point.Point.OriginalComment = "";
-                if(point.Point.OriginalComment.EndsWith(comment))
+                if (point.Point.OriginalComment.EndsWith(comment))
                     point.Point.OriginalComment = point.Point.OriginalComment.Remove(point.Point.OriginalComment.Length - comment.Length);
             }
         }
@@ -50,7 +51,7 @@ namespace AccurateFileSystem
         {
             foreach (var (footage, length) in spacers)
             {
-                if(footage == 0)
+                if (footage == 0)
                 {
                     ShiftPoints(length);
                     continue;
@@ -63,7 +64,7 @@ namespace AccurateFileSystem
                     {
                         var distance = nextPoint.Footage - curPoint.Footage;
                         var diff = length - distance;
-                        for(int j = i + 1; j < Points.Count; j++)
+                        for (int j = i + 1; j < Points.Count; j++)
                         {
                             Points[j].Footage += diff;
                         }
@@ -143,14 +144,14 @@ namespace AccurateFileSystem
             var firstPoint = Points[0];
             var nextPoint = Points[1];
             var startDist = nextPoint.Footage - firstPoint.Footage;
-            HasStartSkip = startDist > maxDistance;
+            HasStartSkip = startDist >= maxDistance;
 
             var prevPoint = Points[Points.Count - 2];
             var lastPoint = Points[Points.Count - 1];
             var lastDist = lastPoint.Footage - prevPoint.Footage;
 
             if (Points.Count != 2)
-                HasEndSkip = lastDist > maxDistance;
+                HasEndSkip = lastDist >= maxDistance;
         }
 
         public void Reverse()
@@ -652,7 +653,7 @@ namespace AccurateFileSystem
             }
         }
 
-        public void ReverseBasedOnHca(Hca hca)
+        public bool ReverseBasedOnHca(Hca hca)
         {
             var startGps = hca.GetStartGps();
             int start = HasStartSkip ? 1 : 0;
@@ -676,7 +677,9 @@ namespace AccurateFileSystem
             if (endDist < startDist)
             {
                 Reverse();
+                return true;
             }
+            return false;
         }
 
         public string GetSkipData(double maxDistance = 15, int readDecimals = 4, int gpsDecimals = 7, bool useMir = true)
@@ -736,7 +739,7 @@ namespace AccurateFileSystem
             return output.ToString();
         }
 
-        public string GetTabularData(List<(string Name, List<(double Footage, double Value)>)> addedValues, int readDecimals = 4)
+        public string GetTabularData(List<(string Name, List<(double Footage, double Value)>)> addedValues, List<(string Name, string Formula)> formulas = null, int readDecimals = 4, bool includeMir = true)
         {
             var stringAddedValues = new List<(string Name, List<(double Footage, string Value)>)>();
             foreach (var (name, values) in addedValues)
@@ -748,10 +751,10 @@ namespace AccurateFileSystem
                 }
                 stringAddedValues.Add((name, curValues));
             }
-            return GetTabularData(readDecimals, stringAddedValues);
+            return GetTabularData(readDecimals, stringAddedValues, formulas, includeMir);
         }
 
-        public string GetTabularData(int readDecimals = 4, List<(string Name, List<(double Footage, string Value)>)> addedValues = null)
+        public string GetTabularData(int readDecimals = 4, List<(string Name, List<(double Footage, string Value)>)> addedValues = null, List<(string Name, string Formula)> formulas = null, bool includeMir = true)
         {
             var output = new StringBuilder();
             var readFormat = $"F{readDecimals}";
@@ -786,12 +789,23 @@ namespace AccurateFileSystem
             curLine[27] = "Foreign Off";
             curLine[28] = "ACV";
             curLine[29] = "DoC";
+            if (!includeMir)
+            {
+                curLine = curLine.Where((_, index) => index != 1 && index != 2).ToArray();
+            }
             var header = string.Join("\t", curLine);
             if (addedValues != null)
             {
                 foreach (var (addedHeader, _) in addedValues)
                 {
                     header = $"{header}\t{addedHeader}";
+                }
+            }
+            if (formulas != null)
+            {
+                foreach (var (formulaHeader, _) in formulas)
+                {
+                    header = $"{header}\t{formulaHeader}";
                 }
             }
             output.AppendLine(header);
@@ -904,6 +918,10 @@ namespace AccurateFileSystem
                     }
                 }
                 curLine[29] = point.Depth?.ToString("F0") ?? "";
+                if (!includeMir)
+                {
+                    curLine = curLine.Where((_, index) => index != 1 && index != 2).ToArray();
+                }
                 var lineString = string.Join("\t", curLine);
 
                 if (addedValues != null)
@@ -922,6 +940,13 @@ namespace AccurateFileSystem
                     }
                 }
 
+                if (formulas != null)
+                {
+                    foreach (var (_, formula) in formulas)
+                    {
+                        lineString = $"{lineString}\t{formula}";
+                    }
+                }
                 output.AppendLine(lineString);
             }
 
@@ -1064,6 +1089,16 @@ namespace AccurateFileSystem
                         else if (read is ACTestStationRead ac)
                         {
                             curLine[25] = ac.Value.ToString(readFormat);
+                        }
+                        else if(read is InsulationTestStationRead iso)
+                        {
+                            if (string.IsNullOrEmpty(curLine[5]))
+                            {
+                                curLine[5] = iso.StructOn.ToString(readFormat);
+                                curLine[6] = iso.StructOff.ToString(readFormat);
+                            }
+                            curLine[23] = iso.ForeignOn.ToString(readFormat);
+                            curLine[24] = iso.ForeignOff.ToString(readFormat);
                         }
                     }
                     for (int i = 5; i <= 25; ++i)
