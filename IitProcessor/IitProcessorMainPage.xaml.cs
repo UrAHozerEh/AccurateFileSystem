@@ -190,19 +190,47 @@ namespace IitProcessor
             var pcmFiles = new List<CsvPcm>();
             var acvgReads = new List<(BasicGeoposition, string, double)>();
             var soilReads = new List<(BasicGeoposition, string)>();
-            Skips cisSkips = null;
-            Skips pcmSkips = null;
+            Skips cisSkips = new Skips("Cis Skips");
+            Skips pcmSkips = new Skips("Pcm Skips");
             Spacers cisSpacers = null;
             CommentReplacements commentReplacements = null;
             GlobalGpsShift gpsShift = null;
+            var alignData = true;
+            BasicGeoposition? alignStop = null;
+            BasicGeoposition? alignStart = null;
+
 
             foreach (var file in storageFiles)
             {
+                if (file.FileType.Contains("dontalign", StringComparison.OrdinalIgnoreCase))
+                {
+                    var lines = await file.GetLines();
+                    var splitLines = lines.Select(l => l.Split(','));
+                    if (splitLines.Count() == 0 || string.IsNullOrWhiteSpace(splitLines.First()[0]))
+                    {
+                        alignData = false;
+                        continue;
+                    }
+                    var split = splitLines.First();
+                    if (split.Length != 3)
+                    {
+                        alignData = false;
+                        continue;
+                    }
+                    if (double.TryParse(split[0], out var lat) && double.TryParse(split[1], out var lon))
+                    {
+                        if (split[2].Contains("stop", StringComparison.OrdinalIgnoreCase))
+                            alignStop = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+                        else
+                            alignStart = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+                    }
+                    continue;
+                }
                 var factory = new FileFactory(file);
                 var newFile = await factory.GetFile();
                 if (newFile is CsvPcm csvPcmFile)
                 {
-                    if(csvPcmFile.AcvgData.Count > 0)
+                    if (csvPcmFile.AcvgData.Count > 0)
                     {
                         acvgReads.AddRange(csvPcmFile.AcvgData);
                     }
@@ -223,10 +251,10 @@ namespace IitProcessor
                 if (newFile is Skips)
                 {
                     var skipFile = newFile as Skips;
-                    if (newFile.Name.ToLower().Contains("cis") && cisSkips == null)
-                        cisSkips = skipFile;
-                    else if (newFile.Name.ToLower().Contains("pcm") && pcmSkips == null)
-                        pcmSkips = skipFile;
+                    if (newFile.Name.ToLower().Contains("cis"))
+                        cisSkips.Combine(skipFile);
+                    else if (newFile.Name.ToLower().Contains("pcm"))
+                        pcmSkips.Combine(skipFile);
                     else
                         throw new Exception("Unknown Skip File");
                 }
@@ -254,9 +282,6 @@ namespace IitProcessor
                     soilReads = splitLines.Select(s => (new BasicGeoposition() { Latitude = double.Parse(s[1]), Longitude = double.Parse(s[2]) }, s[0])).ToList();
                 }
             }
-            // This is J00685E stuff
-            //BothAcvgDcvg = !isDcvg; // Stuff for both ACVG and DCVG
-            //isDcvg = true;
             Hca hca;
             var isDuplicateSurvey = false;
             if (displayName.EndsWith(" Duplicate Survey"))
@@ -269,6 +294,7 @@ namespace IitProcessor
             {
                 hca = regions.GetHca(displayName);
             }
+
             if (gpsShift != null && gpsShift.HasReportD)
             {
                 hca.ShiftGps(gpsShift.ReportDLatitudeShift, gpsShift.ReportDLongitudeShift);
@@ -287,6 +313,8 @@ namespace IitProcessor
                 }
                 return;
             }
+            var hcaSkips = hca.ExtractSkips();
+            cisSkips.Combine(hcaSkips);
             cisFiles = GetUniqueFiles(cisFiles);
             foreach (var file in cisFiles)
             {
@@ -313,16 +341,49 @@ namespace IitProcessor
             var curFileSetGps = combinedCisFile.Points.Count > 4 ? LongFileFollowReportQGps : ShortFileFollowReportQGps;
             var (startHcaFootage, endHcaFootage, bufferEndFootage, bufferStartFootage) = AddHcaComments(combinedCisFile, hca, commentReplacements, curFileSetGps);
 
+            double startAlignFoot = 0;
+            double endAlignFoot = 0;
+            if (alignStart.HasValue)
+            {
+                (startAlignFoot, _) = combinedCisFile.GetClosestFootage(alignStart.Value);
+            }
+            if (alignStop.HasValue)
+            {
+                (endAlignFoot, _) = combinedCisFile.GetClosestFootage(alignStop.Value);
+            }
+
+
             //combinedCisFile.StraightenGps();
             if (IsPge)
             {
-                if (curLineData != null)
+                if (curLineData != null && alignData)
                 {
                     if (!AlignBuffer)
                     {
-                        combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
-                        combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage, maxAnchorDistance: double.MaxValue);
-                        combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
+                        if (!alignStart.HasValue && !alignStop.HasValue)
+                        {
+                            combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
+                            combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage, maxAnchorDistance: double.MaxValue);
+                            combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
+                        }
+                        else if (alignStart.HasValue && alignStop.HasValue)
+                        {
+                            combinedCisFile.AlignToLineData(curLineData, startAlignFoot, endAlignFoot);
+                            combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage, maxAnchorDistance: double.MaxValue);
+                            combinedCisFile.AlignToLineData(curLineData, startAlignFoot, endAlignFoot);
+                        }
+                        else if (alignStart.HasValue)
+                        {
+                            combinedCisFile.AlignToLineData(curLineData, startAlignFoot, endHcaFootage);
+                            combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage, maxAnchorDistance: double.MaxValue);
+                            combinedCisFile.AlignToLineData(curLineData, startAlignFoot, endHcaFootage);
+                        }
+                        else if (alignStop.HasValue)
+                        {
+                            combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endAlignFoot);
+                            combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage, maxAnchorDistance: double.MaxValue);
+                            combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endAlignFoot);
+                        }
                     }
                     else
                     {
@@ -1355,7 +1416,7 @@ namespace IitProcessor
             var depthString = depthException.ToString();
             var uniqueRegionsString = string.Join(", ", uniqueRegions);
             var (hcaStartMp, hcaEndMp) = hca.GetMpForHca();
-            
+
             //var reportLLengths = ecdaReport.GetActualReadFootage();
             var reportLCisLengths = GetCisReadFootage(areas);
             var reportLDcvgLength = GetDcvgReadFootage(areas)[0];

@@ -298,6 +298,11 @@ namespace AccurateFileSystem
                     }
                 }
 
+                if (onLine.Count == 0)
+                {
+                    continue;
+                }
+
                 var isReverse = onLine.First().Point.Footage > onLine.Last().Point.Footage;
 
                 foreach (var (point, curGps, curAmps, readDate) in onLine)
@@ -1090,7 +1095,7 @@ namespace AccurateFileSystem
                         {
                             curLine[25] = ac.Value.ToString(readFormat);
                         }
-                        else if(read is InsulationTestStationRead iso)
+                        else if (read is InsulationTestStationRead iso)
                         {
                             if (string.IsNullOrEmpty(curLine[5]))
                             {

@@ -37,6 +37,23 @@ namespace AccurateFileSystem
             ParseLines(lines);
         }
 
+        public List<Skip> ExtractSkips()
+        {
+            var output = new List<Skip>();
+            for (int i = 0; i < Regions.Count; i++)
+            {
+                var region = Regions[i];
+                if (region.ShouldSkip)
+                {
+                    var gps = region.StartGps;//.MiddleTowards(region.EndGps);
+                    output.Add(new Skip(gps, region));
+                    Regions.RemoveAt(i);
+                    --i;
+                }
+            }
+            return output;
+        }
+
         public int GetStartFootageGap()
         {
             if (StartBuffer != null)
@@ -125,6 +142,8 @@ namespace AccurateFileSystem
 
         public (string StartMp, string EndMp) GetMpForHca()
         {
+            if (Regions.Count == 0)
+                Regions = Regions;
             var startMp = Regions.First().StartMp;
             var endMp = Regions.Last().EndMp;
             if (double.TryParse(startMp, out var hcaStartMpDouble))

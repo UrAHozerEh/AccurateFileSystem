@@ -389,9 +389,10 @@ namespace AccurateReportSystem
                 var remainingData = data.Where(d => d.Footage >= lastFoot);
                 if (!remainingData.Any())
                     continue;
+
                 var end = remainingData.OrderBy(d => d.Point.GPS.Distance(region.EndGps)).First();
                 var endFootage = end.Footage;
-                var endDistance = Math.Round(end.Point.GPS.Distance(region.EndGps), 2);
+                var endDistance = Math.Round(end.Point.GPS.Distance(region.EndGps), 0);
                 var next = endFootage;
                 if (remainingData.Count() > 1 && endDistance != 0)
                 {
@@ -405,7 +406,7 @@ namespace AccurateReportSystem
                     remainingData.Where(d => d.Footage != lastFoot);
                     end = remainingData.OrderBy(d => d.Point.GPS.Distance(region.EndGps)).First();
                     endFootage = end.Footage;
-                    endDistance = Math.Round(end.Point.GPS.Distance(region.EndGps), 2);
+                    endDistance = Math.Round(end.Point.GPS.Distance(region.EndGps), 0);
                     if (remainingData.Count() > 1 && endDistance != 0)
                     {
                         var nextFoot = remainingData.OrderBy(d => d.Footage).Skip(1).First().Footage;
