@@ -13,9 +13,25 @@ namespace AccurateFileSystem
     {
         public List<Skip> Locations { get; set; }
 
-        public Skips(string name, List<Skip> locations) : base(name, FileType.Skips)
+        public Skips(string name, List<Skip> locations = null) : base(name, FileType.Skips)
         {
-            Locations = locations;
+            Locations = locations ?? new List<Skip>();
+        }
+
+        public void Combine(Skips skips)
+        {
+            foreach (var otherSkip in skips.Locations)
+            {
+                Locations.Add(otherSkip);
+            }
+        }
+
+        public void Combine(List<Skip> skips)
+        {
+            foreach (var otherSkip in skips)
+            {
+                Locations.Add(otherSkip);
+            }
         }
 
         public static async Task<Skips> GetSkips(StorageFile file)
