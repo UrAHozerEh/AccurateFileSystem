@@ -1284,12 +1284,19 @@ namespace IitProcessor
             {
                 var dcvgShapeFileTest = new ShapefileData($"{folderName} DCVG Shapefile", ecdaClassSeries.DcvgShapefileOutput);
                 await dcvgShapeFileTest.WriteToFolder(shapefileFolder);
+
+                var dcvgKmlFileTest = new KmlFile($"{folderName} DCVG Shapefile", ecdaClassSeries.DcvgKmlData);
+                await dcvgKmlFileTest.WriteToFile(googleShapefileFolder);
+
             }
 
             if (acvgData.Count > 0)
             {
                 var acvgShapeFileTest = new ShapefileData($"{folderName} ACVG Shapefile", ecdaClassSeries.AcvgShapefileOutput);
                 await acvgShapeFileTest.WriteToFolder(shapefileFolder);
+
+                var acvgKmlFileTest = new KmlFile($"{folderName} ACVG Shapefile", ecdaClassSeries.AcvgKmlData);
+                await acvgKmlFileTest.WriteToFile(googleShapefileFolder);
             }
 
             if (ampLabels.Count > 0)

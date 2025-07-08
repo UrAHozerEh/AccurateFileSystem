@@ -29,7 +29,9 @@ namespace AccurateReportSystem
         public List<string[]> SempraCISShapeFileOutput { get; set; }
         public List<string[]> CISShapeFileOutput { get; set; }
         public List<string[]> DcvgShapefileOutput { get; set; }
+        public List<(double Footage, BasicGeoposition Gps, string Depth)> DcvgKmlData { get; set; }
         public List<string[]> AcvgShapefileOutput { get; set; }
+        public List<(double Footage, BasicGeoposition Gps, string Depth)> AcvgKmlData { get; set; }
         public List<string[]> AmpsShapeFileOutput { get; set; }
 
         private static int LABEL = 0;
@@ -116,10 +118,12 @@ namespace AccurateReportSystem
             {
                 header
             };
+            DcvgKmlData = new List<(double Footage, BasicGeoposition Gps, string Depth)>();
             AcvgShapefileOutput = new List<string[]>
             {
                 header
             };
+            AcvgKmlData = new List<(double Footage, BasicGeoposition Gps, string Depth)>();
             AmpsShapeFileOutput = new List<string[]>
             {
                 header
@@ -433,6 +437,7 @@ namespace AccurateReportSystem
                         shapeValues[DCVGCAT] = "Indication";
                     }
                     DcvgShapefileOutput.Add(shapeValues);
+                    DcvgKmlData.Add((curFoot, curDcvgGps, $"{curDcvgValue:F1}%"));
                 }
                 if (acvgSeverities.ContainsKey(curFoot) && !curRegion.ShouldSkip)
                 {
@@ -452,6 +457,7 @@ namespace AccurateReportSystem
                     shapeValues[ACVG] = curAcvgValue.ToString("F2");
                     shapeValues[ACVGCAT] = curAcvgSeverity.GetDisplayName();
                     AcvgShapefileOutput.Add(shapeValues);
+                    AcvgKmlData.Add((curFoot, curAcvgGps, $"{curAcvgValue:F2}"));
                 }
 
                 if (pcmSeverities.ContainsKey(curFoot) && !curRegion.ShouldSkip && !Double.IsNaN(curAmpValue))
@@ -656,9 +662,9 @@ namespace AccurateReportSystem
             var lastEnd = double.NaN;
             var lastPrio = 0;
 
-            foreach(var (curStart, curEnd, curPrio) in reportQ)
+            foreach (var (curStart, curEnd, curPrio) in reportQ)
             {
-                if(double.IsNaN(lastStart))
+                if (double.IsNaN(lastStart))
                 {
                     lastStart = curStart;
                     lastEnd = curEnd;
