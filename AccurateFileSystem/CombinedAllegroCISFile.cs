@@ -633,16 +633,44 @@ namespace AccurateFileSystem
             }
         }
 
+        public void SetFootageFromGpsBetter(int roundDecimals = 0, int startIndex = 0)
+        {
+            double remainder = 0;
+            for (int index = startIndex - 1; index >= 0; --index)
+            {
+                var nextData = Points[index + 1];
+                var curData = Points[index];
+
+                var fullDistance = nextData.Point.GPS.Distance(curData.Point.GPS) + remainder;
+                var usedDistance = Math.Max(Math.Round(fullDistance, roundDecimals), 1);
+                remainder = fullDistance - usedDistance;
+
+                curData.Footage = nextData.Footage - usedDistance;
+                Points[index] = curData;
+            }
+            remainder = 0;
+            for (int index = startIndex + 1; index < Points.Count; ++index)
+            {
+                var lastData = Points[index - 1];
+                var curData = Points[index];
+
+                var fullDistance = lastData.Point.GPS.Distance(curData.Point.GPS) + remainder;
+                var usedDistance = Math.Max(Math.Round(fullDistance, roundDecimals), 1);
+                remainder = fullDistance - usedDistance;
+
+                curData.Footage = lastData.Footage + usedDistance;
+                Points[index] = curData;
+            }
+        }
+
         public void SetFootageFromGps(int roundDecimals = 0, int startIndex = 0)
         {
-            var distances = new List<double>();
             for (int index = startIndex - 1; index >= 0; --index)
             {
                 var nextData = Points[index + 1];
                 var curData = Points[index];
 
                 var distance = Math.Max(Math.Round(nextData.Point.GPS.Distance(curData.Point.GPS), roundDecimals), 1);
-                distances.Add(distance);
                 curData.Footage = nextData.Footage - distance;
                 Points[index] = curData;
             }
@@ -652,7 +680,6 @@ namespace AccurateFileSystem
                 var curData = Points[index];
 
                 var distance = Math.Max(Math.Round(lastData.Point.GPS.Distance(curData.Point.GPS), roundDecimals), 1);
-                distances.Add(distance);
                 curData.Footage = lastData.Footage + distance;
                 Points[index] = curData;
             }

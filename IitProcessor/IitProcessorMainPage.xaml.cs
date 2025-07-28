@@ -51,7 +51,8 @@ namespace IitProcessor
         public bool GraphsInSubFolder { get; set; } = false;
         public bool ReportsInSubFolder { get; set; } = false;
         public bool DrawBufferShadow { get; set; } = true;
-        public bool AlignBuffer { get; set; } = false;
+        public bool AlignBuffer { get; set; } = true;
+        public bool BetterFootageCalc { get; set; } = true;
 
         public MainPage()
         {
@@ -419,7 +420,10 @@ namespace IitProcessor
             var endBufferShadowStart = bufferStartFootage == null ? 0 : endHcaFootage;
             var startBufferShadowEndPoint = combinedCisFile.GetClosesetPoint(startBufferShadowEnd);
             var endBufferShadowStartPoint = combinedCisFile.GetClosesetPoint(endBufferShadowStart);
-            combinedCisFile.SetFootageFromGps();
+            if (BetterFootageCalc)
+                combinedCisFile.SetFootageFromGpsBetter();
+            else
+                combinedCisFile.SetFootageFromGps();
             if (combinedCisFile.HasStartSkip)
             {
                 combinedCisFile.ShiftPoints(-combinedCisFile.Points[1].Footage);
