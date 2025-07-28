@@ -388,9 +388,30 @@ namespace IitProcessor
                     }
                     else
                     {
-                        combinedCisFile.AlignToLineData(curLineData);
-                        combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue);
-                        combinedCisFile.AlignToLineData(curLineData);
+                        if (alignStart.HasValue && alignStop.HasValue)
+                        {
+                            combinedCisFile.AlignToLineData(curLineData, startAlignFoot, endAlignFoot);
+                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue, bufferStartFootage: startAlignFoot, bufferEndFootage: endAlignFoot);
+                            combinedCisFile.AlignToLineData(curLineData, startAlignFoot, endAlignFoot);
+                        }
+                        else if(alignStart.HasValue)
+                        {
+                            combinedCisFile.AlignToLineData(curLineData, startAlignFoot);
+                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue, bufferStartFootage: startAlignFoot);
+                            combinedCisFile.AlignToLineData(curLineData, startAlignFoot);
+                        }
+                        else if(alignStop.HasValue)
+                        {
+                            combinedCisFile.AlignToLineData(curLineData, endFootage: endAlignFoot);
+                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue, bufferEndFootage: endAlignFoot);
+                            combinedCisFile.AlignToLineData(curLineData, endFootage: endAlignFoot);
+                        }
+                        else
+                        {
+                            combinedCisFile.AlignToLineData(curLineData);
+                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue);
+                            combinedCisFile.AlignToLineData(curLineData);
+                        }
                     }
                 }
                 else
