@@ -1196,7 +1196,7 @@ namespace IitProcessor
                 var (startMp, endMp) = hca.GetMpForRegion(region);
                 var name = hca.Name;
                 if (region.IsBuffer)
-                    name = name + " Buffer";
+                    name = name + " Non-HCA";
                 var minDepthString = minDepth == -1 ? "" : minDepth.ToString("F0");
                 var startGps = file.GetClosesetGps(startFoot);
                 var endGps = file.GetClosesetGps(endFoot);
