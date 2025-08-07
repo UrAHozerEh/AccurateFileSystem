@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using Windows.Devices.Geolocation;
 using Windows.Globalization.NumberFormatting;
 using Windows.Media.Streaming.Adaptive;
@@ -1660,6 +1661,16 @@ namespace AccurateFileSystem
                 start = 0;
                 end = Points.Count - 1;
             }
+            if (HasStartSkip)
+            {
+                var first = Points.First();
+                var firstComment = first.Point.OriginalComment;
+                if (filters != null)
+                    foreach (var filter in filters)
+                        firstComment = firstComment.Replace(filter, "");
+                if (!string.IsNullOrWhiteSpace(firstComment))
+                    list.Add((first.Footage, firstComment));
+            }
             for (int i = start; i <= end; ++i)
             {
                 var comment = Points[i].Point.OriginalComment;
@@ -1668,6 +1679,16 @@ namespace AccurateFileSystem
                         comment = comment.Replace(filter, "");
                 if (!string.IsNullOrWhiteSpace(comment))
                     list.Add((Points[i].Footage, comment));
+            }
+            if (HasEndSkip)
+            {
+                var last = Points.Last();
+                var firstComment = last.Point.OriginalComment;
+                if (filters != null)
+                    foreach (var filter in filters)
+                        firstComment = firstComment.Replace(filter, "");
+                if (!string.IsNullOrWhiteSpace(firstComment))
+                    list.Add((last.Footage, firstComment));
             }
             return list;
         }

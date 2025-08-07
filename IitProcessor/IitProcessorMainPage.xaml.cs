@@ -855,12 +855,12 @@ namespace IitProcessor
             report.LegendInfo.NameFontSize = 16f;
             if (file.Points.Last().Footage < medGraphLength)
             {
-                report.PageSetup = new AccurateReportSystem.PageSetup(200, 20);
-                report.XAxisInfo.MajorGridline.Offset = 10;
+                report.PageSetup = new AccurateReportSystem.PageSetup(300, 50);
+                report.XAxisInfo.MajorGridline.Offset = 50;
             }
             if (file.Points.Last().Footage < shortGraphLength)
             {
-                report.PageSetup = new AccurateReportSystem.PageSetup(100, 10);
+                report.PageSetup = new AccurateReportSystem.PageSetup(100, 20);
                 report.XAxisInfo.MajorGridline.Offset = 10;
             }
 

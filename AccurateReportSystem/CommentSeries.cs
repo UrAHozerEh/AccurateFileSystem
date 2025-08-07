@@ -57,11 +57,15 @@ namespace AccurateReportSystem
                     if (string.IsNullOrWhiteSpace(comment))
                         continue;
                     string prefix;
-                    var footString = footage.ToString("F0");
+                    var isNegative = footage < 0;
+
+                    var footString = footage.ToString("F0").Trim('-');
                     switch (StationStyle)
                     {
                         case StationStyle.PlusFoot:
                             footString = footString.PadLeft(3, '0');
+                            if(isNegative)
+                                footString = '-' + footString;
                             prefix = $"{StationPrefix}{footString.Insert(footString.Length - 2, "+")}{StationSuffix}";
                             break;
                         case StationStyle.Footage:
