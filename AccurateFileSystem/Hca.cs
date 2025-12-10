@@ -202,6 +202,10 @@ namespace AccurateFileSystem
             var line = lines[startIndex];
             var route = line[1].Trim();
             var name = line[8].Trim();
+            if(name.IndexOf("-") != -1)
+            {
+                name = name.Substring(0, name.IndexOf("-")).Trim();
+            }
             var lat = double.Parse(line[4]);
             var lon = double.Parse(line[5]);
             var startGps = new BasicGeoposition() { Latitude = lat, Longitude = lon };

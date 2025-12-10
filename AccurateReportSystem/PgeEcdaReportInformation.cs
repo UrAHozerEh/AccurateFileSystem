@@ -486,7 +486,7 @@ namespace AccurateReportSystem
             AllegroDataPoint lastPoint = null;
             EcdaData = new List<PgeEcdaDataPoint>();
             double? lastDepth = null;
-            foreach (var (curFootage, _, curPoint, _, _) in CisFile.Points)
+            foreach (var (curFootage, _, _, curPoint, _, _) in CisFile.Points)
             {
                 if (curPoint.Depth.HasValue)
                 {
@@ -494,7 +494,7 @@ namespace AccurateReportSystem
                     break;
                 }
             }
-            foreach (var (curFootage, _, curPoint, _, _) in CisFile.Points)
+            foreach (var (curFootage, _, _, curPoint, _, _) in CisFile.Points)
             {
                 if (!curPoint.HasGPS)
                     throw new Exception();
@@ -627,7 +627,7 @@ namespace AccurateReportSystem
             AllegroDataPoint lastPoint = null;
             EcdaData = new List<PgeEcdaDataPoint>();
             double? lastDepth = null;
-            foreach (var (curFootage, _, curPoint, _, _) in CisFile.Points)
+            foreach (var (curFootage, _, _, curPoint, _, _) in CisFile.Points)
             {
                 if (curFootage < startFootage || curFootage > endFootage)
                     continue;
@@ -637,7 +637,7 @@ namespace AccurateReportSystem
                     break;
                 }
             }
-            foreach (var (curFootage, _, curPoint, _, _) in CisFile.Points)
+            foreach (var (curFootage, _, _, curPoint, _, _) in CisFile.Points)
             {
                 if (curFootage < startFootage || curFootage > endFootage)
                     continue;

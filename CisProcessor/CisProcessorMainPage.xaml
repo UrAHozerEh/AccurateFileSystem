@@ -8,7 +8,17 @@
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
-    <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
-        <Button x:Name="DoWork" Content="Do Work" Click="DoWorkButtonClick"/>
+    <Grid VerticalAlignment="Center" HorizontalAlignment="Center" Padding="10">
+        <Grid.RowDefinitions>
+            <RowDefinition />
+            <RowDefinition/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Button x:Name="DoWork" HorizontalAlignment="Center" Content="Do Work" Click="DoWorkButtonClick" Grid.Row="0"/>
+        <CheckBox x:Name="PassingShapes" Content="Passing Shapefiles" Grid.Row="1"/>
+        <CheckBox x:Name="FileDebug" Content="Debug Files" Grid.Row="2"/>
     </Grid>
 </Page>

@@ -30,6 +30,7 @@ namespace AccurateFileSystem
         public bool SetFootageFromGps { get; set; } = false;
         public bool StraightenGps => StraightenGpsCommentsDistance.HasValue;
         public double? StraightenGpsCommentsDistance { get; set; } = null;
+        public bool IgnoreStartAndEndSkips { get; set; } = false;
 
 
         public CisSettings(string name, List<string> lines) : base(name, FileType.CisSettings)
@@ -113,6 +114,9 @@ namespace AccurateFileSystem
                         break;
                     case "setfootagefromgps":
                         SetFootageFromGps = boolValue;
+                        break;
+                    case "ignorestartandendskips":
+                        IgnoreStartAndEndSkips = boolValue;
                         break;
                     default:
                         break;

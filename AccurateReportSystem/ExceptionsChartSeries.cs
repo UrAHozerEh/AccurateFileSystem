@@ -26,7 +26,7 @@ namespace AccurateReportSystem
 
         private readonly LegendInfo MasterLegendInfo;
         private readonly YAxesInfo MasterYAxesInfo;
-        
+
 
         public ExceptionsChartSeries(LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo)
         {
@@ -48,10 +48,16 @@ namespace AccurateReportSystem
                 {
                     var x1 = transform.ToDrawArea(Start);
                     var x2 = transform.ToDrawArea(End);
+                    if (Start > End)
+                    {
+                        (x1, x2) = (x2, x1);
+                    }
                     var width = x2 - x1;
+                    if (width < 0)
+                        width = 0;
                     var drawRect = new Rect(x1, drawArea.Top, width, drawArea.Height);
                     session.FillRectangle(drawRect, Color);
-                    if(OutlineColor.HasValue)
+                    if (OutlineColor.HasValue)
                         session.DrawRectangle(drawRect, OutlineColor.Value);
                 }
             }

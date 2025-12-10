@@ -53,7 +53,7 @@ namespace AccurateFileSystem
                                 return new TidalCsvData(File.DisplayName, lines);
                             if (lines[1].Contains("Observations:"))
                                 return new VivaxPcm(File.DisplayName, lines);
-                            if (lines[0].IndexOf("ID") != -1 && (lines[0].IndexOf("Depth") != -1 || lines[0].IndexOf("Signal") != -1) && lines[0].IndexOf("Latitude") != -1)
+                            if ((lines[0].IndexOf("ID") != -1 || lines[0].IndexOf("UP#") != -1) && (lines[0].IndexOf("Depth") != -1 || lines[0].IndexOf("Signal") != -1) && lines[0].IndexOf("Latitude") != -1)
                                 return new OtherPcm(File.DisplayName, lines);
                             if (lines[0].IndexOf("ID") != -1 && (lines[0].IndexOf("db", StringComparison.OrdinalIgnoreCase) != -1 || lines[0].IndexOf("Trans") != -1) && lines[0].IndexOf("Latitude") != -1)
                                 return new OtherPcm(File.DisplayName, lines);

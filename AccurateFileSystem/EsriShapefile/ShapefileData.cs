@@ -81,6 +81,7 @@ namespace AccurateFileSystem.EsriShapefile
                         case "LONGITUDE":
                         case "ONREAD":
                         case "OFFREAD":
+                        case "STATICREAD":
                         case "PCM":
                         case "CTRL_ELV":
                         case "CTRL_LAT":

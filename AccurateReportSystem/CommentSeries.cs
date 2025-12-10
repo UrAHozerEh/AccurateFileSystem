@@ -173,7 +173,9 @@ namespace AccurateReportSystem
                         default:
                             break;
                     }
-                    var backdropRect = new Rect(lineTopEdgePadding, first.CommentMiddle - lineLengthFromMiddle, newBounds.Width + (LineBuffer * 2), lineLengthFromMiddle * 2);
+                    var backdropWidth = newBounds.Width + (LineBuffer * 2);
+                    var backdropX = IsFlippedVertical ? lineTopEdgePadding - backdropWidth : lineTopEdgePadding;
+                    var backdropRect = new Rect(backdropX, first.CommentMiddle - lineLengthFromMiddle, backdropWidth, lineLengthFromMiddle * 2);
 
                     if (lineOutputGeo == null)
                     {

@@ -53,6 +53,9 @@ namespace IitProcessor
         public bool DrawBufferShadow { get; set; } = true;
         public bool AlignBuffer { get; set; } = true;
         public bool BetterFootageCalc { get; set; } = true;
+        public bool GraphFromBottom { get; set; } = true;
+        public bool ShowSoilResComment { get; set; } = true;
+        public bool MakeRawKml { get; private set; } = true;
 
         public MainPage()
         {
@@ -327,6 +330,12 @@ namespace IitProcessor
             }
             dcvgFiles = GetUniqueFiles(dcvgFiles);
             var combinedCisFile = CombinedAllegroCisFile.CombineFiles("Combined", cisFiles, 1500);
+            if(MakeRawKml)
+            {
+                var rawKmlOutput = await outputFolder.CreateFolderAsync("Google Earth Raw FOR QAQC", CreationCollisionOption.OpenIfExists);
+                var cisKmlFile = new KmlFile($"{displayName} RAW CIS", combinedCisFile.GetCisKmlData());
+                await cisKmlFile.WriteToFile(rawKmlOutput);
+            }
             combinedCisFile.FixGps();
             if (gpsShift != null && gpsShift.HasPre)
             {
@@ -336,6 +345,16 @@ namespace IitProcessor
             if (lineData != null)
             {
                 curLineData = lineData.GetValueOrDefault(hca.LineName);
+                if (curLineData == null)
+                {
+                    foreach (var (key, value) in lineData)
+                    {
+                        if (key.Contains(hca.LineName))
+                        {
+                            curLineData = value;
+                        }
+                    }
+                }
             }
 
             combinedCisFile.ReverseBasedOnHca(hca);
@@ -391,19 +410,19 @@ namespace IitProcessor
                         if (alignStart.HasValue && alignStop.HasValue)
                         {
                             combinedCisFile.AlignToLineData(curLineData, startAlignFoot, endAlignFoot);
-                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue, bufferStartFootage: startAlignFoot, bufferEndFootage: endAlignFoot);
+                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue);
                             combinedCisFile.AlignToLineData(curLineData, startAlignFoot, endAlignFoot);
                         }
-                        else if(alignStart.HasValue)
+                        else if (alignStart.HasValue)
                         {
                             combinedCisFile.AlignToLineData(curLineData, startAlignFoot);
-                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue, bufferStartFootage: startAlignFoot);
+                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue);
                             combinedCisFile.AlignToLineData(curLineData, startAlignFoot);
                         }
-                        else if(alignStop.HasValue)
+                        else if (alignStop.HasValue)
                         {
                             combinedCisFile.AlignToLineData(curLineData, endFootage: endAlignFoot);
-                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue, bufferEndFootage: endAlignFoot);
+                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue);
                             combinedCisFile.AlignToLineData(curLineData, endFootage: endAlignFoot);
                         }
                         else
@@ -462,7 +481,7 @@ namespace IitProcessor
 
             var ampReads = combinedCisFile.AlignAmpReads(pcmFiles);
             var combinedFootages = new List<(double, BasicGeoposition)>();
-            foreach (var (foot, _, point, _, _) in combinedCisFile.Points)
+            foreach (var (foot, _, _, point, _, _) in combinedCisFile.Points)
             {
                 if (point.HasGPS)
                 {
@@ -558,6 +577,11 @@ namespace IitProcessor
                     cisSkips.Locations.Add(newSkip);
                 }
                 cisSkips.Locations.AddRange(cisFootageSkips);
+            }
+            foreach (var (location, name) in soilReads)
+            {
+                var (closest, dist) = reportInfo.CisFile.GetClosestPoint(location);
+                closest.Point.OriginalComment += $"Soil Res {name}: {dist:F0} feet away";
             }
             await MakeIITGraphsUpdated(reportInfo.CisFile, reportInfo, displayName, hca, cisSkips, pcmSkips, startShadowEnd, endShadowStart, isDuplicateSurvey, outputFolder, pcmFiles.FirstOrDefault()?.TxData, soilReads, gpsShift);
         }
@@ -860,7 +884,7 @@ namespace IitProcessor
             var directionData = new List<(double, bool, string)>();
             AddMaxDepthComment(file, maxDepth);
 
-            var depthData = file.GetDoubleData("Depth");
+            var depthData = file.GetDepthData();
             var offData = ecdaReport.GetOffData();
             var onData = ecdaReport.GetOnData();
             var ampData = ecdaReport.GetAmpData();
@@ -923,7 +947,7 @@ namespace IitProcessor
                 IsDrawnInLegend = false,
                 Opcaity = 0.75f
             };
-            var commentSeries = new CommentSeries { Values = commentData, PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs, BackdropOpacity = 0.75f };
+            var commentSeries = new CommentSeries { Values = commentData, PercentOfGraph = 0.35f, IsFlippedVertical = false, BorderType = BorderType.Pegs, BackdropOpacity = 0.75f };
 
 
             onOffGraph.Series.Add(depth);
@@ -945,12 +969,19 @@ namespace IitProcessor
             var acvgLabels = acvgData.Select((value) => (value.Item1, value.Item2.ToString("F1") + "")).ToList();
             var ampLabels = ampData.Select((value) => (value.Item1, value.Item2.ToString("F0"))).ToList();
 
-            var dcvgIndication = new PointWithLabelGraphSeries($"DCVG Indication", -0.2, dcvgLabels)
+            var dcvgIndication = new PointWithLabelGraphSeries($"DCVG Indication", -2.8, dcvgLabels)
             {
                 ShapeRadius = 3,
                 PointColor = Colors.Red,
                 BackdropOpacity = 1f
             };
+
+            if (GraphFromBottom)
+            {
+                commentSeries.PercentOfGraph = 0.4f;
+                commentSeries.IsFlippedVertical = true;
+            }
+
             if (hca.HasDcvg)
                 onOffGraph.Series.Add(dcvgIndication);
 
@@ -1464,7 +1495,7 @@ namespace IitProcessor
             }
             reportLString += "\n" + reportLNext;
 
-            foreach (var (foot, _, point, _, _) in file.Points)
+            foreach (var (foot, _, _, point, _, _) in file.Points)
             {
                 foreach (var tsRead in point.TestStationReads)
                 {
@@ -1633,6 +1664,8 @@ namespace IitProcessor
 
             if (hasStartBuffer)
             {
+                if (file.Points.IndexOf(hcaStartPoint) == 0)
+                    hcaStartPoint = file.Points[file.Points.IndexOf(hcaStartPoint) + 1];
                 if (BufferComments)
                     file.Points[file.HasStartSkip ? 1 : 0].Point.OriginalComment += startBufferComment;
             }
@@ -1640,11 +1673,12 @@ namespace IitProcessor
             {
                 hcaStartPoint = file.Points[file.HasStartSkip ? 1 : 0];
             }
+
             //var  hcaStartComment = (hasStartBuffer ? " END OF BUFFER" : "") + " START OF HCA";
             //hcaStartPoint = file.AddExtrapolatedPoint(hcaStartGps, hcaStartComment);
             var bufferEndIndex = file.Points.IndexOf(hcaStartPoint) - 1;
             double? bufferEndFootage = null;
-            if (bufferEndIndex > 0)
+            if (hasStartBuffer)
             {
                 if (BufferComments)
                 {

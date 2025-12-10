@@ -177,7 +177,7 @@ namespace AccurateFileSystem
             for (var i = 1; i < Points.Count; ++i)
             {
                 var cur = Points[i];
-                if (cur.On == 0 || (cur.Off == 0 && IsOnOff))
+                if (cur.On == 0)
                 {
                     if (string.IsNullOrWhiteSpace(cur.OriginalComment))
                     {
@@ -191,18 +191,19 @@ namespace AccurateFileSystem
                     {
                         var recon = cur.GetReconnect();
                         cur.On = recon.NGOn;
-                        cur.Off = recon.NGOff;
+                        if (Math.Round(cur.Off, 3) != 0)
+                            cur.Off = recon.NGOff;
                     }
-                    else if (prevOn.HasValue)
-                    {
-                        cur.On = prevOn.Value;
-                        cur.Off = prevOff.Value;
-                    }
-                    else if (i + 1 < Points.Count)
-                    {
-                        cur.On = Points[i + 1].On;
-                        cur.Off = Points[i + 1].Off;
-                    }
+                    //if (prevOn.HasValue)
+                    //{
+                    //    cur.On = prevOn.Value;
+                    //    cur.Off = prevOff.Value;
+                    //}
+                    //else if (i + 1 < Points.Count)
+                    //{
+                    //    cur.On = Points[i + 1].On;
+                    //    cur.Off = Points[i + 1].Off;
+                    //}
                 }
 
                 var curGps = cur.GPS;
