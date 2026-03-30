@@ -31,7 +31,12 @@ namespace AccurateFileSystem
                 var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
                 if (string.IsNullOrWhiteSpace(Data[r, txColumn]))
                     continue;
-                TxData.Add((gps, Data[r, dateColumn]));
+                var date = "";
+                if (dateColumn != -1)
+                {
+                    date = Data[r, dateColumn];
+                }
+                TxData.Add((gps, date));
             }
         }
 
@@ -51,7 +56,12 @@ namespace AccurateFileSystem
                     depth = double.Parse(Data[r, depthColumn]);
                 if (depth == 0)
                     continue;
-                DepthData.Add((gps, depth, Data[r, dateColumn]));
+                var date = "";
+                if (dateColumn != -1)
+                {
+                    date = Data[r, dateColumn];
+                }
+                DepthData.Add((gps, depth, date));
             }
         }
 
@@ -71,7 +81,12 @@ namespace AccurateFileSystem
                     dB = double.Parse(dbString);
                 if (dB == 0)
                     continue;
-                AcvgData.Add((gps, Data[r, dateColumn], dB));
+                var date = "";
+                if (dateColumn != -1)
+                {
+                    date = Data[r, dateColumn];
+                }
+                AcvgData.Add((gps, date, dB));
             }
         }
 
@@ -89,7 +104,12 @@ namespace AccurateFileSystem
                     amps = double.Parse(Data[r, ampColumn]) * 1000;
                 if (amps == 0)
                     continue;
-                AmpData.Add((gps, amps, Data[r, dateColumn]));
+                var date = "";
+                if (dateColumn != -1)
+                {
+                    date = Data[r, dateColumn];
+                }
+                AmpData.Add((gps, amps, date));
             }
         }
 

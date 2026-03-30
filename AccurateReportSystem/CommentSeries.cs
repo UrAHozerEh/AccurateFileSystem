@@ -33,6 +33,7 @@ namespace AccurateReportSystem
 
         public (GeometryInfo, GeometryInfo, CanvasGeometry) GetGeometry(PageInformation page, Rect drawArea, CanvasDrawingSession session)
         {
+            Values.Sort((f, s) => f.footage.CompareTo(s.footage));
             CanvasGeometry commentOutputGeo = null;// = CanvasGeometry.CreateRectangle(device, 0, 0, (float)drawArea.Height, (float)drawArea.Width);
             CanvasGeometry backdropOutputGeo = null;
             CanvasGeometry lineOutputGeo = null;

@@ -34,6 +34,19 @@ namespace AccurateFileSystem
             ProcessPoints();
         }
 
+        public void ConvertOnOnly()
+        {
+            Type = FileType.Native;
+            if (Header.ContainsKey("onoff"))
+            {
+                Header["onoff"] = "F";
+            }
+            foreach(var (_, point) in Points)
+            {
+                point.Off = 0;
+            }
+        }
+
         public List<int> GetAnchorPoints(int distance = 50)
         {
             var testStations = new List<int> { 0 };

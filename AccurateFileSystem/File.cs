@@ -8,7 +8,7 @@ namespace AccurateFileSystem
 {
     public abstract class File : Object
     {
-        public FileType Type { get; }
+        public FileType Type { get; protected set; }
 
         public File(string name, FileType type) : base(name)
         {

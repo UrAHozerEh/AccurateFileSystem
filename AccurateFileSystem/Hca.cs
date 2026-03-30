@@ -17,6 +17,7 @@ namespace AccurateFileSystem
         public bool HasEndBuffer => EndBuffer != null;
         public string LineName { get; private set; }
         public string Name { get; private set; }
+        public string CleanName => Name.Trim('a').Trim('b').Trim('c');
         public double StartBufferGpsLength => StartBuffer?.GpsLength ?? 0;
         public double EndBufferGpsLength => EndBuffer?.GpsLength ?? 0;
         public double HcaGpsLength => Regions.Sum(region => region.GpsLength);
@@ -47,6 +48,15 @@ namespace AccurateFileSystem
                 {
                     var gps = region.StartGps;//.MiddleTowards(region.EndGps);
                     output.Add(new Skip(gps, region));
+                    //var middle = region.StartGps.MiddleTowards(region.EndGps);
+                    //if(i != Regions.Count - 1)
+                    //{
+                    //    Regions[i + 1].StartGps = region.StartGps;
+                    //}
+                    //if(i != 0)
+                    //{
+                    //    Regions[i - 1].EndGps = region.EndGps;
+                    //}
                     Regions.RemoveAt(i);
                     --i;
                 }
@@ -81,19 +91,23 @@ namespace AccurateFileSystem
 
         public BasicGeoposition GetStartGps()
         {
+            if (StartBuffer == null && Regions.Count == 0 && EndBuffer != null)
+                return EndBuffer.StartGps;
             var startRegion = StartBuffer ?? Regions.First();
             return startRegion.StartGps;
         }
 
         public BasicGeoposition GetEndGps()
         {
+            if(EndBuffer == null && Regions.Count == 0 && StartBuffer != null)
+                return StartBuffer.EndGps;
             var endRegion = EndBuffer ?? Regions.Last();
             return endRegion.EndGps;
         }
 
         public HcaRegion GetClosestRegion(BasicGeoposition gps)
         {
-            var closestRegion = Regions.First();
+            HcaRegion closestRegion = null;
             foreach (var region in Regions)
             {
                 closestRegion = GetCloserRegion(closestRegion, region, gps);
@@ -143,7 +157,9 @@ namespace AccurateFileSystem
         public (string StartMp, string EndMp) GetMpForHca()
         {
             if (Regions.Count == 0)
-                Regions = Regions;
+            {
+                return ("N/A", "N/A");
+            }
             var startMp = Regions.First().StartMp;
             var endMp = Regions.Last().EndMp;
             if (double.TryParse(startMp, out var hcaStartMpDouble))
@@ -159,6 +175,10 @@ namespace AccurateFileSystem
 
         private HcaRegion GetCloserRegion(HcaRegion region1, HcaRegion region2, BasicGeoposition gps)
         {
+            if (region1 == null && region2 != null)
+                return region2;
+            if (region1 != null && region2 == null)
+                return region1;
             var firstDist = region1.DistanceToGps(gps);
             var secondDist = region2.DistanceToGps(gps);
             if (Math.Abs(secondDist - firstDist) < 1)
@@ -202,7 +222,7 @@ namespace AccurateFileSystem
             var line = lines[startIndex];
             var route = line[1].Trim();
             var name = line[8].Trim();
-            if(name.IndexOf("-") != -1)
+            if (name.IndexOf("-") != -1)
             {
                 name = name.Substring(0, name.IndexOf("-")).Trim();
             }
@@ -263,8 +283,12 @@ namespace AccurateFileSystem
                 {
                     curHasPcm = true;
                 }
-
-                if (line[8].Trim() == name && curRoute == route && IsSameFirstTime(isFirstTime, curIsFirstTime) &&
+                var nextName = line[8].Trim();
+                if (nextName.IndexOf("-") != -1)
+                {
+                    nextName = nextName.Substring(0, nextName.IndexOf("-")).Trim();
+                }
+                if (nextName == name && curRoute == route && IsSameFirstTime(isFirstTime, curIsFirstTime) &&
                     (regionHasAcvg == curHasAcvg) && (regionHasDcvg == curHasDcvg) && (regionHasPcm == curHasPcm))
                 {
                     lat = double.Parse(line[6]);

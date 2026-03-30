@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -585,7 +586,7 @@ namespace AccurateFileSystem
             Points[lastAnchor].Footage = lastFootage;
         }
 
-        public void StraightenGps(double maxAnchorDistance = 50, double? bufferStartFootage = null, double? bufferEndFootage = null)
+        public void StraightenGps(double maxAnchorDistance = 50)
         {
             CombinedDataPoint lastData = Points[0];
             var lastPointIndex = 0;
@@ -596,16 +597,11 @@ namespace AccurateFileSystem
 
                 var distance = curData.Footage - lastData.Footage;
 
-                var isExplicitAnchor = curPoint.OriginalComment.Contains("+");
-                var skipEndBuffer = bufferEndFootage.HasValue && bufferEndFootage == curData.Footage;
-                var skipStartBuffer = bufferStartFootage.HasValue && bufferStartFootage == curData.Footage;
+                var hasComment = !string.IsNullOrWhiteSpace(curPoint.OriginalComment);
+                if(hasComment && curPoint.OriginalComment.Contains("-*-"))
+                    hasComment = false;
 
-                if (!isExplicitAnchor && (skipEndBuffer || skipStartBuffer))
-                {
-                    continue;
-                }
-
-                if ((!string.IsNullOrWhiteSpace(curPoint.OriginalComment) || curPoint.Depth.HasValue || distance > maxAnchorDistance) && curPoint.HasGPS)
+                if ((hasComment || distance > maxAnchorDistance) && curPoint.HasGPS)
                 {
                     if (index - lastPointIndex != 1) // IF comments are next to eachother then just skip. Nothing to extrapolate.
                     {
@@ -1682,7 +1678,7 @@ namespace AccurateFileSystem
             return list;
         }
 
-        public List<(double footage, string value)> GetCommentData(List<string> filters = null, bool ignoreStartEndSkips = false)
+        public List<(double footage, string value)> GetCommentData(List<string> filters = null, bool ignoreStartEndSkips = false, bool stripComment = false)
         {
             var list = new List<(double, string)>();
             var (start, end) = GetActualStartEnd();
@@ -1694,7 +1690,7 @@ namespace AccurateFileSystem
             if (HasStartSkip)
             {
                 var first = Points.First();
-                var firstComment = first.Point.OriginalComment;
+                var firstComment = !stripComment ? first.Point.OriginalComment : first.Point.StrippedComment;
                 if (filters != null)
                     foreach (var filter in filters)
                         firstComment = firstComment.Replace(filter, "");
@@ -1703,7 +1699,7 @@ namespace AccurateFileSystem
             }
             for (int i = start; i <= end; ++i)
             {
-                var comment = Points[i].Point.OriginalComment;
+                var comment = !stripComment ? Points[i].Point.OriginalComment : Points[i].Point.StrippedComment;
                 if (filters != null)
                     foreach (var filter in filters)
                         comment = comment.Replace(filter, "");
@@ -1713,7 +1709,7 @@ namespace AccurateFileSystem
             if (HasEndSkip)
             {
                 var last = Points.Last();
-                var firstComment = last.Point.OriginalComment;
+                var firstComment =!stripComment ? last.Point.OriginalComment : last.Point.StrippedComment;
                 if (filters != null)
                     foreach (var filter in filters)
                         firstComment = firstComment.Replace(filter, "");

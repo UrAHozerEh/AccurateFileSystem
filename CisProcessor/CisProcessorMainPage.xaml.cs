@@ -67,6 +67,7 @@ namespace CisProcessor
             DoWork.IsEnabled = enabled;
             FileDebug.IsEnabled = enabled;
             PassingShapes.IsEnabled = enabled;
+            StaticComments.IsEnabled = enabled;
         }
 
         private static async Task<(string, bool)?> InputTextDialogAsync(string title, string testStationData, string firstComment, string lastComment)
@@ -519,7 +520,12 @@ namespace CisProcessor
 
             if (response == null)
                 return (null, false);
-            if (response.Value.Item2)
+            var staticEndOffset = 0.0;
+            if(staticFile != null)
+            {
+                staticEndOffset = onOffFile.Points.Last().Footage - staticFile.Points.Last().Footage;
+            }
+            if (response.Value.IsReversed)
             {
                 onOffFile.Reverse();
             }
@@ -573,7 +579,7 @@ namespace CisProcessor
             };
             var commentSeries = new CommentSeries { Values = onOffFile.GetCommentData(ignoreStartEndSkips: true), PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs };
 
-            commentGraph.CommentSeries = commentSeries;
+            commentGraph.CommentSeries.Add(commentSeries);
             commentGraph.LegendInfo.Name = "CIS Comments";
             commentGraph.DrawTopBorder = false;
 
@@ -582,7 +588,7 @@ namespace CisProcessor
             commentGraph.YAxesInfo.MajorGridlines.IsEnabled = false;
             commentGraph.YAxesInfo.Y1IsDrawn = false;
 
-            graph1.CommentSeries = commentSeries;
+            graph1.CommentSeries.Add(commentSeries);
             graph1.YAxesInfo.Y1MinimumValue = cisSettings.CisGraphMinValue;
             graph1.YAxesInfo.Y1MaximumValue = cisSettings.CisGraphMaxValue;
             graph1.YAxesInfo.MajorGridlines.Offset = cisSettings.CisGraphMajorGridStep;
@@ -614,15 +620,22 @@ namespace CisProcessor
             List<(double Footage, double Value)> polData = null;
             if (staticFile != null)
             {
-                if (response.Value.Item2)
-                {
-                    staticFile?.Reverse();
-                }
+                //if (response.Value.IsReversed)
+                //{
+                //    staticFile?.Reverse();
+                //    staticFile?.ShiftPoints(staticEndOffset);
+                //}
+                staticFile.AlignTo(onOffFile);
                 var staticData = new GraphSeries("Static", staticFile.GetOnData())
                 {
                     LineColor = Colors.Magenta,
                     MaxDrawDistance = cisSettings.CisGap
                 };
+                if (StaticComments.IsChecked ?? false)
+                {
+                    var staticCommentSeries = new CommentSeries { Values = staticFile.GetCommentData(ignoreStartEndSkips: true), PercentOfGraph = 0.5f, IsFlippedVertical = true, BorderType = BorderType.Pegs };
+                    graph1.CommentSeries.Add(staticCommentSeries);
+                }
                 polData = (cisSettings.UseMir ? offMir : off).Difference(staticData, cisSettings.CisGap);
                 var polarizationData = new GraphSeries("Polarization", polData)
                 {

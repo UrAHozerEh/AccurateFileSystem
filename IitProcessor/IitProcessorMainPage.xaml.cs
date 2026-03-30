@@ -33,12 +33,21 @@ using Colors = Windows.UI.Colors;
 
 namespace IitProcessor
 {
+    public struct CommentSettings
+    {
+        public float Width;
+        public bool StripComments;
+        public bool IsFlippedVertical;
+        public BorderType BorderType;
+        public float BackdropOpacity;
+    }
+
     /// <summary>
     /// An empty page that can be used on its own or navigated to within a Frame.
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        public string ReportQ { get; set; } = "";
+        public Dictionary<string, string> ReportQ { get; set; } = new Dictionary<string, string>();
         public static bool IsPge { get; } = true;
         public double MaxDepth { get; set; } = 120;
         public double MinDepth { get; set; } = 36;
@@ -53,9 +62,17 @@ namespace IitProcessor
         public bool DrawBufferShadow { get; set; } = true;
         public bool AlignBuffer { get; set; } = true;
         public bool BetterFootageCalc { get; set; } = true;
-        public bool GraphFromBottom { get; set; } = true;
         public bool ShowSoilResComment { get; set; } = true;
         public bool MakeRawKml { get; private set; } = true;
+        public bool StripOffReads { get; private set; } = false;
+        public CommentSettings CommentSettings { get; set; } = new CommentSettings()
+        {
+            Width = 0.25f,
+            StripComments = false,
+            IsFlippedVertical = true,
+            BorderType = BorderType.Pegs,
+            BackdropOpacity = 0.75f
+        };
 
         public MainPage()
         {
@@ -134,7 +151,7 @@ namespace IitProcessor
             if (masterFolder.DisplayName == "Processed Data")
                 return;
             var folders = await masterFolder.GetFoldersAsync();
-            ReportQ = "";
+            ReportQ = new Dictionary<string, string>();
 
             var masterFiles = await masterFolder.GetFilesAsync();
             StorageFile regionFile = null;
@@ -155,6 +172,7 @@ namespace IitProcessor
             {
                 await ParseIitFolder(curFolder, regions, outputFolder, lineData);
             }
+            var reportQ = OrderReportQ(regions);
             var outputFile = await outputFolder.CreateFileAsync($"Report Q {masterFolder.DisplayName} Raw.xlsx", CreationCollisionOption.ReplaceExisting);
             using (var outStream = await outputFile.OpenStreamForWriteAsync())
             using (var spreadDoc = SpreadsheetDocument.Create(outStream, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
@@ -162,10 +180,27 @@ namespace IitProcessor
                 var wbPart = spreadDoc.AddWorkbookPart();
                 wbPart.Workbook = new Workbook();
                 wbPart.Workbook.AppendChild(new Sheets());
-                AddData(wbPart, ReportQ, 1, "Report Q", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
+                AddData(wbPart, reportQ, 1, "Report Q", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
                 //AddData(wbPart, reportQ, 2, "Report Q2", new List<string>() { "A1:A2", "B1:B2", "C1:D1", "E1:F1", "G1:G2", "H1:H2", "I1:I2", "J1:M1", "N1:Q1" });
                 wbPart.Workbook.Save();
             }
+        }
+
+        private string OrderReportQ(IitRegionFile regionFile)
+        {
+            var output = new StringBuilder();
+            foreach (var hca in regionFile.Hcas)
+            {
+                if (ReportQ.TryGetValue(hca.Name, out string curReportQ))
+                {
+                    output.Append(curReportQ);
+                }
+                else
+                {
+                    var test = "test";
+                }
+            }
+            return output.ToString();
         }
 
         private async Task ParseIitFolder(StorageFolder folder, IitRegionFile regions, StorageFolder outputFolder, Dictionary<string, List<List<BasicGeoposition>>> lineData)
@@ -175,6 +210,10 @@ namespace IitProcessor
             if (plusIndex != -1)
             {
                 displayName = displayName.Substring(plusIndex + 1).Trim();
+            }
+            if (displayName.StartsWith("HCA "))
+            {
+                displayName = displayName.Substring(4).Trim();
             }
 
             var storageFiles = new List<StorageFile>();
@@ -246,6 +285,10 @@ namespace IitProcessor
                     var allegroFile = newFile as AllegroCISFile;
                     if (allegroFile.Type == FileType.OnOff || allegroFile.Type == FileType.Native)
                     {
+                        if (StripOffReads)
+                        {
+                            allegroFile.ConvertOnOnly();
+                        }
                         cisFiles.Add(allegroFile);
                     }
                     if (allegroFile.Type == FileType.DCVG)
@@ -311,9 +354,11 @@ namespace IitProcessor
                 var endGps = region.EndGps;
                 if (!isDuplicateSurvey)
                 {
-                    ReportQ += $"{hca.Name.TrimEnd('a').TrimEnd('b').TrimEnd('c')}\t{hca.LineName}\t{startMp}\t{endMp}\tNT\tNT\t{region.Name}\t";
-                    ReportQ += $"{hca.HcaGpsLength:F0}\tNT\t{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t";
-                    ReportQ += $"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{hca.Regions.First().FirstTimeString}\tNT\tNT\tNT\tNT\tNT\t{hca.Regions[0].LongSkipReason}\n";
+                    var curReportQ = "";
+                    curReportQ += $"{hca.CleanName}\t{hca.LineName}\t{startMp}\t{endMp}\tNT\tNT\t{region.Name}\t";
+                    curReportQ += $"{hca.HcaGpsLength:F0}\tNT\t{startGps.Latitude:F8}\t{startGps.Longitude:F8}\t";
+                    curReportQ += $"{endGps.Latitude:F8}\t{endGps.Longitude:F8}\t{hca.Regions.First().FirstTimeString}\tNT\tNT\tNT\tNT\tNT\t{hca.Regions[0].LongSkipReason}\n";
+                    ReportQ.Add(hca.Name, curReportQ);
                 }
                 return;
             }
@@ -330,7 +375,7 @@ namespace IitProcessor
             }
             dcvgFiles = GetUniqueFiles(dcvgFiles);
             var combinedCisFile = CombinedAllegroCisFile.CombineFiles("Combined", cisFiles, 1500);
-            if(MakeRawKml)
+            if (MakeRawKml)
             {
                 var rawKmlOutput = await outputFolder.CreateFolderAsync("Google Earth Raw FOR QAQC", CreationCollisionOption.OpenIfExists);
                 var cisKmlFile = new KmlFile($"{displayName} RAW CIS", combinedCisFile.GetCisKmlData());
@@ -383,25 +428,25 @@ namespace IitProcessor
                         if (!alignStart.HasValue && !alignStop.HasValue)
                         {
                             combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
-                            combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage, maxAnchorDistance: double.MaxValue);
+                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue);
                             combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endHcaFootage);
                         }
                         else if (alignStart.HasValue && alignStop.HasValue)
                         {
                             combinedCisFile.AlignToLineData(curLineData, startAlignFoot, endAlignFoot);
-                            combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage, maxAnchorDistance: double.MaxValue);
+                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue);
                             combinedCisFile.AlignToLineData(curLineData, startAlignFoot, endAlignFoot);
                         }
                         else if (alignStart.HasValue)
                         {
                             combinedCisFile.AlignToLineData(curLineData, startAlignFoot, endHcaFootage);
-                            combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage, maxAnchorDistance: double.MaxValue);
+                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue);
                             combinedCisFile.AlignToLineData(curLineData, startAlignFoot, endHcaFootage);
                         }
                         else if (alignStop.HasValue)
                         {
                             combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endAlignFoot);
-                            combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage, maxAnchorDistance: double.MaxValue);
+                            combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue);
                             combinedCisFile.AlignToLineData(curLineData, startHcaFootage, endAlignFoot);
                         }
                     }
@@ -435,13 +480,15 @@ namespace IitProcessor
                 }
                 else
                 {
-                    combinedCisFile.StraightenGps(bufferStartFootage: bufferStartFootage, bufferEndFootage: bufferEndFootage, maxAnchorDistance: double.MaxValue);
+                    combinedCisFile.StraightenGps(maxAnchorDistance: double.MaxValue);
                 }
             }
             combinedCisFile.RemoveComments("+");
+            combinedCisFile.RemoveComments("-*-");
 
             var hcaStartPoint = combinedCisFile.GetClosesetPoint(startHcaFootage);
-            hca.Regions[0].StartGps = hcaStartPoint.Point.GPS;
+            if (hca.Regions.Count > 0)
+                hca.Regions[0].StartGps = hcaStartPoint.Point.GPS;
             if (hca.HasStartBuffer && bufferEndFootage.HasValue)
             {
                 var bufferEndPoint = combinedCisFile.GetClosesetPoint(bufferEndFootage.Value);
@@ -450,7 +497,8 @@ namespace IitProcessor
             }
 
             var hcaEndPoint = combinedCisFile.GetClosesetPoint(endHcaFootage);
-            hca.Regions.Last().EndGps = hcaEndPoint.Point.GPS;
+            if (hca.Regions.Count > 0)
+                hca.Regions.Last().EndGps = hcaEndPoint.Point.GPS;
             if (hca.HasEndBuffer && bufferStartFootage.HasValue)
             {
                 var bufferStartPoint = combinedCisFile.GetClosesetPoint(bufferStartFootage.Value);
@@ -750,7 +798,8 @@ namespace IitProcessor
                 IsDrawnInLegend = false,
                 Opcaity = 0.75f
             };
-            var commentSeries = new CommentSeries { Values = commentData, PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs, BackdropOpacity = 0.75f };
+
+            var commentSeries = new CommentSeries { Values = commentData, PercentOfGraph = CommentSettings.Width, IsFlippedVertical = CommentSettings.IsFlippedVertical, BorderType = CommentSettings.BorderType, BackdropOpacity = CommentSettings.BackdropOpacity };
 
 
             onOffGraph.Series.Add(depth);
@@ -763,10 +812,6 @@ namespace IitProcessor
             onOffGraph.Series.Add(redLine);
             onOffGraph.DrawTopBorder = false;
 
-            if (finalFootage < shortGraphLength)
-            {
-                onOffGraph.CommentSeries.PercentOfGraph = 0.25f;
-            }
 
             var dcvgLabels = dcvgData.Select((value) => (value.Item1, value.Item2.ToString("F1") + "%")).ToList();
 
@@ -890,7 +935,7 @@ namespace IitProcessor
             var ampData = ecdaReport.GetAmpData();
             //if (CheckDepthGaps(depthData, onData.First().footage, onData.Last().footage, 75))
             //    onData = onData;
-            var commentData = file.GetCommentData();
+            var commentData = file.GetCommentData(stripComment: CommentSettings.StripComments);
             if (onData.Count == 1)
             {
                 onData.Add((5, onData[0].Value));
@@ -947,8 +992,7 @@ namespace IitProcessor
                 IsDrawnInLegend = false,
                 Opcaity = 0.75f
             };
-            var commentSeries = new CommentSeries { Values = commentData, PercentOfGraph = 0.35f, IsFlippedVertical = false, BorderType = BorderType.Pegs, BackdropOpacity = 0.75f };
-
+            var commentSeries = new CommentSeries { Values = commentData, PercentOfGraph = CommentSettings.Width, IsFlippedVertical = CommentSettings.IsFlippedVertical, BorderType = CommentSettings.BorderType, BackdropOpacity = CommentSettings.BackdropOpacity };
 
             onOffGraph.Series.Add(depth);
             onOffGraph.YAxesInfo.Y2IsDrawn = true;
@@ -975,12 +1019,6 @@ namespace IitProcessor
                 PointColor = Colors.Red,
                 BackdropOpacity = 1f
             };
-
-            if (GraphFromBottom)
-            {
-                commentSeries.PercentOfGraph = 0.4f;
-                commentSeries.IsFlippedVertical = true;
-            }
 
             if (hca.HasDcvg)
                 onOffGraph.Series.Add(dcvgIndication);
@@ -1319,7 +1357,7 @@ namespace IitProcessor
                 lastRegion = region;
             }
             if (!isDuplicateSurvey)
-                ReportQ += output.ToString();
+                ReportQ.Add(hca.Name, output.ToString());
             var shapefileFolder = await outputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
             var googleShapefileFolder = await outputFolder.CreateFolderAsync("Google Earth", CreationCollisionOption.OpenIfExists);
             var cisShapeFileStringBuilder = new StringBuilder();
@@ -1685,7 +1723,7 @@ namespace IitProcessor
                     var tempEndBufferComment = endBufferComment;
                     if (!string.IsNullOrWhiteSpace(file.Points[bufferEndIndex].Point.OriginalComment))
                         tempEndBufferComment += "+";
-                    file.Points[bufferEndIndex].Point.OriginalComment += tempEndBufferComment;
+                    file.Points[bufferEndIndex].Point.OriginalComment += tempEndBufferComment + "-*-";
                 }
                 bufferEndFootage = file.Points[bufferEndIndex].Footage;
             }
@@ -1714,7 +1752,7 @@ namespace IitProcessor
                 if (!string.IsNullOrWhiteSpace(file.Points[bufferStartIndex].Point.OriginalComment))
                     tempStartBufferComment += "+";
                 if (BufferComments)
-                    file.Points[bufferStartIndex].Point.OriginalComment += tempStartBufferComment;
+                    file.Points[bufferStartIndex].Point.OriginalComment += tempStartBufferComment + "-*-";
                 bufferStartFootage = file.Points[bufferStartIndex].Footage;
             }
             if (setGps)

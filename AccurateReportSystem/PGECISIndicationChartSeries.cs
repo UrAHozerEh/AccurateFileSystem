@@ -393,13 +393,22 @@ namespace AccurateReportSystem
                 var end = remainingData.OrderBy(d => d.Point.GPS.Distance(region.EndGps)).First();
                 var endFootage = end.Footage;
                 var endDistance = Math.Round(end.Point.GPS.Distance(region.EndGps), 0);
-                var next = endFootage;
+                //var next = endFootage;
+                var nextFootages = remainingData.Where(d => d.Footage > endFootage);
+                var nextFootage = endFootage;
+                if (nextFootages.Any())
+                    nextFootage = nextFootages.Min(d => d.Footage);
+                var shiftedBack = false;
                 if (remainingData.Count() > 1 && endDistance != 0)
                 {
                     var nextFoot = remainingData.OrderBy(d => d.Footage).Skip(1).First().Footage;
                     if (nextFoot < endFootage)
+                    {
                         endFootage -= 1;
+                        shiftedBack = true;
+                    }
                 }
+
                 var takenData = remainingData.Where(d => d.Footage <= endFootage).ToList();
                 if (!lastRegionMulti || takenData.Count > 1)
                 {
@@ -411,9 +420,17 @@ namespace AccurateReportSystem
                     {
                         var nextFoot = remainingData.OrderBy(d => d.Footage).Skip(1).First().Footage;
                         if (nextFoot < endFootage)
+                        {
                             endFootage -= 1;
+                            shiftedBack = true;
+                        }
                     }
                     takenData = remainingData.Where(d => d.Footage <= endFootage).ToList();
+                }
+                var inSkip = cisSkips.Locations.Any(f => f.HasFootage && f.Footage >= endFootage && f.Footage <= nextFootage);
+                if (inSkip && shiftedBack)
+                {
+                    endFootage = end.Footage;
                 }
 
                 if (endFootage == lastFoot)
@@ -610,17 +627,17 @@ namespace AccurateReportSystem
         {
             var changeInBaseline = Math.Abs(on - baseline);
             if (on > -0.6)
-                return (PGESeverity.Severe, "On is more positive than -0.600");
+                return (PGESeverity.Severe, "On is more positive than -0.600V");
             if (on > -0.8 && changeInBaseline >= 0.2)
-                return (PGESeverity.Severe, "On is between -0.800 and -0.601 and difference in baseline is greater than 0.200");
+                return (PGESeverity.Severe, "On is between -0.800V and -0.601V and difference in baseline is greater than 0.200V");
             if (on > -0.8)
-                return (PGESeverity.Moderate, "On is between -0.800 and -0.600");
+                return (PGESeverity.Moderate, "On is between -0.800V and -0.600V");
             if (on > -0.95 && changeInBaseline >= 0.2)
-                return (PGESeverity.Moderate, "On is between -0.950 and -0.801 and difference in baseline is greater than 0.200");
+                return (PGESeverity.Moderate, "On is between -0.950V and -0.801V and difference in baseline is greater than 0.200V");
             if (on > -0.95)
-                return (PGESeverity.Minor, "On is between -0.950 and -0.801");
+                return (PGESeverity.Minor, "On is between -0.950V and -0.801V");
             if (changeInBaseline >= 0.2)
-                return (PGESeverity.Minor, "difference in baseline is greater than 0.200");
+                return (PGESeverity.Minor, "Difference in baseline is greater than 0.200V");
             return (PGESeverity.NRI, "");
         }
 
