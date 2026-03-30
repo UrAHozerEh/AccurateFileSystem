@@ -671,10 +671,10 @@ namespace AccurateReportSystem
                     lastPrio = curPrio;
                     continue;
                 }
-                if (curPrio == lastPrio)
-                {
-                    continue;
-                }
+                //if (curPrio == lastPrio)
+                //{
+                //    continue;
+                //}
                 var color = GetColor(lastPrio);
                 if (color.HasValue)
                     colors.Add((lastStart, curStart, color.Value));

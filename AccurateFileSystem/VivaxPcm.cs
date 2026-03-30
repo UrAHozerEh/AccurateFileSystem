@@ -24,6 +24,11 @@ namespace AccurateFileSystem
             for (var i = 0; i < Headers.Count; ++i)
             {
                 var header = Headers[i];
+                if (header.StartsWith("depth", StringComparison.OrdinalIgnoreCase))
+                {
+                    depthColumn = i;
+                    continue;
+                }
                 switch (header)
                 {
                     case "Latitude":
@@ -32,10 +37,8 @@ namespace AccurateFileSystem
                     case "Longitude":
                         lonColumn = i;
                         break;
-                    case "Depth(in)":
-                        depthColumn = i;
-                        break;
                     case "GPS_Date":
+                    case "GPS Time":
                         dateColumn = i;
                         break;
                 }

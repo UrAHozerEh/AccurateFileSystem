@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using Windows.Devices.Geolocation;
 using Windows.Globalization.NumberFormatting;
 using Windows.Media.Streaming.Adaptive;
@@ -18,8 +20,8 @@ namespace AccurateFileSystem
         public FileType Type { get; set; }
         public string Name { get; set; }
         public List<CombinedDataPoint> Points = null;
-        public bool HasStartSkip { get; private set; }
-        public bool HasEndSkip { get; private set; }
+        public bool HasStartSkip { get; set; }
+        public bool HasEndSkip { get; set; }
         public List<(string, string)> PcmCalcOutput { get; private set; }
         public List<(double StartFootage, double EndFootage, double Percent)> PcmPercentRegions { get; private set; }
         public List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool IsReverse, string ReadDate)> PcmPercentValues { get; private set; }
@@ -584,7 +586,7 @@ namespace AccurateFileSystem
             Points[lastAnchor].Footage = lastFootage;
         }
 
-        public void StraightenGps(double maxAnchorDistance = 50, double? bufferStartFootage = null, double? bufferEndFootage = null)
+        public void StraightenGps(double maxAnchorDistance = 50)
         {
             CombinedDataPoint lastData = Points[0];
             var lastPointIndex = 0;
@@ -595,16 +597,11 @@ namespace AccurateFileSystem
 
                 var distance = curData.Footage - lastData.Footage;
 
-                var isExplicitAnchor = curPoint.OriginalComment.Contains("+");
-                var skipEndBuffer = bufferEndFootage.HasValue && bufferEndFootage == curData.Footage;
-                var skipStartBuffer = bufferStartFootage.HasValue && bufferStartFootage == curData.Footage;
+                var hasComment = !string.IsNullOrWhiteSpace(curPoint.OriginalComment);
+                if(hasComment && curPoint.OriginalComment.Contains("-*-"))
+                    hasComment = false;
 
-                if (!isExplicitAnchor && (skipEndBuffer || skipStartBuffer))
-                {
-                    continue;
-                }
-
-                if ((!string.IsNullOrWhiteSpace(curPoint.OriginalComment) || curPoint.Depth.HasValue || distance > maxAnchorDistance) && curPoint.HasGPS)
+                if ((hasComment || distance > maxAnchorDistance) && curPoint.HasGPS)
                 {
                     if (index - lastPointIndex != 1) // IF comments are next to eachother then just skip. Nothing to extrapolate.
                     {
@@ -750,20 +747,34 @@ namespace AccurateFileSystem
                     curLine[1] = curPoint.Footage.ToString("F0");
                     curLine[2] = (curPoint.Footage - lastPoint.Footage).ToString("F0");
 
+                    var lastDataPoint = lastPoint.Point;
+                    var curDataPoint = curPoint.Point;
+                    if (!curDataPoint.Times.Any() && !lastDataPoint.Times.Any())
+                        throw new Exception($"Skip from {lastPoint.Footage} to {curPoint.Footage} does not have a valid DateTime");
+
                     curLine[3] = lastPoint.Point.GPS.Latitude.ToString(gpsFormat);
                     curLine[4] = lastPoint.Point.GPS.Longitude.ToString(gpsFormat);
-                    curLine[5] = lastPoint.Point.Times.First().ToShortDateString();
+
+                    if (lastDataPoint.Times.Any())
+                        curLine[5] = lastDataPoint.Times.First().ToShortDateString();
+                    else if (curDataPoint.Times.Any())
+                        curLine[5] = curDataPoint.Times.First().ToShortDateString();
+
                     curLine[6] = lastPoint.Point.OriginalComment;
                     curLine[7] = (lastPoint.UseMir && useMir) ? lastPoint.Point.MirOn.ToString(readFormat) : lastPoint.Point.On.ToString(readFormat);
                     curLine[8] = (lastPoint.UseMir && useMir) ? lastPoint.Point.MirOff.ToString(readFormat) : lastPoint.Point.Off.ToString(readFormat);
 
-                    var point = curPoint.Point;
-                    curLine[9] = point.GPS.Latitude.ToString(gpsFormat);
-                    curLine[10] = point.GPS.Longitude.ToString(gpsFormat);
-                    curLine[11] = point.Times.First().ToShortDateString();
-                    curLine[12] = point.OriginalComment;
-                    curLine[13] = (curPoint.UseMir && useMir) ? point.MirOn.ToString(readFormat) : point.On.ToString(readFormat);
-                    curLine[14] = (curPoint.UseMir && useMir) ? point.MirOff.ToString(readFormat) : point.Off.ToString(readFormat);
+                    curLine[9] = curDataPoint.GPS.Latitude.ToString(gpsFormat);
+                    curLine[10] = curDataPoint.GPS.Longitude.ToString(gpsFormat);
+
+                    if (curDataPoint.Times.Any())
+                        curLine[11] = curDataPoint.Times.First().ToShortDateString();
+                    else if (lastDataPoint.Times.Any())
+                        curLine[11] = lastDataPoint.Times.First().ToShortDateString();
+
+                    curLine[12] = curDataPoint.OriginalComment;
+                    curLine[13] = (curPoint.UseMir && useMir) ? curDataPoint.MirOn.ToString(readFormat) : curDataPoint.On.ToString(readFormat);
+                    curLine[14] = (curPoint.UseMir && useMir) ? curDataPoint.MirOff.ToString(readFormat) : curDataPoint.Off.ToString(readFormat);
                     output.AppendLine(string.Join("\t", curLine));
                 }
                 lastPoint = curPoint;
@@ -842,14 +853,24 @@ namespace AccurateFileSystem
             }
             output.AppendLine(header);
 
-            foreach (var (footage, isReverse, point, useMir, file) in Points)
+            foreach (var (footage, isReverse, isOnOff, point, useMir, file) in Points)
             {
                 curLine = new string[30];
                 curLine[0] = footage.ToString("F0");
                 curLine[1] = point.MirOn.ToString(readFormat);
-                curLine[2] = point.MirOff.ToString(readFormat);
+
+                if (isOnOff)
+                    curLine[2] = point.MirOff.ToString(readFormat);
+                else
+                    curLine[2] = "N/A";
+
                 curLine[3] = point.On.ToString(readFormat);
-                curLine[4] = point.Off.ToString(readFormat);
+
+                if (isOnOff)
+                    curLine[4] = point.Off.ToString(readFormat);
+                else
+                    curLine[4] = "N/A";
+
                 if (point.HasTime)
                     curLine[5] = point.Times[0].ToString("MM/dd/yyyy");
                 else
@@ -1019,7 +1040,7 @@ namespace AccurateFileSystem
             curLine[25] = "ACV";
             output.AppendLine(string.Join("\t", curLine));
 
-            foreach (var (footage, isReverse, point, useMir, file) in Points)
+            foreach (var (footage, isReverse, isOnOff, point, useMir, file) in Points)
             {
                 if (point.TestStationReads.Count > 0)
                 {
@@ -1191,7 +1212,7 @@ namespace AccurateFileSystem
             var output = GetShapefileStringBuilder();
             var readFormat = $"F{readDecimals}";
 
-            foreach (var (footage, isReverse, point, useMir, file) in Points)
+            foreach (var (footage, isReverse, isOnOff, point, useMir, file) in Points)
             {
                 var on = point.On;
                 var off = point.Off;
@@ -1202,6 +1223,8 @@ namespace AccurateFileSystem
                 }
                 var curLine = new string[34];
                 curLine[0] = $"On: {on.ToString(readFormat)}, Off: {off.ToString(readFormat)}";
+                if (!isOnOff)
+                    curLine[0] = $"On: {on.ToString(readFormat)}";
                 curLine[1] = footage.ToString("F0");
                 if (point.HasTime)
                     curLine[2] = point.Times[0].ToString("MM/dd/yyyy");
@@ -1222,7 +1245,10 @@ namespace AccurateFileSystem
                     curLine[13] = "N/A";
                 }
                 curLine[19] = on.ToString(readFormat);
-                curLine[20] = off.ToString(readFormat);
+                if (isOnOff)
+                    curLine[20] = off.ToString(readFormat);
+                else
+                    curLine[20] = "N/A";
                 curLine[25] = "CECIS";
                 var curPcmValues = pcmValues?.Where(value => value.Footage == footage).ToList();
                 if (curPcmValues != null && curPcmValues.Count != 0)
@@ -1241,7 +1267,7 @@ namespace AccurateFileSystem
             var readFormat = $"F{readDecimals}";
             var hasRead = false;
 
-            foreach (var (footage, isReverse, point, useMir, file) in Points)
+            foreach (var (footage, isReverse, isOnOff, point, useMir, file) in Points)
             {
                 var on = point.On;
                 var off = point.Off;
@@ -1250,7 +1276,7 @@ namespace AccurateFileSystem
                     on = point.MirOn;
                     off = point.MirOff;
                 }
-                if (off > -0.850)
+                if (off > -0.850 || !isOnOff)
                     continue;
                 hasRead = true;
                 var curLine = new string[34];
@@ -1289,7 +1315,7 @@ namespace AccurateFileSystem
             var output = GetShapefileStringBuilder();
             var readFormat = $"F{readDecimals}";
             var hasRead = false;
-            foreach (var (footage, isReverse, point, useMir, file) in Points)
+            foreach (var (footage, isReverse, isOnOff, point, useMir, file) in Points)
             {
                 var on = point.On;
                 var off = point.Off;
@@ -1298,7 +1324,7 @@ namespace AccurateFileSystem
                     on = point.MirOn;
                     off = point.MirOff;
                 }
-                if (off <= -0.850)
+                if (off <= -0.850 || !isOnOff)
                     continue;
                 hasRead = true;
                 var curLine = new string[34];
@@ -1336,15 +1362,15 @@ namespace AccurateFileSystem
         {
             if (!Points.First().Point.HasGPS || !Points.Last().Point.HasGPS)
                 return;
-            var (firstFoot, _, firstPoint, _, _) = Points.First();
+            var (firstFoot, _, _, firstPoint, _, _) = Points.First();
             for (int i = 1; i < Points.Count; ++i)
             {
-                var (_, _, point, _, _) = Points[i];
+                var (_, _, _, point, _, _) = Points[i];
                 if (!point.HasGPS)
                 {
                     for (int j = i + 1; j < Points.Count; ++j)
                     {
-                        var (nextFoot, _, nextPoint, _, _) = Points[j];
+                        var (nextFoot, _, _, nextPoint, _, _) = Points[j];
                         if (!nextPoint.HasGPS)
                             continue;
                         var dist = nextFoot - firstFoot;
@@ -1352,7 +1378,7 @@ namespace AccurateFileSystem
                         var lonFactor = (nextPoint.GPS.Longitude - firstPoint.GPS.Longitude) / dist;
                         for (int k = i; k < j; ++k)
                         {
-                            var (curFoot, _, curPoint, _, _) = Points[k];
+                            var (curFoot, _, _, curPoint, _, _) = Points[k];
                             if (curPoint.HasGPS)
                                 return;
                             var curDist = curFoot - firstFoot;
@@ -1365,7 +1391,7 @@ namespace AccurateFileSystem
                 }
                 else
                 {
-                    (firstFoot, _, firstPoint, _, _) = Points[i];
+                    (firstFoot, _, _, firstPoint, _, _) = Points[i];
                 }
             }
         }
@@ -1376,9 +1402,9 @@ namespace AccurateFileSystem
             {
                 var prevIndex = curIndex - 1;
                 var nextIndex = curIndex + 1;
-                var (curFoot, _, curPoint, _, _) = Points[curIndex];
-                var (prevFoot, _, prevPoint, _, _) = Points[prevIndex];
-                var (nextFoot, _, nextPoint, _, _) = Points[nextIndex];
+                var (curFoot, _, curIsOnOff, curPoint, _, _) = Points[curIndex];
+                var (prevFoot, _, prevIsOnOff, prevPoint, _, _) = Points[prevIndex];
+                var (nextFoot, _, nextIsOnOf, nextPoint, _, _) = Points[nextIndex];
 
                 var curOn = curPoint.On;
                 var curOff = curPoint.Off;
@@ -1399,9 +1425,12 @@ namespace AccurateFileSystem
                     {
                         curPoint.On = (prevOn + nextOn) / 2;
                     }
-                    if ((prevOffDiff > 0.09 && nextOffDiff > 0.09) || (prevOffDiff < -0.09 && nextOffDiff < -0.09))
+                    if (prevIsOnOff == nextIsOnOf)
                     {
-                        curPoint.Off = (prevOff + nextOff) / 2;
+                        if ((prevOffDiff > 0.09 && nextOffDiff > 0.09) || (prevOffDiff < -0.09 && nextOffDiff < -0.09))
+                        {
+                            curPoint.Off = (prevOff + nextOff) / 2;
+                        }
                     }
                 }
             }
@@ -1432,7 +1461,7 @@ namespace AccurateFileSystem
                         }
                     }
                     var (useMir, start, end, reason) = alreadyFound[recon];
-                    Points[i] = (combinedPoint.Footage, combinedPoint.IsReverse, combinedPoint.Point, useMir, combinedPoint.File);
+                    Points[i] = (combinedPoint.Footage, combinedPoint.IsReverse, combinedPoint.IsOnOff, combinedPoint.Point, useMir, combinedPoint.File);
                     if (combinedPoint.Footage < start.Footage)
                         alreadyFound[recon] = (useMir, combinedPoint, end, reason);
                     if (combinedPoint.Footage > end.Footage)
@@ -1465,25 +1494,6 @@ namespace AccurateFileSystem
             return (false, null);
         }
 
-        public List<(double footage, double value)> GetDoubleData(string fieldName)
-        {
-            switch (fieldName)
-            {
-                case "On":
-                    return GetOnData();
-                case "On Compensated":
-                    return GetOnCompensatedData();
-                case "Off":
-                    return GetOffData();
-                case "Off Compensated":
-                    return GetOffCompensatedData();
-                case "Depth":
-                    return GetDepthData();
-                default:
-                    return null;
-            }
-        }
-
         public void UpdatePoints()
         {
             var list = new List<CombinedDataPoint>();
@@ -1501,7 +1511,8 @@ namespace AccurateFileSystem
                 {
                     var curPoint = file.Points[i];
                     var footage = Math.Abs(curPoint.Footage - fileOffset) + offset;
-                    list.Add((footage, isReverse, curPoint, true, file));
+                    var isOnOff = (Math.Round(curPoint.Off, 3) != 0);
+                    list.Add((footage, isReverse, isOnOff, curPoint, true, file));
 
                 }
                 offset += info.TotalFootage;
@@ -1539,11 +1550,21 @@ namespace AccurateFileSystem
             var list = new List<(double, double, double)>();
             for (int i = 0; i < Points.Count; ++i)
             {
-                var (footage, _, point, useMir, _) = Points[i];
-                if (useMir)
-                    list.Add((footage, point.MirOn, point.MirOff));
+                var (footage, _, isOnOff, point, useMir, _) = Points[i];
+                if (isOnOff)
+                {
+                    if (useMir)
+                        list.Add((footage, point.MirOn, point.MirOff));
+                    else
+                        list.Add((footage, point.On, point.Off));
+                }
                 else
-                    list.Add((footage, point.On, point.Off));
+                {
+                    if (useMir)
+                        list.Add((footage, point.MirOn, double.NaN));
+                    else
+                        list.Add((footage, point.On, double.NaN));
+                }
             }
             return list;
         }
@@ -1553,13 +1574,16 @@ namespace AccurateFileSystem
             var list = new List<(double, double, double)>();
             for (int i = 0; i < Points.Count; ++i)
             {
-                var (footage, _, point, _, _) = Points[i];
-                list.Add((footage, point.On, point.Off));
+                var (footage, _, isOnOff, point, _, _) = Points[i];
+                if (isOnOff)
+                    list.Add((footage, point.On, point.Off));
+                else
+                    list.Add((footage, point.On, double.NaN));
             }
             return list;
         }
 
-        private List<(double footage, double value)> GetOnData()
+        public List<(double footage, double value)> GetOnData()
         {
             var list = new List<(double, double)>();
             var (start, end) = GetActualStartEnd();
@@ -1588,12 +1612,12 @@ namespace AccurateFileSystem
             return list;
         }
 
-        private List<(double footage, double value)> GetOnCompensatedData()
+        public List<(double footage, double value)> GetOnCompensatedData()
         {
             var list = new List<(double, double)>();
             for (int i = 0; i < Points.Count; ++i)
             {
-                var (footage, _, point, useMir, _) = Points[i];
+                var (footage, _, _, point, useMir, _) = Points[i];
                 if (useMir)
                     list.Add((footage, point.MirOn));
                 else
@@ -1602,23 +1626,26 @@ namespace AccurateFileSystem
             return list;
         }
 
-        private List<(double footage, double value)> GetOffData()
+        public List<(double footage, double value)> GetOffData()
         {
             var list = new List<(double, double)>();
             var (start, end) = GetActualStartEnd();
             for (int i = start; i <= end; ++i)
             {
-                list.Add((Points[i].Footage, Points[i].Point.Off));
+                if (Points[i].IsOnOff)
+                    list.Add((Points[i].Footage, Points[i].Point.Off));
             }
             return list;
         }
 
-        private List<(double footage, double value)> GetOffCompensatedData()
+        public List<(double footage, double value)> GetOffCompensatedData()
         {
             var list = new List<(double, double)>();
             for (int i = 0; i < Points.Count; ++i)
             {
-                var (footage, _, point, useMir, _) = Points[i];
+                if (!Points[i].IsOnOff)
+                    continue;
+                var (footage, _, _, point, useMir, _) = Points[i];
                 if (useMir)
                     list.Add((footage, point.MirOff));
                 else
@@ -1627,7 +1654,7 @@ namespace AccurateFileSystem
             return list;
         }
 
-        private List<(double footage, double value)> GetDepthData()
+        public List<(double footage, double value)> GetDepthData()
         {
             var list = new List<(double, double)>();
             var (start, end) = GetActualStartEnd();
@@ -1651,7 +1678,7 @@ namespace AccurateFileSystem
             return list;
         }
 
-        public List<(double footage, string value)> GetCommentData(List<string> filters = null, bool ignoreStartEndSkips = false)
+        public List<(double footage, string value)> GetCommentData(List<string> filters = null, bool ignoreStartEndSkips = false, bool stripComment = false)
         {
             var list = new List<(double, string)>();
             var (start, end) = GetActualStartEnd();
@@ -1660,14 +1687,34 @@ namespace AccurateFileSystem
                 start = 0;
                 end = Points.Count - 1;
             }
+            if (HasStartSkip)
+            {
+                var first = Points.First();
+                var firstComment = !stripComment ? first.Point.OriginalComment : first.Point.StrippedComment;
+                if (filters != null)
+                    foreach (var filter in filters)
+                        firstComment = firstComment.Replace(filter, "");
+                if (!string.IsNullOrWhiteSpace(firstComment))
+                    list.Add((first.Footage, firstComment));
+            }
             for (int i = start; i <= end; ++i)
             {
-                var comment = Points[i].Point.OriginalComment;
+                var comment = !stripComment ? Points[i].Point.OriginalComment : Points[i].Point.StrippedComment;
                 if (filters != null)
                     foreach (var filter in filters)
                         comment = comment.Replace(filter, "");
                 if (!string.IsNullOrWhiteSpace(comment))
                     list.Add((Points[i].Footage, comment));
+            }
+            if (HasEndSkip)
+            {
+                var last = Points.Last();
+                var firstComment =!stripComment ? last.Point.OriginalComment : last.Point.StrippedComment;
+                if (filters != null)
+                    foreach (var filter in filters)
+                        firstComment = firstComment.Replace(filter, "");
+                if (!string.IsNullOrWhiteSpace(firstComment))
+                    list.Add((last.Footage, firstComment));
             }
             return list;
         }
@@ -1798,7 +1845,7 @@ namespace AccurateFileSystem
         {
             var distance = double.MaxValue;
             AllegroDataPoint closePoint = null;
-            foreach (var (curfootage, _, point, _, _) in Points)
+            foreach (var (curfootage, _, _, point, _, _) in Points)
             {
                 var curDist = Math.Abs(curfootage - footage);
                 if (curDist < distance && point.HasGPS)
@@ -1883,14 +1930,14 @@ namespace AccurateFileSystem
             {
                 var nextDist = closestPoint.Point.GPS.Distance(nextSegGps);
                 var nextAllegroPoint = new AllegroDataPoint(closestPoint.Point, nextSegGps, comment);
-                var nextPoint = new CombinedDataPoint(closestPoint.Footage + nextDist, closestPoint.IsReverse, nextAllegroPoint, closestPoint.UseMir, closestPoint.File);
+                var nextPoint = new CombinedDataPoint(closestPoint.Footage + nextDist, closestPoint.IsReverse, closestPoint.IsOnOff, nextAllegroPoint, closestPoint.UseMir, closestPoint.File);
                 Points.Insert(foundIndex + 1, nextPoint);
                 return nextPoint;
             }
 
             var prevDist = closestPoint.Point.GPS.Distance(prevSegGps);
             var prevAllegroPoint = new AllegroDataPoint(closestPoint.Point, nextSegGps, comment);
-            var prevPoint = new CombinedDataPoint(closestPoint.Footage + prevDist, closestPoint.IsReverse, prevAllegroPoint, closestPoint.UseMir, closestPoint.File);
+            var prevPoint = new CombinedDataPoint(closestPoint.Footage + prevDist, closestPoint.IsReverse, closestPoint.IsOnOff, prevAllegroPoint, closestPoint.UseMir, closestPoint.File);
             Points.Insert(foundIndex, prevPoint);
             return prevPoint;
         }
@@ -2402,17 +2449,19 @@ namespace AccurateFileSystem
 
     public class CombinedDataPoint
     {
-        public double Footage;
-        public bool IsReverse;
-        public AllegroDataPoint Point;
-        public bool UseMir;
-        public AllegroCISFile File;
+        public double Footage { get; set; }
+        public bool IsReverse { get; set; }
+        public AllegroDataPoint Point { get; set; }
+        public bool UseMir { get; set; }
+        public bool IsOnOff { get; set; }
+        public AllegroCISFile File { get; set; }
 
-        public CombinedDataPoint(double footage, bool isReverse, AllegroDataPoint point, bool useMir, AllegroCISFile file)
+        public CombinedDataPoint(double footage, bool isReverse, bool isOnOff, AllegroDataPoint point, bool useMir, AllegroCISFile file)
         {
             Footage = footage;
             IsReverse = isReverse;
             Point = point;
+            IsOnOff = isOnOff;
             UseMir = useMir;
             File = file;
         }
@@ -2438,23 +2487,24 @@ namespace AccurateFileSystem
             return hashCode;
         }
 
-        public void Deconstruct(out double footage, out bool isReverse, out AllegroDataPoint point, out bool useMir, out AllegroCISFile file)
+        public void Deconstruct(out double footage, out bool isReverse, out bool isOnOff, out AllegroDataPoint point, out bool useMir, out AllegroCISFile file)
         {
             footage = Footage;
             isReverse = IsReverse;
+            isOnOff = IsOnOff;
             point = Point;
             useMir = UseMir;
             file = File;
         }
 
-        public static implicit operator (double Footage, bool IsReverse, AllegroDataPoint Point, bool UseMir, AllegroCISFile File)(CombinedDataPoint value)
+        public static implicit operator (double Footage, bool IsReverse, bool isOnOff, AllegroDataPoint Point, bool UseMir, AllegroCISFile File)(CombinedDataPoint value)
         {
-            return (value.Footage, value.IsReverse, value.Point, value.UseMir, value.File);
+            return (value.Footage, value.IsReverse, value.IsOnOff, value.Point, value.UseMir, value.File);
         }
 
-        public static implicit operator CombinedDataPoint((double Footage, bool IsReverse, AllegroDataPoint Point, bool UseMir, AllegroCISFile File) value)
+        public static implicit operator CombinedDataPoint((double Footage, bool IsReverse, bool IsOnOff, AllegroDataPoint Point, bool UseMir, AllegroCISFile File) value)
         {
-            return new CombinedDataPoint(value.Footage, value.IsReverse, value.Point, value.UseMir, value.File);
+            return new CombinedDataPoint(value.Footage, value.IsReverse, value.IsOnOff, value.Point, value.UseMir, value.File);
         }
     }
 }

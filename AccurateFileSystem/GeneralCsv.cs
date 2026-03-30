@@ -16,6 +16,7 @@ namespace AccurateFileSystem
         private bool InString;
         private bool InGps;
 
+
         public GeneralCsv(string name, List<string> lines) : base(name, FileType.Unknown)
         {
             ParseLines(lines);

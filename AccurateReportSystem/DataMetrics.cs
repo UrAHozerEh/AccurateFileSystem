@@ -9,7 +9,9 @@ namespace AccurateReportSystem
 {
     public class DataMetrics
     {
-        public int TotalReads = 0;
+        public int TotalOnReads = 0;
+        public int TotalOffReads = 0;
+        public int TotalPolReads = 0;
         public int TotalAcReads = 0;
         public List<DataMetricRow> On850 = new List<DataMetricRow>();
         public List<DataMetricRow> Off850 = new List<DataMetricRow>();
@@ -19,7 +21,7 @@ namespace AccurateReportSystem
         public List<DataMetricRow> Ac = new List<DataMetricRow>();
         public bool UseMir = true;
 
-        public DataMetrics(List<(double, AllegroDataPoint)> onOffData, bool useMir, List<(double Footage, double Value)> polData = null)
+        public DataMetrics(CombinedAllegroCisFile cisFile, bool useMir, List<(double Footage, double Value)> polData = null)
         {
             DataMetricRow on850 = null;
             DataMetricRow off850 = null;
@@ -28,12 +30,14 @@ namespace AccurateReportSystem
             DataMetricRow polarization = null;
             UseMir = useMir;
 
-            for (var i = 0; i < onOffData.Count; ++i)
+            for (var i = 0; i < cisFile.Points.Count; ++i)
             {
-                var (footage, point) = onOffData[i];
-                ++TotalReads;
-                var curOn = UseMir ? point.MirOn : point.On;
-                var curOff = UseMir ? point.MirOff : point.Off;
+                var (footage, isReverse, isOnOff, point, pointUseMir, file) = cisFile.Points[i];
+                ++TotalOnReads;
+                if (isOnOff)
+                    ++TotalOffReads;
+                var curOn = (UseMir && pointUseMir) ? point.MirOn : point.On;
+                var curOff = (UseMir && pointUseMir) ? point.MirOff : point.Off;
 
                 if (curOn > -0.85)
                 {
@@ -64,8 +68,8 @@ namespace AccurateReportSystem
                     //On850.Add(on850);
                     on850 = null;
                 }
-                
-                if (curOff > -0.85)
+
+                if (isOnOff && curOff > -0.85)
                 {
                     if (off850 == null)
                     {
@@ -95,7 +99,7 @@ namespace AccurateReportSystem
                     off850 = null;
                 }
 
-                if (curOff < -1.25)
+                if (isOnOff && curOff < -1.25)
                 {
                     if (off1250 == null)
                     {
@@ -125,7 +129,7 @@ namespace AccurateReportSystem
                     off1250 = null;
                 }
 
-                if (curOff < -0.6 && curOff > -0.75)
+                if (isOnOff && curOff < -0.6 && curOff > -0.75)
                 {
                     if (offBetween == null)
                     {
@@ -181,12 +185,13 @@ namespace AccurateReportSystem
                 return;
             foreach (var (footage, value) in polData)
             {
+                ++TotalPolReads;
                 if (value > -0.1)
                 {
                     var curPolVal = value;
                     if (polarization == null)
                     {
-                        var point = onOffData.First(x => x.Item1 >= footage).Item2;
+                        var point = cisFile.Points.First(x => x.Footage >= footage).Point;
                         polarization = new DataMetricRow()
                         {
                             StartFootage = footage,
@@ -200,7 +205,7 @@ namespace AccurateReportSystem
                     }
                     else
                     {
-                        var point = onOffData.First(x => x.Item1 >= footage).Item2;
+                        var point = cisFile.Points.First(x => x.Footage >= footage).Point;
                         polarization.Readings += 1;
                         polarization.EndFootage = footage;
                         polarization.EndPoint = point;
@@ -245,7 +250,7 @@ namespace AccurateReportSystem
                 curLength += row.Length;
                 on850 += row.ToString() + "\n";
             }
-            summary += $"On < -0.850V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads):P}\t{curLength}\n";
+            summary += $"On < -0.850V\t{TotalOnReads}\t{curCount}\t{(curCount / (double)TotalOnReads):P}\t{curLength}\n";
 
             var off850 = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
@@ -256,7 +261,7 @@ namespace AccurateReportSystem
                 curLength += row.Length;
                 off850 += row.ToString() + "\n";
             }
-            summary += $"Off < -0.850V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads):P}\t{curLength}\n";
+            summary += $"Off < -0.850V\t{TotalOffReads}\t{curCount}\t{(curCount / (double)TotalOnReads):P}\t{curLength}\n";
 
             var off1250 = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
@@ -267,7 +272,7 @@ namespace AccurateReportSystem
                 curLength += row.Length;
                 off1250 += row.ToString() + "\n";
             }
-            summary += $"Off > -1.250V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads):P}\t{curLength}\n";
+            summary += $"Off > -1.250V\t{TotalOffReads}\t{curCount}\t{(curCount / (double)TotalOnReads):P}\t{curLength}\n";
 
             var offBetween = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
@@ -278,7 +283,7 @@ namespace AccurateReportSystem
                 curLength += row.Length;
                 offBetween += row.ToString() + "\n";
             }
-            summary += $"Off Between -0.600V and -0.750V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads):P}\t{curLength}\n";
+            summary += $"Off Between -0.600V and -0.750V\t{TotalOffReads}\t{curCount}\t{(curCount / (double)TotalOnReads):P}\t{curLength}\n";
 
             var pol100 = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;
@@ -289,7 +294,7 @@ namespace AccurateReportSystem
                 curLength += row.Length;
                 pol100 += row.ToString() + "\n";
             }
-            summary += $"Polarization < 0.100V\t{TotalReads}\t{curCount}\t{(curCount / (double)TotalReads):P}\t{curLength}\n";
+            summary += $"Polarization < 0.100V\t{TotalPolReads}\t{curCount}\t{(curCount / (double)TotalOnReads):P}\t{curLength}\n";
 
             var ac = "Number of Readings\tStart Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tLength\tWorst (Volts)\n";
             curCount = 0;

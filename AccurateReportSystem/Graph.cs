@@ -21,7 +21,7 @@ namespace AccurateReportSystem
     {
         public bool IsInverted { get; set; } = false;
         public List<GraphSeries> Series { get; set; } = new List<GraphSeries>();
-        public CommentSeries CommentSeries { get; set; }
+        public List<CommentSeries> CommentSeries { get; set; } = new List<CommentSeries>();
         public XAxisInfo XAxisInfo { get; set; }
         public LegendInfo LegendInfo { get; set; }
         public YAxesInfo YAxesInfo { get; set; }
@@ -107,22 +107,25 @@ namespace AccurateReportSystem
                 }
 
                 //TODO: Comment should draw itself. Should have a way to order drawing of everything (gridlines, series, shadow, comments, comment backdrop, etc.)
-                if (CommentSeries != null)
+                foreach(var commentSeries in CommentSeries)
                 {
-                    var (commentGeoInfo, lineGeoInfo, backdropGeo) = CommentSeries.GetGeometry(page, graphBodyDrawArea, session);
+                    var (commentGeoInfo, lineGeoInfo, backdropGeo) = commentSeries.GetGeometry(page, graphBodyDrawArea, session);
                     var style = new CanvasStrokeStyle
                     {
 
                     };
                     if (backdropGeo != null)
                     {
-                        using (var _ = session.CreateLayer(CommentSeries.BackdropOpacity))
-                            session.FillGeometry(backdropGeo, CommentSeries.BackdropColor);
+                        using (var _ = session.CreateLayer(commentSeries.BackdropOpacity))
+                            session.FillGeometry(backdropGeo, commentSeries.BackdropColor);
                     }
-                    if (lineGeoInfo != null)
-                        session.DrawGeometry(lineGeoInfo.Geometry, lineGeoInfo.Color, 1, style);
-                    if (commentGeoInfo != null)
-                        session.FillGeometry(commentGeoInfo.Geometry, commentGeoInfo.Color);
+                    using (var _ = session.CreateLayer(1f))
+                    {
+                        if (lineGeoInfo != null)
+                            session.DrawGeometry(lineGeoInfo.Geometry, lineGeoInfo.Color, 1, style);
+                        if (commentGeoInfo != null)
+                            session.FillGeometry(commentGeoInfo.Geometry, commentGeoInfo.Color);
+                    }
 
                     //TODO: Canvas Stroke Style should be in Geo Info. Also should have different styles for text and the indicators.
                 }

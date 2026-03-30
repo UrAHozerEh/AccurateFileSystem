@@ -326,23 +326,23 @@ namespace AFSTester
             var graph3 = new Graph(report);
             var mirFilterData = "Start Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tReason\n" + ((MirFilter.IsChecked ?? false) ? allegroFile.FilterMir(new List<string>() { "anode", "rectifier" }) : "");
             allegroFile.FixGps();
-            var on = new GraphSeries("On", allegroFile.GetDoubleData("On"))
+            var on = new GraphSeries("On", allegroFile.GetOnData())
             {
                 LineColor = Colors.Blue
             };
-            var off = new GraphSeries("Off", allegroFile.GetDoubleData("Off"))
+            var off = new GraphSeries("Off", allegroFile.GetOffData())
             {
                 LineColor = Colors.Green
             };
-            var onMir = new GraphSeries("On MIR Compensated", allegroFile.GetDoubleData("On Compensated"))
+            var onMir = new GraphSeries("On MIR Compensated", allegroFile.GetOnCompensatedData())
             {
                 LineColor = Colors.Purple
             };
-            var offMir = new GraphSeries("Off MIR Compensated", allegroFile.GetDoubleData("Off Compensated"))
+            var offMir = new GraphSeries("Off MIR Compensated", allegroFile.GetOffCompensatedData())
             {
                 LineColor = Color.FromArgb(255, 57, 255, 20)
             };
-            var depth = new GraphSeries("Depth", allegroFile.GetDoubleData("Depth"))
+            var depth = new GraphSeries("Depth", allegroFile.GetDepthData())
             {
                 LineColor = Colors.Black,
                 PointColor = Colors.Orange,
@@ -510,7 +510,7 @@ namespace AFSTester
         {
             var tabular = allegroFile.GetTabularData();
             await CreateExcelFile($"{fileName} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) });
-            var dataMetrics = new DataMetrics(allegroFile.GetPoints(), true);
+            var dataMetrics = new DataMetrics(allegroFile, true);
             await CreateExcelFile($"{fileName} Data Metrics", dataMetrics.GetSheets());
             var testStation = allegroFile.GetTestStationData();
             await CreateExcelFile($"{fileName} Test Station Data", new List<(string Name, string Data)>() { ("Test Station Data", testStation) });
@@ -735,8 +735,8 @@ namespace AFSTester
                 }
             }
             depthData = pcmInput.Where(val => val.Depth != 0).Select(val => (val.Footage, val.Depth)).ToList();
-            offData = file.GetDoubleData("Off");
-            onData = file.GetDoubleData("On");
+            offData = file.GetOffData();
+            onData = file.GetOnData();
             commentData = file.GetCommentData();
             commentData.AddRange(pcmCommentData);
             commentData.Sort((a, b) => a.Item1.CompareTo(b.Item1));
@@ -1446,7 +1446,7 @@ namespace AFSTester
                 }
                 var combinedFile = CombinedAllegroCisFile.CombineOrderedFiles("Combined", onOffFiles, 10);
                 var combinedFootages = new List<(double, BasicGeoposition)>();
-                foreach (var (foot, _, point, _, _) in combinedFile.Points)
+                foreach (var (foot, _, isOnOff, point, _, _) in combinedFile.Points)
                 {
                     if (point.HasGPS)
                         combinedFootages.Add((foot, point.GPS));
@@ -2320,15 +2320,15 @@ namespace AFSTester
             };
             var mainGraph = new Graph(report);
 
-            var on = new GraphSeries("On", allegroFile.GetDoubleData("On"))
+            var on = new GraphSeries("On", allegroFile.GetOnData())
             {
                 LineColor = Colors.Blue
             };
-            var off = new GraphSeries("Off", allegroFile.GetDoubleData("Off"))
+            var off = new GraphSeries("Off", allegroFile.GetOffData())
             {
                 LineColor = Colors.Green
             };
-            var depol = new GraphSeries("Depol", depolFile.GetDoubleData("On"))
+            var depol = new GraphSeries("Depol", depolFile.GetOnData())
             {
                 LineColor = Colors.Chartreuse,
                 MaxDrawDistance = 15

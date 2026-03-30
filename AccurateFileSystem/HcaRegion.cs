@@ -42,8 +42,8 @@ namespace AccurateFileSystem
         public string EndMp { get; }
         public string ReportQName => IsBuffer ? "Buffer" : Name.Replace("P", "");
         public bool ShouldSkip { get; }
-        public bool IsBuffer => Name == "0" || Name == "Buffer" || Name == "0P";
-        private static (string Value, string ShortReason, string LongReason)[] SkipRegions { get; } = { ("6A", "Atmospheric", "Atmospheric Corrosion Inspection"), ("3", "Casing", "Casing Inspection") };
+        public bool IsBuffer => Name == "0" || Name.ToLower() == "non-hca" || Name == "0P" || Name.ToLower() == "buffer";
+        private static (string Value, string ShortReason, string LongReason)[] SkipRegions { get; } = { ("6A", "Atmospheric", "Atmospheric Corrosion Inspection"), /*("7A", "Atmospheric", "Atmospheric Corrosion Inspection"),*/ ("3", "Casing", "Casing Inspection") };
         public string ShortSkipReason { get; }
         public string LongSkipReason { get; }
         public bool? FirstTime { get; }

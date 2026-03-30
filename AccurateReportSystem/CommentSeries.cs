@@ -33,6 +33,7 @@ namespace AccurateReportSystem
 
         public (GeometryInfo, GeometryInfo, CanvasGeometry) GetGeometry(PageInformation page, Rect drawArea, CanvasDrawingSession session)
         {
+            Values.Sort((f, s) => f.footage.CompareTo(s.footage));
             CanvasGeometry commentOutputGeo = null;// = CanvasGeometry.CreateRectangle(device, 0, 0, (float)drawArea.Height, (float)drawArea.Width);
             CanvasGeometry backdropOutputGeo = null;
             CanvasGeometry lineOutputGeo = null;
@@ -57,11 +58,15 @@ namespace AccurateReportSystem
                     if (string.IsNullOrWhiteSpace(comment))
                         continue;
                     string prefix;
-                    var footString = footage.ToString("F0");
+                    var isNegative = footage < 0;
+
+                    var footString = footage.ToString("F0").Trim('-');
                     switch (StationStyle)
                     {
                         case StationStyle.PlusFoot:
                             footString = footString.PadLeft(3, '0');
+                            if(isNegative)
+                                footString = '-' + footString;
                             prefix = $"{StationPrefix}{footString.Insert(footString.Length - 2, "+")}{StationSuffix}";
                             break;
                         case StationStyle.Footage:
@@ -169,7 +174,9 @@ namespace AccurateReportSystem
                         default:
                             break;
                     }
-                    var backdropRect = new Rect(lineTopEdgePadding, first.CommentMiddle - lineLengthFromMiddle, newBounds.Width + (LineBuffer * 2), lineLengthFromMiddle * 2);
+                    var backdropWidth = newBounds.Width + (LineBuffer * 2);
+                    var backdropX = IsFlippedVertical ? lineTopEdgePadding - backdropWidth : lineTopEdgePadding;
+                    var backdropRect = new Rect(backdropX, first.CommentMiddle - lineLengthFromMiddle, backdropWidth, lineLengthFromMiddle * 2);
 
                     if (lineOutputGeo == null)
                     {

@@ -50,6 +50,26 @@ namespace CisProcessor
             this.InitializeComponent();
         }
 
+        private void StartWork()
+        {
+            SetUiEnabled(false);
+            DoWork.Content = "Working...";
+        }
+
+        private void EndWork()
+        {
+            SetUiEnabled(true);
+            DoWork.Content = "Do Work";
+        }
+
+        private void SetUiEnabled(bool enabled)
+        {
+            DoWork.IsEnabled = enabled;
+            FileDebug.IsEnabled = enabled;
+            PassingShapes.IsEnabled = enabled;
+            StaticComments.IsEnabled = enabled;
+        }
+
         private static async Task<(string, bool)?> InputTextDialogAsync(string title, string testStationData, string firstComment, string lastComment)
         {
             var panel = new StackPanel()
@@ -171,6 +191,66 @@ namespace CisProcessor
                 return null;
         }
 
+        
+
+        private static async Task<(string, bool)?> ShowFoundFilesAsync(IReadOnlyList<StorageFile> files)
+        {
+            var panel = new StackPanel()
+            {
+                Orientation = Orientation.Vertical
+            };
+            var filesList = new ListBox();
+            foreach (var file in files)
+            {
+                filesList.Items.Add(file.DisplayName);
+            }
+
+            panel.Children.Add(filesList);
+            var dialog = new ContentDialog
+            {
+                Content = panel,
+                Title = "Found Files",
+                IsSecondaryButtonEnabled = false,
+                PrimaryButtonText = "OK",
+            };
+            await dialog.ShowAsync();
+            return null;
+        }
+
+        private static async Task<(string, bool)?> ShowParsedFilesAsync(List<AllegroCISFile> cis, List<AllegroCISFile> depol, List<CsvPcm> doc, bool defaultSettings)
+        {
+            var panel = new StackPanel()
+            {
+                Orientation = Orientation.Vertical
+            };
+
+            var filesList = new ListBox();
+            filesList.Items.Add("CIS Settings " + (defaultSettings ? "not found" : "found"));
+            foreach (var file in cis)
+            {
+                filesList.Items.Add($"CIS - {file.Name} - {file.Points.Count} reads");
+            }
+            foreach (var file in depol)
+            {
+                filesList.Items.Add($"Depol - {file.Name} - {file.Points.Count} reads");
+            }
+            foreach (var file in doc)
+            {
+                filesList.Items.Add($"DoC - {file.Name} - {file.DepthData.Count} reads");
+            }
+
+            panel.Children.Add(filesList);
+            var dialog = new ContentDialog
+            {
+                Content = panel,
+                Title = "Found Files",
+                IsSecondaryButtonEnabled = false,
+                PrimaryButtonText = "OK",
+            };
+            await dialog.ShowAsync();
+            return null;
+        }
+
         private List<(BasicGeoposition Gps, double Read)> ParseAcvgReads(List<string> lines)
         {
             //var correction = 15.563025007672872650175335959592166719366374913056088;
@@ -204,160 +284,33 @@ namespace CisProcessor
         {
             try
             {
+                StartWork();
                 var folderPicker = new FolderPicker();
                 folderPicker.FileTypeFilter.Add(".");
                 var masterFolder = await folderPicker.PickSingleFolderAsync();
                 if (masterFolder == null)
                     return;
-                var folders = await masterFolder.GetFoldersAsync();
+                var foundFolders = await masterFolder.GetFoldersAsync();
                 var outputFolder = await masterFolder.CreateFolderAsync("0000 Processed Data", CreationCollisionOption.OpenIfExists);
                 var fileOrder = await masterFolder.CreateFolderAsync("0000 Files Orders", CreationCollisionOption.OpenIfExists);
                 var finishedFileNames = await GetFilesNames(fileOrder);
-                folders = folders.OrderBy(folder => folder.DisplayName).ToList().AsReadOnly();
-                CisSettings cisSettings = null;
-                foreach (var folder in folders)
+                var folders = new List<StorageFolder>();
+                foreach (var foundFolder in foundFolders)
                 {
-                    if (folder.DisplayName == outputFolder.DisplayName || folder.DisplayName == fileOrder.DisplayName)
+                    if (foundFolder.DisplayName == outputFolder.DisplayName || foundFolder.DisplayName == fileOrder.DisplayName)
                         continue;
-                    var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
-                    var cisFiles = new List<AllegroCISFile>();
-                    var docFiles = new List<CsvPcm>();
-                    var fileNames = new HashSet<string>();
-                    var acvgReads = new List<(BasicGeoposition, double)>();
-                    var hasAcvgFiles = false;
-
-                    foreach (var storageFile in files)
+                    folders.Add(foundFolder);
+                }
+                if (folders.Count == 0)
+                {
+                    await ProcessFolder(outputFolder, fileOrder, finishedFileNames, null, masterFolder);
+                }
+                else
+                {
+                    folders = folders.OrderBy(folder => folder.DisplayName).ToList();
+                    foreach (var folder in folders)
                     {
-                        var fileFactory = new FileFactory(storageFile);
-                        var file = await fileFactory.GetFile();
-                        if (file == null && storageFile.FileType.ToLower() == ".acvg")
-                        {
-                            acvgReads = ParseAcvgReads(await storageFile.GetLines());
-                            hasAcvgFiles = true;
-                        }
-                        if (file is CsvPcm docFile)
-                        {
-                            docFiles.Add(docFile);
-                            continue;
-                        }
-                        if (file is CisSettings settings)
-                        {
-                            cisSettings = settings;
-                            continue;
-                        }
-                        if (!(file is AllegroCISFile allegroFile))
-                            continue;
-                        if (!fileNames.Contains(allegroFile.Name))
-                        {
-                            cisFiles.Add(allegroFile);
-                            fileNames.Add(allegroFile.Name);
-                        }
-                        else
-                        {
-                            if (allegroFile.Extension != ".csv") continue;
-                            for (var i = 0; i < cisFiles.Count; ++i)
-                            {
-                                if (cisFiles[i].Name != allegroFile.Name) continue;
-                                cisFiles.RemoveAt(i);
-                                cisFiles.Add(allegroFile);
-                                break;
-                            }
-                        }
-                    }
-
-                    if (cisFiles.Count == 0) continue;
-                    if (cisSettings == null)
-                    {
-                        cisSettings = new CisSettings();
-                    }
-                    cisFiles.Sort((file1, file2) => string.Compare(file1.Name, file2.Name, StringComparison.Ordinal));
-
-                    var onOffFiles = new List<AllegroCISFile>();
-                    var staticFiles = new List<AllegroCISFile>();
-
-                    foreach (var file in cisFiles)
-                    {
-                        if (file.IsOnOff)
-                        {
-                            onOffFiles.Add(file);
-                        }
-                        else
-                        {
-                            staticFiles.Add(file);
-                        }
-                    }
-                    var type = $" On Off {(staticFiles.Count == 0 ? "" : "And Depol ")}CIS";
-                    var combinedOnOffFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + type, onOffFiles, 5);
-                    var combinedStaticFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + " Depol CIS", staticFiles, 5);
-                    combinedStaticFiles?.AddPcmDepthData(docFiles);
-                    combinedStaticFiles?.AddMaxDepthComment(cisSettings.DepthGraphMaxValue);
-                    combinedOnOffFiles?.AddPcmDepthData(docFiles);
-                    combinedOnOffFiles?.AddMaxDepthComment(cisSettings.DepthGraphMaxValue);
-                    var pcmReads = new List<(double Footage, double Read)>();
-                    if (docFiles.Count != 0)
-                    {
-                        foreach (var docFile in docFiles)
-                        {
-
-                            foreach (var (gps, read, _) in docFile.AmpData)
-                            {
-                                if (read == 0) continue;
-                                if (combinedOnOffFiles != null)
-                                {
-                                    var (footage, dist) = combinedOnOffFiles.GetClosestFootage(gps);
-                                    pcmReads.Add((footage, read));
-                                }
-                                else
-                                {
-                                    var (footage, dist) = combinedStaticFiles.GetClosestFootage(gps);
-                                    pcmReads.Add((footage, read));
-                                }
-                            }
-                        }
-                    }
-                    combinedOnOffFiles?.FixContactSpikes();
-                    combinedStaticFiles?.FixContactSpikes();
-                    combinedStaticFiles?.FixGps();
-                    if (cisSettings.StraightenGps)
-                        combinedStaticFiles?.StraightenGps(cisSettings.StraightenGpsCommentsDistance.Value);
-                    if (cisSettings.SetFootageFromGps)
-                        combinedStaticFiles?.SetFootageFromGps();
-                    combinedOnOffFiles?.FixGps();
-                    if (cisSettings.StraightenGps)
-                        combinedOnOffFiles?.StraightenGps(cisSettings.StraightenGpsCommentsDistance.Value);
-                    if (cisSettings.SetFootageFromGps)
-                        combinedOnOffFiles.SetFootageFromGps();
-                    combinedOnOffFiles?.RemoveComments("+");
-                    if (combinedOnOffFiles.HasStartSkip)
-                    {
-                        combinedOnOffFiles.ShiftPoints(-combinedOnOffFiles.Points[1].Footage);
-                    }
-                    if (staticFiles.Count > 0 && onOffFiles.Count > 0)
-                    {
-                        var onOffStart = combinedOnOffFiles.Points.First().Point.GPS;
-                        var onOffEnd = combinedOnOffFiles.Points.Last().Point.GPS;
-                        var staticStart = combinedStaticFiles.Points.First().Point.GPS;
-                        var staticEnd = combinedStaticFiles.Points.Last().Point.GPS;
-                        if (staticStart.Distance(onOffEnd) < staticStart.Distance(onOffStart))
-                        {
-                            combinedStaticFiles.Reverse();
-                        }
-                        combinedStaticFiles.AlignTo(combinedOnOffFiles);
-                    }
-                    if (!hasAcvgFiles)
-                        acvgReads = null;
-                    var finishedFinalName = finishedFileNames.GetValueOrDefault(folder.DisplayName, null);
-                    if (combinedStaticFiles != null && combinedOnOffFiles != null)
-                    {
-                        var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, outputFolder, pcmReads, cisSettings, acvgReads, finishedFinalName);
-                        await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedOnOffFiles.FileInfos.GetExcelData(0)) }, fileOrder);
-                        await CreateExcelFile($"{folder.DisplayName} Static+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedStaticFiles.FileInfos.GetExcelData(0)) }, fileOrder);
-                    }
-                    else
-                    {
-                        var file = combinedOnOffFiles ?? combinedStaticFiles;
-                        var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, null, outputFolder, pcmReads, cisSettings, acvgReads, finishedFinalName);
-                        await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", file.FileInfos.GetExcelData(0)) }, fileOrder);
+                        await ProcessFolder(outputFolder, fileOrder, finishedFileNames, null, folder);
                     }
                 }
                 var dialog = new MessageDialog("Done");
@@ -368,6 +321,172 @@ namespace CisProcessor
                 var dialog = new MessageDialog("Error: " + ex.Message);
                 await dialog.ShowAsync();
             }
+            EndWork();
+        }
+
+        private async Task ProcessFolder(StorageFolder outputFolder, StorageFolder fileOrder, Dictionary<string, (string, bool)?> finishedFileNames, CisSettings cisSettings, StorageFolder folder)
+        {
+            if (folder.DisplayName == outputFolder.DisplayName || folder.DisplayName == fileOrder.DisplayName)
+                return;
+            var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
+            if (FileDebug.IsChecked ?? false)
+                await ShowFoundFilesAsync(files);
+            var cisFiles = new List<AllegroCISFile>();
+            var docFiles = new List<CsvPcm>();
+            var fileNames = new HashSet<string>();
+            var acvgReads = new List<(BasicGeoposition, double)>();
+            var hasAcvgFiles = false;
+
+            foreach (var storageFile in files)
+            {
+                var fileFactory = new FileFactory(storageFile);
+                var file = await fileFactory.GetFile();
+                if (file == null && storageFile.FileType.ToLower() == ".acvg")
+                {
+                    acvgReads = ParseAcvgReads(await storageFile.GetLines());
+                    hasAcvgFiles = true;
+                }
+                if (file is CsvPcm docFile)
+                {
+                    docFiles.Add(docFile);
+                    continue;
+                }
+                if (file is CisSettings settings)
+                {
+                    cisSettings = settings;
+                    continue;
+                }
+                if (!(file is AllegroCISFile allegroFile))
+                    continue;
+                if (!fileNames.Contains(allegroFile.Name))
+                {
+                    cisFiles.Add(allegroFile);
+                    fileNames.Add(allegroFile.Name);
+                }
+                else
+                {
+                    if (allegroFile.Extension != ".csv") continue;
+                    for (var i = 0; i < cisFiles.Count; ++i)
+                    {
+                        if (cisFiles[i].Name != allegroFile.Name) continue;
+                        cisFiles.RemoveAt(i);
+                        cisFiles.Add(allegroFile);
+                        break;
+                    }
+                }
+            }
+
+            if (cisFiles.Count == 0) return;
+            var defaultSettings = false;
+            if (cisSettings == null)
+            {
+                defaultSettings = true;
+                cisSettings = new CisSettings();
+            }
+            cisFiles.Sort((file1, file2) => string.Compare(file1.Name, file2.Name, StringComparison.Ordinal));
+
+            var onOffFiles = new List<AllegroCISFile>();
+            var staticFiles = new List<AllegroCISFile>();
+
+            foreach (var file in cisFiles)
+            {
+                if (file.IsOnOff)
+                {
+                    onOffFiles.Add(file);
+                }
+                else
+                {
+                    staticFiles.Add(file);
+                }
+            }
+            if(onOffFiles.Count ==  0 && staticFiles.Count != 0)
+            {
+                onOffFiles.AddRange(staticFiles);
+                staticFiles.Clear();
+            }
+            if (FileDebug.IsChecked ?? false)
+                await ShowParsedFilesAsync(onOffFiles, staticFiles, docFiles, defaultSettings);
+            var type = $" On Off {(staticFiles.Count == 0 ? "" : "And Depol ")}CIS";
+            var combinedOnOffFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + type, onOffFiles, 5);
+            var combinedStaticFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + " Depol CIS", staticFiles, 5);
+
+            combinedStaticFiles?.AddPcmDepthData(docFiles);
+            combinedStaticFiles?.AddMaxDepthComment(cisSettings.DepthGraphMaxValue);
+            combinedOnOffFiles?.AddPcmDepthData(docFiles);
+            combinedOnOffFiles?.AddMaxDepthComment(cisSettings.DepthGraphMaxValue);
+            var pcmReads = new List<(double Footage, double Read)>();
+            if (docFiles.Count != 0)
+            {
+                foreach (var docFile in docFiles)
+                {
+
+                    foreach (var (gps, read, _) in docFile.AmpData)
+                    {
+                        if (read == 0) continue;
+                        if (combinedOnOffFiles != null)
+                        {
+                            var (footage, dist) = combinedOnOffFiles.GetClosestFootage(gps);
+                            pcmReads.Add((footage, read));
+                        }
+                        else
+                        {
+                            var (footage, dist) = combinedStaticFiles.GetClosestFootage(gps);
+                            pcmReads.Add((footage, read));
+                        }
+                    }
+                }
+            }
+            combinedOnOffFiles?.FixContactSpikes();
+            combinedStaticFiles?.FixContactSpikes();
+            combinedStaticFiles?.FixGps();
+            if (cisSettings.StraightenGps)
+                combinedStaticFiles?.StraightenGps(cisSettings.StraightenGpsCommentsDistance.Value);
+            if (cisSettings.SetFootageFromGps)
+                combinedStaticFiles?.SetFootageFromGps();
+            combinedOnOffFiles?.FixGps();
+            if (cisSettings.StraightenGps)
+                combinedOnOffFiles?.StraightenGps(cisSettings.StraightenGpsCommentsDistance.Value);
+            if (cisSettings.SetFootageFromGps)
+                combinedOnOffFiles.SetFootageFromGps();
+            combinedOnOffFiles?.RemoveComments("+");
+            if (cisSettings.IgnoreStartAndEndSkips)
+            {
+                combinedOnOffFiles.HasStartSkip = false;
+                combinedOnOffFiles.HasEndSkip = false;
+            }
+            if (combinedOnOffFiles.HasStartSkip)
+            {
+                combinedOnOffFiles.ShiftPoints(-combinedOnOffFiles.Points[1].Footage);
+            }
+            if (staticFiles.Count > 0 && onOffFiles.Count > 0)
+            {
+                var onOffStart = combinedOnOffFiles.Points.First().Point.GPS;
+                var onOffEnd = combinedOnOffFiles.Points.Last().Point.GPS;
+                var staticStart = combinedStaticFiles.Points.First().Point.GPS;
+                var staticEnd = combinedStaticFiles.Points.Last().Point.GPS;
+                if (staticStart.Distance(onOffEnd) < staticStart.Distance(onOffStart))
+                {
+                    combinedStaticFiles.Reverse();
+                }
+                combinedStaticFiles.AlignTo(combinedOnOffFiles);
+            }
+            if (!hasAcvgFiles)
+                acvgReads = null;
+            var finishedFinalName = finishedFileNames.GetValueOrDefault(folder.DisplayName, null);
+            if (combinedStaticFiles != null && combinedOnOffFiles != null)
+            {
+                var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, outputFolder, pcmReads, cisSettings, acvgReads, finishedFinalName);
+                await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedOnOffFiles.FileInfos.GetExcelData(0)) }, fileOrder);
+                await CreateExcelFile($"{folder.DisplayName} Static+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedStaticFiles.FileInfos.GetExcelData(0)) }, fileOrder);
+            }
+            else
+            {
+                var file = combinedOnOffFiles ?? combinedStaticFiles;
+                var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, null, outputFolder, pcmReads, cisSettings, acvgReads, finishedFinalName);
+                await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", file.FileInfos.GetExcelData(0)) }, fileOrder);
+            }
+
+            return;
         }
 
         private async Task<Dictionary<string, (string, bool)?>> GetFilesNames(StorageFolder folder)
@@ -401,7 +520,12 @@ namespace CisProcessor
 
             if (response == null)
                 return (null, false);
-            if (response.Value.Item2)
+            var staticEndOffset = 0.0;
+            if(staticFile != null)
+            {
+                staticEndOffset = onOffFile.Points.Last().Footage - staticFile.Points.Last().Footage;
+            }
+            if (response.Value.IsReversed)
             {
                 onOffFile.Reverse();
             }
@@ -425,27 +549,27 @@ namespace CisProcessor
             var graph3 = new Graph(report);
             //var mirFilterData = "Start Footage\tStart Latitude\tStart Longitude\tEnd Footage\tEnd Latitude\tEnd Longitude\tReason\n" + ((MirFilter.IsChecked ?? false) ? allegroFile.FilterMir(new List<string>() { "anode", "rectifier" }) : "");
 
-            var on = new GraphSeries("On", onOffFile.GetDoubleData("On"))
+            var on = new GraphSeries("On", onOffFile.GetOnData())
             {
                 LineColor = Colors.Blue,
                 MaxDrawDistance = cisSettings.CisGap
             };
-            var off = new GraphSeries("Off", onOffFile.GetDoubleData("Off"))
+            var off = new GraphSeries("Off", onOffFile.GetOffData())
             {
                 LineColor = Colors.Green,
                 MaxDrawDistance = cisSettings.CisGap
             };
-            var onMir = new GraphSeries("On MIR Compensated", onOffFile.GetDoubleData("On Compensated"))
+            var onMir = new GraphSeries("On MIR Compensated", onOffFile.GetOnCompensatedData())
             {
                 LineColor = Colors.Purple,
                 MaxDrawDistance = cisSettings.CisGap
             };
-            var offMir = new GraphSeries("Off MIR Compensated", onOffFile.GetDoubleData("Off Compensated"))
+            var offMir = new GraphSeries("Off MIR Compensated", onOffFile.GetOffCompensatedData())
             {
                 LineColor = Color.FromArgb(255, 57, 255, 20),
                 MaxDrawDistance = cisSettings.CisGap
             };
-            var depth = new GraphSeries("Depth", onOffFile.GetDoubleData("Depth"))
+            var depth = new GraphSeries("Depth", onOffFile.GetDepthData())
             {
                 LineColor = Colors.Black,
                 PointColor = Colors.Orange,
@@ -455,7 +579,7 @@ namespace CisProcessor
             };
             var commentSeries = new CommentSeries { Values = onOffFile.GetCommentData(ignoreStartEndSkips: true), PercentOfGraph = 0.5f, IsFlippedVertical = false, BorderType = BorderType.Pegs };
 
-            commentGraph.CommentSeries = commentSeries;
+            commentGraph.CommentSeries.Add(commentSeries);
             commentGraph.LegendInfo.Name = "CIS Comments";
             commentGraph.DrawTopBorder = false;
 
@@ -464,7 +588,7 @@ namespace CisProcessor
             commentGraph.YAxesInfo.MajorGridlines.IsEnabled = false;
             commentGraph.YAxesInfo.Y1IsDrawn = false;
 
-            graph1.CommentSeries = commentSeries;
+            graph1.CommentSeries.Add(commentSeries);
             graph1.YAxesInfo.Y1MinimumValue = cisSettings.CisGraphMinValue;
             graph1.YAxesInfo.Y1MaximumValue = cisSettings.CisGraphMaxValue;
             graph1.YAxesInfo.MajorGridlines.Offset = cisSettings.CisGraphMajorGridStep;
@@ -475,7 +599,7 @@ namespace CisProcessor
             graph1.Series.Add(on);
             if (cisSettings.UseMir)
                 graph1.Series.Add(onMir);
-            if (onOffFile.Type == FileType.OnOff)
+            if (off.Values.Count > 0)
             {
                 graph1.Series.Add(off);
                 if (cisSettings.UseMir)
@@ -496,15 +620,22 @@ namespace CisProcessor
             List<(double Footage, double Value)> polData = null;
             if (staticFile != null)
             {
-                if (response.Value.Item2)
-                {
-                    staticFile?.Reverse();
-                }
-                var staticData = new GraphSeries("Static", staticFile.GetDoubleData("On"))
+                //if (response.Value.IsReversed)
+                //{
+                //    staticFile?.Reverse();
+                //    staticFile?.ShiftPoints(staticEndOffset);
+                //}
+                staticFile.AlignTo(onOffFile);
+                var staticData = new GraphSeries("Static", staticFile.GetOnData())
                 {
                     LineColor = Colors.Magenta,
                     MaxDrawDistance = cisSettings.CisGap
                 };
+                if (StaticComments.IsChecked ?? false)
+                {
+                    var staticCommentSeries = new CommentSeries { Values = staticFile.GetCommentData(ignoreStartEndSkips: true), PercentOfGraph = 0.5f, IsFlippedVertical = true, BorderType = BorderType.Pegs };
+                    graph1.CommentSeries.Add(staticCommentSeries);
+                }
                 polData = (cisSettings.UseMir ? offMir : off).Difference(staticData, cisSettings.CisGap);
                 var polarizationData = new GraphSeries("Polarization", polData)
                 {
@@ -689,23 +820,24 @@ namespace CisProcessor
             var shapefileFolder = await masterOutputFolder.CreateFolderAsync("Shapefiles", CreationCollisionOption.OpenIfExists);
             var cisShapeFile = new ShapefileData($"{response.Value.Text}", onOffFile.GetShapeFile());
             await cisShapeFile.WriteToFolder(shapefileFolder);
-
-            var passShapefileFolder = await masterOutputFolder.CreateFolderAsync("Passing Shapefiles", CreationCollisionOption.OpenIfExists);
-            var passingCisShapefileData = onOffFile.GetPassingShapeFile();
-            if (!string.IsNullOrEmpty(passingCisShapefileData))
+            if (PassingShapes.IsChecked ?? false)
             {
-                var passingCisShapeFile = new ShapefileData($"{response.Value.Text}", passingCisShapefileData);
-                await passingCisShapeFile.WriteToFolder(passShapefileFolder);
-            }
+                var passShapefileFolder = await masterOutputFolder.CreateFolderAsync("Passing Shapefiles", CreationCollisionOption.OpenIfExists);
+                var passingCisShapefileData = onOffFile.GetPassingShapeFile();
+                if (!string.IsNullOrEmpty(passingCisShapefileData))
+                {
+                    var passingCisShapeFile = new ShapefileData($"{response.Value.Text}", passingCisShapefileData);
+                    await passingCisShapeFile.WriteToFolder(passShapefileFolder);
+                }
 
-            var failingShapefileFolder = await masterOutputFolder.CreateFolderAsync("Failing Shapefiles", CreationCollisionOption.OpenIfExists);
-            var failingCisShapefileData = onOffFile.GetFailingShapeFile();
-            if (!string.IsNullOrEmpty(failingCisShapefileData))
-            {
-                var failingCisShapeFile = new ShapefileData($"{response.Value.Text}", failingCisShapefileData);
-                await failingCisShapeFile.WriteToFolder(failingShapefileFolder);
+                var failingShapefileFolder = await masterOutputFolder.CreateFolderAsync("Failing Shapefiles", CreationCollisionOption.OpenIfExists);
+                var failingCisShapefileData = onOffFile.GetFailingShapeFile();
+                if (!string.IsNullOrEmpty(failingCisShapefileData))
+                {
+                    var failingCisShapeFile = new ShapefileData($"{response.Value.Text}", failingCisShapefileData);
+                    await failingCisShapeFile.WriteToFolder(failingShapefileFolder);
+                }
             }
-
             //if (MirFilter.IsChecked ?? false)
             //    await CreateExcelFile($"{curFileName} MIR Skips", new List<(string Name, string Data)>() { ("MIR Skips", mirFilterData) });
             var imageFiles = new List<StorageFile>();
@@ -766,14 +898,14 @@ namespace CisProcessor
                 tabular = allegroFile.GetTabularData(addedValues: stringAddedValues);
             }
             await CreateExcelFile($"{fileName} Tabular Data", new List<(string Name, string Data)>() { ("Tabular Data", tabular) }, outputFolder);
-            var dataMetrics = new DataMetrics(allegroFile.GetPoints(), cisSettings.UseMir);
+            var dataMetrics = new DataMetrics(allegroFile, cisSettings.UseMir);
             if (depolFile != null)
             {
                 await CreateExcelFile($"{fileName} Depol Tabular Data", new List<(string Name, string Data)>() { ("Depol Tabular Data", depolFile.GetTabularData()) }, outputFolder);
                 if (addedValues.Any(value => value.Item1 == "Polarization"))
                 {
                     var polData = addedValues.First(val => val.Item1 == "Polarization");
-                    dataMetrics = new DataMetrics(allegroFile.GetPoints(), cisSettings.UseMir, polData.Item2);
+                    dataMetrics = new DataMetrics(allegroFile, cisSettings.UseMir, polData.Item2);
                 }
             }
 
@@ -793,8 +925,8 @@ namespace CisProcessor
                     ("Test Station Data", testStation)
                 }, outputFolder);
             }
-            //var cisSkips = allegroFile.GetSkipData();
-            //await CreateExcelFile($"{fileName} CIS Skip Data", new List<(string Name, string Data)>() { ("CIS Skip Data", cisSkips) }, outputFolder);
+            var cisSkips = allegroFile.GetSkipData(maxDistance: cisSettings.CisGap, useMir: cisSettings.UseMir);
+            await CreateExcelFile($"{fileName} CIS Skip Data", new List<(string Name, string Data)>() { ("CIS Skip Data", cisSkips) }, outputFolder);
             var depthExceptions = allegroFile.GetDepthExceptions(ShallowCover, double.MaxValue);
             await CreateExcelFile($"{fileName} Shallow Cover", new List<(string Name, string Data)>() { ("Shallow Cover", depthExceptions) }, outputFolder);
             var shapefile = allegroFile.GetShapeFile();
