@@ -310,7 +310,7 @@ namespace UdlProcessor
             var timeSpan = dataSet.EndTime - dataSet.StartTime;
             var pages = report.PageSetup.GetAllPages(dataSet.StartTime.Hour, timeSpan.TotalHours);
 
-            var imageFiles = new List<StorageFile>();
+            //var imageFiles = new List<StorageFile>();
             for (var i = 0; i < pages.Count; ++i)
             {
                 var page = pages[i];
@@ -328,13 +328,39 @@ namespace UdlProcessor
                 {
                     fileName = $"{reportName} Graph.png";
                 }
-                var imageFile = await outputFolder.CreateFileAsync($"{fileName}", CreationCollisionOption.ReplaceExisting);
-                using (var image = report.GetImage(page, 300))
-                using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
+                var success = false;
+                var failCount = 0;
+                while (!success)
                 {
-                    await image.SaveAsync(stream, CanvasBitmapFileFormat.Png);
+                    success = true;
+                    try
+                    {
+                        var imageFile = await outputFolder.CreateFileAsync($"{fileName}", CreationCollisionOption.ReplaceExisting);
+                        using (var image = report.GetImage(page, 300))
+                        using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
+                        {
+                            stream.Size = 0;
+                            await image.SaveAsync(stream, CanvasBitmapFileFormat.Png);
+                            await stream.FlushAsync();
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        failCount++;
+                        success = false;
+                        await Task.Delay(500);
+                    }
+                    if (failCount == 10)
+                    {
+                        throw new Exception($"Failed to create image file {fileName} after 10 attempts.");
+                    }
                 }
-                imageFiles.Add(imageFile);
+                if (i % 25 == 0) // Every 25 images
+                {
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                }
+                //imageFiles.Add(imageFile);
             }
         }
 
@@ -364,7 +390,7 @@ namespace UdlProcessor
 
             var pages = report.PageSetup.GetAllPages(startHour, totalHours);
 
-            var imageFiles = new List<StorageFile>();
+            //var imageFiles = new List<StorageFile>();
             if (pages.Count != 1)
             {
                 return;
@@ -374,9 +400,10 @@ namespace UdlProcessor
             using (var image = report.GetImage(page, 300))
             using (var stream = await imageFile.OpenAsync(FileAccessMode.ReadWrite))
             {
+                stream.Size = 0;
                 await image.SaveAsync(stream, CanvasBitmapFileFormat.Png);
             }
-            imageFiles.Add(imageFile);
+            //imageFiles.Add(imageFile);
         }
     }
 }
