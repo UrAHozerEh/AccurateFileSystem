@@ -59,21 +59,24 @@ namespace AccurateFileSystem.EsriShapefile
             Fields = new List<FieldDescriptor>();
             foreach (var name in headers)
             {
+                var upperName = name.ToUpper();
                 var type = "C";
                 var length = 254;
                 var decimals = 0;
                 if(isPge)
                 {
-                    switch (name)
+                    switch (upperName)
                     {
                         case "STATION":
                         case "DEPTH":
                         case "CONTROL":
                         case "CHAINAGE":
+                        case "FOOTAGE":
                             length = 10;
                             type = "N";
                             break;
                         case "DATEOFCIS":
+                        case "DATE":
                             length = 8;
                             type = "D";
                             break;
@@ -98,15 +101,17 @@ namespace AccurateFileSystem.EsriShapefile
                 }
                 else
                 {
-                    switch (name)
+                    switch (upperName)
                     {
                         case "STATION":
                         case "CONTROL":
                         case "CHAINAGE":
+                        case "FOOTAGE":
                             length = 10;
                             type = "N";
                             break;
                         case "DATEOFCIS":
+                        case "DATE":
                             length = 8;
                             type = "D";
                             break;
@@ -130,7 +135,7 @@ namespace AccurateFileSystem.EsriShapefile
                     }
                 }
                 
-                var field = new FieldDescriptor(name, type, length, decimals);
+                var field = new FieldDescriptor(upperName, type, length, decimals);
                 Fields.Add(field);
             }
         }

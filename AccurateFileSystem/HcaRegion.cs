@@ -52,7 +52,7 @@ namespace AccurateFileSystem
         public bool HasAcvg { get; }
         public bool HasPcm { get; }
 
-        public HcaRegion(List<BasicGeoposition> gpsPoints, string name, string route, string startMp, string endMp, bool? firstTime, bool hasDcvg, bool hasAcvg, bool hasPcm)
+        public HcaRegion(List<BasicGeoposition> gpsPoints, string name, string route, string startMp, string endMp, bool? firstTime, bool hasDcvg, bool hasAcvg, bool hasPcm, SkipInfo? skipInfo)
         {
             GpsPoints = gpsPoints;
             GpsLength = gpsPoints.TotalDistance();
@@ -65,17 +65,32 @@ namespace AccurateFileSystem
             StartMp = startMp;
             EndMp = endMp;
             FirstTime = firstTime;
-            (ShouldSkip, ShortSkipReason, LongSkipReason) = CheckShouldSkip(name);
+            if(skipInfo == null)
+            {
+                skipInfo = CheckShouldSkip(name);
+            }
             HasDcvg = hasDcvg;
             HasAcvg = hasAcvg;
             HasPcm = hasPcm;
+            if (skipInfo != null)
+            {
+                ShortSkipReason = skipInfo.Value.ShortReason;
+                LongSkipReason = skipInfo.Value.LongReaason;
+                ShouldSkip = true;
+            }
         }
 
         public HcaRegion(string name, bool? firstTime)
         {
             Name = name;
             FirstTime = firstTime;
-            (ShouldSkip, ShortSkipReason, LongSkipReason) = CheckShouldSkip(name);
+            var skipInfo = CheckShouldSkip(name);
+            if (skipInfo != null) 
+            {
+                ShortSkipReason = skipInfo.Value.ShortReason;
+                LongSkipReason = skipInfo.Value.LongReaason;
+                ShouldSkip = true;
+            }
         }
 
         public HcaRegion(string name, bool? firstTime, string shortSkipReason, string longSkipReason)
@@ -106,16 +121,20 @@ namespace AccurateFileSystem
             GpsPoints.AddRange(updated);
         }
 
-        private static (bool ShouldSkip, string ShortReason, string LongReason) CheckShouldSkip(string name)
+        private static SkipInfo? CheckShouldSkip(string name)
         {
             foreach (var (skip, shortReason, longReason) in SkipRegions)
             {
                 if (name.Contains(skip))
                 {
-                    return (true, shortReason, longReason);
+                    return new SkipInfo() 
+                    { 
+                        ShortReason = shortReason, 
+                        LongReaason = longReason 
+                    };
                 }
             }
-            return (false, "", "");
+            return null;
         }
 
         public double DistanceToGps(BasicGeoposition gps)
@@ -150,6 +169,12 @@ namespace AccurateFileSystem
             if (Name != otherValue.Name)
                 return false;
             return true;
+        }
+
+        public struct SkipInfo
+        {
+            public string ShortReason;
+            public string LongReaason;
         }
     }
 }

@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Windows.Devices.Geolocation;
+using Windows.Devices.Usb;
 using Windows.Globalization.NumberFormatting;
 using Windows.Media.Streaming.Adaptive;
 using Windows.UI.Xaml.Media.Animation;
@@ -36,16 +37,87 @@ namespace AccurateFileSystem
             //var output = FilterMir(new List<string>() { "anode", "rectifier" });
         }
 
+        public string GetMinValueFormG(double start, double end)
+        {
+            double minOff = double.MinValue, minOn = double.MinValue;
+            foreach(var point in Points)
+            {
+                if(point.Footage >= start && point.Footage < end)
+                {
+                    if(point.Point.Off > minOff)
+                    {
+                        minOff = point.Point.Off;
+                        minOn = point.Point.On;
+                    }
+                }
+            }
+            if(minOff == double.MinValue)
+            {
+                foreach(var point in Points)
+                {
+                    if (point.Footage == end)
+                    {
+                        if (point.Point.Off < minOff || minOff == double.MinValue)
+                        {
+                            minOff = point.Point.Off;
+                            minOn = point.Point.On;
+                        }
+                    }
+                }
+            }
+            if(minOff == double.MinValue)
+            {
+                CombinedDataPoint prev = null, next = null;
+                foreach(var point in Points)
+                {
+                    if (point.Footage < start)
+                    {
+                        prev = point;
+                    }
+                    if (point.Footage > end)
+                    {
+                        next = point;
+                        break;
+                    }
+                }
+                if (prev != null && next != null)
+                {
+                    var startDiff = Math.Abs(start - prev.Footage);
+                    var endDiff = Math.Abs(next.Footage - end);
+                    if (startDiff < endDiff)
+                    {
+                        minOff = prev.Point.Off;
+                        minOn = prev.Point.On;
+                    }
+                    else
+                    {
+                        minOff = next.Point.Off;
+                        minOn = next.Point.On;
+                    }
+                }
+            }
+            if (minOff == double.MinValue)
+                return "N/A";
+            return $"{minOn:F3}/{minOff:F3}";
+        }
+
         public void RemoveComments(string comment)
         {
+            
             foreach (var point in Points)
             {
-                if (point.Point.OriginalComment.StartsWith(comment))
-                    point.Point.OriginalComment = point.Point.OriginalComment.Remove(0, comment.Length);
-                if (point.Point.OriginalComment == comment)
-                    point.Point.OriginalComment = "";
-                if (point.Point.OriginalComment.EndsWith(comment))
-                    point.Point.OriginalComment = point.Point.OriginalComment.Remove(point.Point.OriginalComment.Length - comment.Length);
+                string original;
+                do
+                {
+                    original = point.Point.OriginalComment;
+                    point.Point.OriginalComment = point.Point.OriginalComment.Trim();
+                    if (point.Point.OriginalComment.StartsWith(comment))
+                        point.Point.OriginalComment = point.Point.OriginalComment.Remove(0, comment.Length);
+                    if (point.Point.OriginalComment == comment)
+                        point.Point.OriginalComment = "";
+                    if (point.Point.OriginalComment.EndsWith(comment))
+                        point.Point.OriginalComment = point.Point.OriginalComment.Remove(point.Point.OriginalComment.Length - comment.Length);
+                } while (!original.Equals(point.Point.OriginalComment));
             }
         }
 
@@ -455,7 +527,7 @@ namespace AccurateFileSystem
             }
         }
 
-        public List<int> GetAnchorPoints(int distance = 20)
+        public List<int> GetAnchorPoints(int distance = 20, bool includeAllComments = false)
         {
             var testStations = new List<int> { 0 };
             var lastFoot = Points[0].Footage;
@@ -480,16 +552,28 @@ namespace AccurateFileSystem
                     testStations.Add(i);
                     testStations.Add(i + 1);
                 }
+                else if (includeAllComments && !string.IsNullOrEmpty(curPoint.Point.OriginalComment))
+                    testStations.Add(i);
                 lastFoot = curPoint.Footage;
             }
             testStations.Add(Points.Count - 1);
             return testStations;
         }
 
-        public void AlignTo(CombinedAllegroCisFile otherFile, double maxDistance = 25)
+        public void AlignTo(CombinedAllegroCisFile otherFile, double maxDistance = 25, bool includeComments = false, bool exactMatch = false)
         {
-            var myAnchors = GetAnchorPoints();
+            if(Points.Count == 0)
+                return;
+            var myAnchors = GetAnchorPoints(includeAllComments: includeComments);
             var otherAnchors = otherFile.GetAnchorPoints();
+            if (exactMatch)
+            {
+                otherAnchors.Clear();
+                for (int i = 0; i < otherFile.Points.Count; ++i)
+                {
+                    otherAnchors.Add(i);
+                }
+            }
 
             var usedOtherAnchorsDistance = new Dictionary<int, (double Distance, int MyAnchor)>();
             var fixedAnchors = new List<(int Anchor, double NewFootage)>();
@@ -780,6 +864,26 @@ namespace AccurateFileSystem
                 lastPoint = curPoint;
             }
             return output.ToString();
+        }
+
+        public Skips GetSkips(double maxDistance = 15, int readDecimals = 4, int gpsDecimals = 7, bool useMir = true)
+        {
+            var output = new List<Skip>();
+
+            CombinedDataPoint lastPoint = Points.First();
+
+            foreach (var curPoint in Points)
+            {
+                if (curPoint.Footage - lastPoint.Footage > maxDistance)
+                {
+                    var lastDataPoint = lastPoint.Point;
+                    var curDataPoint = curPoint.Point;
+                    var skip = new Skip(lastPoint.Point.GPS, new HcaRegion("Skip", null, "Skip", "Skip"));
+                    output.Add(skip);
+                }
+                lastPoint = curPoint;
+            }
+            return new Skips("Skips", output);
         }
 
         public string GetTabularData(List<(string Name, List<(double Footage, double Value)>)> addedValues, List<(string Name, string Formula)> formulas = null, int readDecimals = 4, bool includeMir = true)

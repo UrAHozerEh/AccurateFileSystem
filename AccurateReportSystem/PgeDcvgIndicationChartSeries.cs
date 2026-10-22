@@ -15,10 +15,11 @@ namespace AccurateReportSystem
         public Color ModerateColor { get; set; } = Colors.Green;
         public Color SevereColor { get; set; } = Colors.Red;
         public double MinimumFeet { get; set; } = 3;
+        public bool IsPge { get; set; }
 
-        public PgeDcvgIndicationChartSeries(List<(double, double, BasicGeoposition)> data, Chart chart, bool isDcvg) : this(data, chart.LegendInfo, chart.YAxesInfo, isDcvg)
+        public PgeDcvgIndicationChartSeries(List<(double, double, BasicGeoposition)> data, Chart chart, bool isDcvg, bool isPge) : this(data, chart.LegendInfo, chart.YAxesInfo, isDcvg)
         {
-
+            IsPge = isPge;
         }
 
         public PgeDcvgIndicationChartSeries(List<(double, double, BasicGeoposition)> data, LegendInfo masterLegendInfo, YAxesInfo masterYAxesInfo, bool isDcvg) : base(masterLegendInfo, masterYAxesInfo)
@@ -26,54 +27,71 @@ namespace AccurateReportSystem
             Data = new List<(double Footage, double ActualFoot, double Percent, PGESeverity Severity, string, BasicGeoposition)>();
             foreach (var (foot, percent, gps) in data)
             {
-                if (!isDcvg)
+                if (IsPge)
                 {
-                    //ACVG
-                    var severity = PGESeverity.NRI;
-                    var reason = "Individual normalized ACVG indications are less than 25";
-                    if (percent >= 75)
+                    if (!isDcvg)
                     {
-                        severity = PGESeverity.Severe;
-                        reason = "Individual normalized ACVG indications are greater than or equal to 75";
+                        //ACVG
+                        var severity = PGESeverity.NRI;
+                        var reason = "Individual normalized ACVG indications are less than 25";
+                        if (percent >= 75)
+                        {
+                            severity = PGESeverity.Severe;
+                            reason = "Individual normalized ACVG indications are greater than or equal to 75";
+                        }
+                        else if (percent >= 50)
+                        {
+                            severity = PGESeverity.Moderate;
+                            reason = "Individual normalized ACVG indications are greater than or equal to 50 and less than 75";
+                        }
+                        else if (percent >= 25)
+                        {
+                            severity = PGESeverity.Minor;
+                            reason = "Individual normalized ACVG indications are greater than or equal to 25 and less than 50";
+                        }
+                        for (var curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
+                        {
+                            Data.Add((curFoot, foot, percent, severity, reason, gps));
+                        }
                     }
-                    else if (percent >= 50)
+                    else
                     {
-                        severity = PGESeverity.Moderate;
-                        reason = "Individual normalized ACVG indications are greater than or equal to 50 and less than 75";
-                    }
-                    else if (percent >= 25)
-                    {
-                        severity = PGESeverity.Minor;
-                        reason = "Individual normalized ACVG indications are greater than or equal to 25 and less than 50";
-                    }
-                    for (var curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
-                    {
-                        Data.Add((curFoot, foot, percent, severity, reason, gps));
+                        //DCVG
+                        var severity = PGESeverity.NRI;
+                        var reason = "DCVG % IR is greater than 0% and less than 16%";
+                        if (percent > 60)
+                        {
+                            severity = PGESeverity.Severe;
+                            reason = "DCVG % IR is greater than 60%";
+                        }
+                        else if (percent > 35)
+                        {
+                            severity = PGESeverity.Moderate;
+                            reason = "DCVG % IR is greater than 35% and less than or equal to 60%";
+                        }
+                        else if (percent >= 16)
+                        {
+                            severity = PGESeverity.Minor;
+                            reason = "DCVG % IR is greater than or equal to 16% and less than or equal to 35%";
+                        }
+                        for (var curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
+                        {
+                            Data.Add((curFoot, foot, percent, severity, reason, gps));
+                        }
                     }
                 }
                 else
                 {
-                    //DCVG
-                    var severity = PGESeverity.NRI;
-                    var reason = "DCVG % IR is greater than 0% and less than 16%";
-                    if (percent > 60)
+                    if(isDcvg)
                     {
-                        severity = PGESeverity.Severe;
-                        reason = "DCVG % IR is greater than 60%";
+                        for (var curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
+                        {
+                            Data.Add((curFoot, foot, percent, PGESeverity.Minor, "DCVG indication present", gps));
+                        }
                     }
-                    else if (percent > 35)
+                    else
                     {
-                        severity = PGESeverity.Moderate;
-                        reason = "DCVG % IR is greater than 35% and less than or equal to 60%";
-                    }
-                    else if (percent >= 16)
-                    {
-                        severity = PGESeverity.Minor;
-                        reason = "DCVG % IR is greater than or equal to 16% and less than or equal to 35%";
-                    }
-                    for (var curFoot = foot - MinimumFeet; curFoot <= foot + MinimumFeet; ++curFoot)
-                    {
-                        Data.Add((curFoot, foot, percent, severity, reason, gps));
+                        throw new NotImplementedException();
                     }
                 }
             }
