@@ -363,7 +363,7 @@ namespace AFSTester
                 commentSeries.BorderType = BorderType.Full;
             }
 
-            commentGraph.CommentSeries = commentSeries;
+            commentGraph.CommentSeries.Add(commentSeries);
             commentGraph.LegendInfo.Name = "CIS Comments";
             commentGraph.DrawTopBorder = false;
 
@@ -377,7 +377,7 @@ namespace AFSTester
                 graph1.YAxesInfo.Y2IsDrawn = true;
             }
             if (!seperateComment)
-                graph1.CommentSeries = commentSeries;
+                graph1.CommentSeries.Add(commentSeries);
             /*
             graph1.YAxesInfo.Y1MaximumValue = 150;
             graph1.YAxesInfo.Y1MinimumValue = 0;
@@ -790,7 +790,7 @@ namespace AFSTester
             onOffGraph.Series.Add(depth);
             onOffGraph.YAxesInfo.Y2IsDrawn = true;
             onOffGraph.YAxesInfo.Y2MaximumValue = maxDepth;
-            onOffGraph.CommentSeries = commentSeries;
+            onOffGraph.CommentSeries.Add(commentSeries);
             onOffGraph.Series.Add(on);
             onOffGraph.Series.Add(off);
             onOffGraph.Series.Add(redLine);
@@ -798,7 +798,7 @@ namespace AFSTester
 
             if (file != null && file.Points.Last().Footage < 100)
             {
-                onOffGraph.CommentSeries.PercentOfGraph = 0.25f;
+                onOffGraph.CommentSeries[0].PercentOfGraph = 0.25f;
             }
 
             var dcvgLabels = dcvgData.Select((value) => (value.Item1, value.Item2.ToString("F1") + "%")).ToList();
@@ -833,7 +833,7 @@ namespace AFSTester
             var pcmComments = new Graph(report);
 
             var pcmCommentSeries = new CommentSeries { Values = pcmCommentData, PercentOfGraph = 1f, IsFlippedVertical = false, BorderType = BorderType.Pegs, BackdropOpacity = 0.75f };
-            pcmComments.CommentSeries = pcmCommentSeries;
+            pcmComments.CommentSeries.Add(pcmCommentSeries);
             pcmComments.XAxisInfo.Title = "PCM Comments";
 
             var bottomGlobalXAxis = new GlobalXAxis(report)
@@ -1363,7 +1363,7 @@ namespace AFSTester
             yAxesInfo.Y1MaximumValue = 500;
             yAxesInfo.Y1IsInverted = false;
 
-            onOffGraph.CommentSeries = commentSeries;
+            onOffGraph.CommentSeries.Add(commentSeries);
             onOffGraph.Series.Add(on);
             onOffGraph.DrawTopBorder = true;
             onOffGraph.DrawBottomBorder = true;
@@ -2137,7 +2137,7 @@ namespace AFSTester
             mainGraph.Series.Add(sixtyRes);
             mainGraph.Series.Add(oneTwentyRes);
             mainGraph.DrawTopBorder = false;
-            mainGraph.CommentSeries = commentSeries;
+            mainGraph.CommentSeries.Add(commentSeries);
             mainGraph.YAxesInfo.Y2IsDrawn = false;
             mainGraph.YAxesInfo.Y1IsInverted = false;
             mainGraph.YAxesInfo.Y1MinimumValue = 0;
@@ -2358,7 +2358,7 @@ namespace AFSTester
             mainGraph.Series.Add(redLine);
             mainGraph.Series.Add(polarizationLine);
             mainGraph.DrawTopBorder = false;
-            mainGraph.CommentSeries = commentSeries;
+            mainGraph.CommentSeries.Add(commentSeries);
             mainGraph.YAxesInfo.Y2IsDrawn = true;
             mainGraph.YAxesInfo.Y2Title = "Depth (inches)";
             mainGraph.YAxesInfo.Y2MaximumValue = 150;

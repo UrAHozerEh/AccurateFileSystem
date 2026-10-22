@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Devices.Geolocation;
+using static AccurateFileSystem.HcaRegion;
 
 namespace AccurateFileSystem
 {
@@ -25,6 +26,8 @@ namespace AccurateFileSystem
         public bool HasDcvg => Regions.Where(r => !r.ShouldSkip).Any(r => r.HasDcvg) || (StartBuffer?.HasDcvg ?? false) || (EndBuffer?.HasDcvg ?? false);
         public bool HasAcvg => Regions.Where(r => !r.ShouldSkip).Any(r => r.HasAcvg) || (StartBuffer?.HasAcvg ?? false) || (EndBuffer?.HasAcvg ?? false);
         public bool HasPcm => Regions.Where(r => !r.ShouldSkip).Any(r => r.HasPcm) || (StartBuffer?.HasPcm ?? false) || (EndBuffer?.HasPcm ?? false);
+        public string StartActualMp { get; set; }
+        public string EndActualMp { get; set; }
 
 
         public Hca(string name, string lineName, List<string[]> lines)
@@ -36,6 +39,7 @@ namespace AccurateFileSystem
             EndBuffer = null;
             //lines = SortLines(lines);
             ParseLines(lines);
+            SetMpForHca();
         }
 
         public List<Skip> ExtractSkips()
@@ -154,11 +158,13 @@ namespace AccurateFileSystem
             return (startMp, endMp);
         }
 
-        public (string StartMp, string EndMp) GetMpForHca()
+        public void SetMpForHca()
         {
             if (Regions.Count == 0)
             {
-                return ("N/A", "N/A");
+                StartActualMp = "N/A";
+                EndActualMp = "N/A";
+                return;
             }
             var startMp = Regions.First().StartMp;
             var endMp = Regions.Last().EndMp;
@@ -170,7 +176,13 @@ namespace AccurateFileSystem
             {
                 endMp = $"{hcaEndMpDouble:F4}";
             }
-            return (startMp, endMp);
+            StartActualMp = startMp;
+            EndActualMp = endMp;
+        }
+
+        public (string StartMp, string EndMp) GetMpForHca()
+        {
+            return (StartActualMp, EndActualMp);
         }
 
         private HcaRegion GetCloserRegion(HcaRegion region1, HcaRegion region2, BasicGeoposition gps)
@@ -244,7 +256,8 @@ namespace AccurateFileSystem
             var regionHasAcvg = false;
             var regionHasDcvg = false;
             var regionHasPcm = false;
-            var tools = string.Join(" ", line.Skip(11).Take(4)).Trim();
+            SkipInfo? skipInfo = null;
+            var tools = string.Join(" ", line.Skip(10).Take(4)).Trim();
             if (tools.Contains("acvg", StringComparison.OrdinalIgnoreCase))
             {
                 regionHasAcvg = true;
@@ -257,7 +270,22 @@ namespace AccurateFileSystem
             {
                 regionHasPcm = true;
             }
-
+            if (tools.Contains("aci", StringComparison.OrdinalIgnoreCase))
+            {
+                skipInfo = new SkipInfo() 
+                { 
+                    ShortReason = "Atmospheric",
+                    LongReaason = "Atmospheric Corrosion Inspection"
+                };
+            }
+            if (tools.Contains("pcm w", StringComparison.OrdinalIgnoreCase) || tools.Contains("frame", StringComparison.OrdinalIgnoreCase))
+            {
+                skipInfo = new SkipInfo()
+                {
+                    ShortReason = "Casing",
+                    LongReaason = "Casing Inspection"
+                };
+            }
             for (var i = startIndex + 1; i < lines.Count; ++i)
             {
                 line = lines[i];
@@ -271,6 +299,7 @@ namespace AccurateFileSystem
                 var curHasAcvg = false;
                 var curHasDcvg = false;
                 var curHasPcm = false;
+                
                 if (curTools.Contains("acvg", StringComparison.OrdinalIgnoreCase))
                 {
                     curHasAcvg = true;
@@ -283,6 +312,7 @@ namespace AccurateFileSystem
                 {
                     curHasPcm = true;
                 }
+                
                 var nextName = line[8].Trim();
                 if (nextName.IndexOf("-") != -1)
                 {
@@ -305,7 +335,7 @@ namespace AccurateFileSystem
             var allGps = new List<BasicGeoposition>() { startGps };
             allGps.AddRange(middleGps);
             allGps.Add(endGps);
-            return new HcaRegion(allGps, name, route, startMp, endMp, isFirstTime, regionHasDcvg, regionHasAcvg, regionHasPcm);
+            return new HcaRegion(allGps, name, route, startMp, endMp, isFirstTime, regionHasDcvg, regionHasAcvg, regionHasPcm, skipInfo);
         }
 
         private bool IsSameFirstTime(bool? first, bool? second)

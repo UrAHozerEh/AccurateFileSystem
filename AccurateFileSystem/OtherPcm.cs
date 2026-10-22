@@ -25,7 +25,7 @@ namespace AccurateFileSystem
             for (var i = 0; i < Headers.Count; ++i)
             {
                 var header = Headers[i].Trim();
-                if (header.StartsWith("depth", StringComparison.OrdinalIgnoreCase))
+                if (header.StartsWith("depth", StringComparison.OrdinalIgnoreCase) || header.StartsWith("pipedepth", StringComparison.OrdinalIgnoreCase))
                 {
                     depthColumn = i;
                     continue;
@@ -39,6 +39,7 @@ namespace AccurateFileSystem
                         lonColumn = i;
                         break;
                     case "Signal_Cur":
+                    case "SignalCurrentA":
                         ampColumn = i;
                         break;
                     case "GPS_Date":

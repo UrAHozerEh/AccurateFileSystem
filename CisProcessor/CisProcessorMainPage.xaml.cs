@@ -68,6 +68,8 @@ namespace CisProcessor
             FileDebug.IsEnabled = enabled;
             PassingShapes.IsEnabled = enabled;
             StaticComments.IsEnabled = enabled;
+            DoShapefile.IsEnabled = enabled;
+
         }
 
         private static async Task<(string, bool)?> InputTextDialogAsync(string title, string testStationData, string firstComment, string lastComment)
@@ -191,7 +193,7 @@ namespace CisProcessor
                 return null;
         }
 
-        
+
 
         private static async Task<(string, bool)?> ShowFoundFilesAsync(IReadOnlyList<StorageFile> files)
         {
@@ -269,6 +271,24 @@ namespace CisProcessor
             return output;
         }
 
+        private List<(BasicGeoposition Gps, string Read)> ParseAnomalies(List<string> lines)
+        {
+            //var correction = 15.563025007672872650175335959592166719366374913056088;
+            var output = new List<(BasicGeoposition Gps, string Read)>();
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+                var splitLine = line.Split(',');
+                var lat = double.Parse(splitLine[0]);
+                var lon = double.Parse(splitLine[1]);
+                var read = splitLine[2]; //- correction;
+                var gps = new BasicGeoposition() { Latitude = lat, Longitude = lon };
+                output.Add((gps, read));
+            }
+            return output;
+        }
+
         private List<(double, string)> GetAlignedAcvgData(List<(BasicGeoposition, double)> acvgReads, CombinedAllegroCisFile cisCombinedData)
         {
             var output = new List<(double, string)>();
@@ -332,48 +352,67 @@ namespace CisProcessor
             if (FileDebug.IsChecked ?? false)
                 await ShowFoundFilesAsync(files);
             var cisFiles = new List<AllegroCISFile>();
+            var dcvgFiles = new List<AllegroCISFile>();
             var docFiles = new List<CsvPcm>();
             var fileNames = new HashSet<string>();
             var acvgReads = new List<(BasicGeoposition, double)>();
+            var anomLabels = new List<(BasicGeoposition, string)>();
             var hasAcvgFiles = false;
 
             foreach (var storageFile in files)
             {
-                var fileFactory = new FileFactory(storageFile);
-                var file = await fileFactory.GetFile();
-                if (file == null && storageFile.FileType.ToLower() == ".acvg")
+                try
                 {
-                    acvgReads = ParseAcvgReads(await storageFile.GetLines());
-                    hasAcvgFiles = true;
-                }
-                if (file is CsvPcm docFile)
-                {
-                    docFiles.Add(docFile);
-                    continue;
-                }
-                if (file is CisSettings settings)
-                {
-                    cisSettings = settings;
-                    continue;
-                }
-                if (!(file is AllegroCISFile allegroFile))
-                    continue;
-                if (!fileNames.Contains(allegroFile.Name))
-                {
-                    cisFiles.Add(allegroFile);
-                    fileNames.Add(allegroFile.Name);
-                }
-                else
-                {
-                    if (allegroFile.Extension != ".csv") continue;
-                    for (var i = 0; i < cisFiles.Count; ++i)
+                    var fileFactory = new FileFactory(storageFile);
+                    var file = await fileFactory.GetFile();
+                    if (file == null && storageFile.FileType.ToLower() == ".anoms")
                     {
-                        if (cisFiles[i].Name != allegroFile.Name) continue;
-                        cisFiles.RemoveAt(i);
+                        anomLabels = ParseAnomalies(await storageFile.GetLines());
+                    }
+                    if (file == null && storageFile.FileType.ToLower() == ".acvg")
+                    {
+                        acvgReads = ParseAcvgReads(await storageFile.GetLines());
+                        hasAcvgFiles = true;
+                    }
+                    if (file is CsvPcm docFile)
+                    {
+                        docFiles.Add(docFile);
+                        continue;
+                    }
+                    if (file is CisSettings settings)
+                    {
+                        cisSettings = settings;
+                        continue;
+                    }
+                    if (!(file is AllegroCISFile allegroFile))
+                        continue;
+                    if (allegroFile.Type == FileType.DCVG)
+                    {
+                        dcvgFiles.Add(allegroFile);
+                        continue;
+                    }
+                    if (!fileNames.Contains(allegroFile.Name))
+                    {
                         cisFiles.Add(allegroFile);
-                        break;
+                        fileNames.Add(allegroFile.Name);
+                    }
+                    else
+                    {
+                        if (allegroFile.Extension != ".csv") continue;
+                        for (var i = 0; i < cisFiles.Count; ++i)
+                        {
+                            if (cisFiles[i].Name != allegroFile.Name) continue;
+                            cisFiles.RemoveAt(i);
+                            cisFiles.Add(allegroFile);
+                            break;
+                        }
                     }
                 }
+                catch (Exception ex)
+                {
+                    throw new Exception($"'{storageFile.DisplayName}' ran into an issue while being imported:\n{ex.Message}");
+                }
+
             }
 
             if (cisFiles.Count == 0) return;
@@ -387,6 +426,7 @@ namespace CisProcessor
 
             var onOffFiles = new List<AllegroCISFile>();
             var staticFiles = new List<AllegroCISFile>();
+            var c2cFiles = new List<AllegroCISFile>();
 
             foreach (var file in cisFiles)
             {
@@ -399,7 +439,12 @@ namespace CisProcessor
                     staticFiles.Add(file);
                 }
             }
-            if(onOffFiles.Count ==  0 && staticFiles.Count != 0)
+            if(staticFiles.Count > 0 && staticFiles[0].Name.StartsWith("c2c"))
+            {
+                c2cFiles.Add(staticFiles[0]);
+                staticFiles.RemoveAt(0);
+            }
+            if (onOffFiles.Count == 0 && staticFiles.Count != 0)
             {
                 onOffFiles.AddRange(staticFiles);
                 staticFiles.Clear();
@@ -409,6 +454,8 @@ namespace CisProcessor
             var type = $" On Off {(staticFiles.Count == 0 ? "" : "And Depol ")}CIS";
             var combinedOnOffFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + type, onOffFiles, 5);
             var combinedStaticFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + " Depol CIS", staticFiles, 5);
+            var combinedCellToCellFiles = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + " Cell to Cell", c2cFiles, 5);
+            var combinedDcvg = CombinedAllegroCisFile.CombineOrderedFiles(folder.DisplayName + " DCVG", dcvgFiles, 5);
 
             combinedStaticFiles?.AddPcmDepthData(docFiles);
             combinedStaticFiles?.AddMaxDepthComment(cisSettings.DepthGraphMaxValue);
@@ -458,31 +505,31 @@ namespace CisProcessor
             {
                 combinedOnOffFiles.ShiftPoints(-combinedOnOffFiles.Points[1].Footage);
             }
-            if (staticFiles.Count > 0 && onOffFiles.Count > 0)
+            if (c2cFiles.Count > 0 && onOffFiles.Count > 0)
             {
                 var onOffStart = combinedOnOffFiles.Points.First().Point.GPS;
                 var onOffEnd = combinedOnOffFiles.Points.Last().Point.GPS;
-                var staticStart = combinedStaticFiles.Points.First().Point.GPS;
-                var staticEnd = combinedStaticFiles.Points.Last().Point.GPS;
+                var staticStart = combinedCellToCellFiles.Points.First().Point.GPS;
+                var staticEnd = combinedCellToCellFiles.Points.Last().Point.GPS;
                 if (staticStart.Distance(onOffEnd) < staticStart.Distance(onOffStart))
                 {
-                    combinedStaticFiles.Reverse();
+                    combinedCellToCellFiles.Reverse();
                 }
-                combinedStaticFiles.AlignTo(combinedOnOffFiles);
+                combinedCellToCellFiles.AlignTo(combinedOnOffFiles);
             }
             if (!hasAcvgFiles)
                 acvgReads = null;
             var finishedFinalName = finishedFileNames.GetValueOrDefault(folder.DisplayName, null);
             if (combinedStaticFiles != null && combinedOnOffFiles != null)
             {
-                var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, outputFolder, pcmReads, cisSettings, acvgReads, finishedFinalName);
+                var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, combinedStaticFiles, combinedDcvg, outputFolder, pcmReads, cisSettings, acvgReads, anomLabels, finishedFinalName);
                 await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedOnOffFiles.FileInfos.GetExcelData(0)) }, fileOrder);
                 await CreateExcelFile($"{folder.DisplayName} Static+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", combinedStaticFiles.FileInfos.GetExcelData(0)) }, fileOrder);
             }
             else
             {
                 var file = combinedOnOffFiles ?? combinedStaticFiles;
-                var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, null, outputFolder, pcmReads, cisSettings, acvgReads, finishedFinalName);
+                var (text, isReversed) = await MakeOnOffStaticGraphs(combinedOnOffFiles, null, combinedDcvg, outputFolder, pcmReads, cisSettings, acvgReads, anomLabels, finishedFinalName, combinedCellToCellFiles);
                 await CreateExcelFile($"{folder.DisplayName}+{text}+{(isReversed ? "T" : "F")}", new List<(string Name, string Data)>() { ("Order", file.FileInfos.GetExcelData(0)) }, fileOrder);
             }
 
@@ -505,7 +552,7 @@ namespace CisProcessor
             return output;
         }
 
-        private async Task<(string Text, bool IsReversed)> MakeOnOffStaticGraphs(CombinedAllegroCisFile onOffFile, CombinedAllegroCisFile staticFile, StorageFolder masterOutputFolder, List<(double Footage, double Read)> pcmReads, CisSettings cisSettings, List<(BasicGeoposition Gps, double Read)> acvgReads, (string Text, bool IsReversed)? exact = null)
+        private async Task<(string Text, bool IsReversed)> MakeOnOffStaticGraphs(CombinedAllegroCisFile onOffFile, CombinedAllegroCisFile staticFile, CombinedAllegroCisFile dcvgFile, StorageFolder masterOutputFolder, List<(double Footage, double Read)> pcmReads, CisSettings cisSettings, List<(BasicGeoposition Gps, double Read)> acvgReads, List<(BasicGeoposition Gps, string Read)> anomLabels, (string Text, bool IsReversed)? exact = null, CombinedAllegroCisFile cellToCell = null)
         {
             var testStationInitial = onOffFile.GetTestStationData();
             var firstPoint = onOffFile.Points.First();
@@ -521,7 +568,7 @@ namespace CisProcessor
             if (response == null)
                 return (null, false);
             var staticEndOffset = 0.0;
-            if(staticFile != null)
+            if (staticFile != null)
             {
                 staticEndOffset = onOffFile.Points.Last().Footage - staticFile.Points.Last().Footage;
             }
@@ -529,6 +576,31 @@ namespace CisProcessor
             {
                 onOffFile.Reverse();
             }
+            if (staticFile != null && staticFile.Points.Count > 0 && onOffFile.Points.Count > 0)
+            {
+                var onOffStart = onOffFile.Points.First().Point.GPS;
+                var onOffEnd = onOffFile.Points.Last().Point.GPS;
+                var staticStart = staticFile.Points.First().Point.GPS;
+                var staticEnd = staticFile.Points.Last().Point.GPS;
+                if (staticStart.Distance(onOffEnd) < staticStart.Distance(onOffStart))
+                {
+                    staticFile.Reverse();
+                }
+                staticFile.AlignTo(onOffFile);
+            }
+            if (dcvgFile != null && dcvgFile.Points.Count > 0 && onOffFile.Points.Count > 0)
+            {
+                var onOffStart = onOffFile.Points.First().Point.GPS;
+                var onOffEnd = onOffFile.Points.Last().Point.GPS;
+                var dcvgStart = dcvgFile.Points.First().Point.GPS;
+                var dcvgEnd = dcvgFile.Points.Last().Point.GPS;
+                if (dcvgStart.Distance(onOffEnd) < dcvgStart.Distance(onOffStart))
+                {
+                    dcvgFile.Reverse();
+                }
+                dcvgFile.AlignTo(onOffFile, includeComments: true, exactMatch: true);
+            }
+
             var report = new GraphicalReport();
             if (cisSettings.HasFeetPerPage)
                 report.PageSetup.FootagePerPage = cisSettings.FeetPerPage.Value;
@@ -606,6 +678,16 @@ namespace CisProcessor
                     graph1.Series.Add(offMir);
             }
             List<(double, string)> acvgLabels = null;
+            if(anomLabels != null && anomLabels.Count > 0)
+            {
+                var anomalies = new PointWithLabelGraphSeries($"Anomalies (Weld #)", -0.2, anomLabels.Select((value) => (onOffFile.GetClosestFootage(value.Gps).Footage, value.Read)).ToList())
+                {
+                    ShapeRadius = 3,
+                    PointColor = Colors.Red,
+                    BackdropOpacity = 1f
+                };
+                graph1.Series.Add(anomalies);
+            }
             if (acvgReads != null) // Has ACVG
             {
                 acvgLabels = GetAlignedAcvgData(acvgReads, onOffFile);
@@ -616,6 +698,38 @@ namespace CisProcessor
                     BackdropOpacity = 1f
                 };
                 graph1.Series.Add(acvgIndication);
+            }
+            var dcvgGraph = new Graph(report);
+            if (dcvgFile != null && dcvgFile.Points.Count > 0)
+            {
+                var minRead = Math.Abs(dcvgFile.Points.Min(p => p.Point.On));
+                var maxRead = Math.Abs(dcvgFile.Points.Max(p => p.Point.On));
+                var maxDcvg = Math.Max(Math.Max(minRead, maxRead), 0.1);
+                var dcvgMinorGrid = maxDcvg / 3;
+                dcvgGraph.YAxesInfo.Y1MinimumValue = -maxDcvg;
+                dcvgGraph.YAxesInfo.Y1MaximumValue = maxDcvg;
+                dcvgGraph.YAxesInfo.Y1IsInverted = false;
+                dcvgGraph.YAxesInfo.MajorGridlines.Offset = maxDcvg;
+                dcvgGraph.YAxesInfo.MinorGridlines.Offset = dcvgMinorGrid;
+                dcvgGraph.LegendInfo.Name = "DCVG";
+                dcvgGraph.YAxesInfo.Y1Title = "Volts";
+                var dcvgSeries = new GraphSeries("DCVG", dcvgFile.GetOnData())
+                {
+                    LineColor = Colors.Orange,
+                    MaxDrawDistance = cisSettings.CisGap,
+                };
+
+                var dcvgLabels = dcvgFile.Points.Where(p => p.Point.HasIndication).Select((value) => (value.Footage, "")).ToList();
+
+                var dcvgIndication = new PointWithLabelGraphSeries($"DCVG Indication", -0.3, dcvgLabels)
+                {
+                    ShapeRadius = 3,
+                    PointColor = Colors.Red,
+                    BackdropOpacity = 1f
+                };
+                graph1.Series.Add(dcvgIndication);
+
+                dcvgGraph.Series.Add(dcvgSeries);
             }
             List<(double Footage, double Value)> polData = null;
             if (staticFile != null)
@@ -650,6 +764,43 @@ namespace CisProcessor
                 graph1.Series.Add(depth);
                 graph1.YAxesInfo.Y2IsDrawn = true;
             } // DEPTH
+            Graph ampGraph = null;
+            if(cellToCell != null)
+            {
+                ampGraph = new Graph(report);
+                var minAmp = cellToCell.GetOnData().Min(v => v.value);
+                var maxAmp = cellToCell.GetOnData().Max(v => v.value);
+                if (maxAmp - minAmp <= 0.1)
+                {
+                    minAmp = maxAmp - (0.1 * maxAmp);
+                    maxAmp = maxAmp + (0.1 * maxAmp);
+                }
+                var diff = maxAmp - minAmp;
+                var yBuffer = diff * 0.1;
+                var minY = minAmp - yBuffer;
+                var maxY = maxAmp + yBuffer;
+                var ySize = maxY - minY;
+                ampGraph.YAxesInfo.Y2IsEnabled = false;
+                ampGraph.YAxesInfo.Y1Title = "V";
+                ampGraph.YAxesInfo.Y1IsInverted = false;
+                ampGraph.YAxesInfo.Y1MinimumValue = minY;
+                ampGraph.YAxesInfo.Y1MaximumValue = maxY;
+                ampGraph.YAxesInfo.MajorGridlines.Offset = ySize / 3;
+                ampGraph.YAxesInfo.MinorGridlines.IsEnabled = false;
+                ampGraph.LegendInfo.Name = "Cell to Cell";
+                ampGraph.YAxesInfo.Y1LabelFormat = "F3";
+
+                var ampsLine = new GraphSeries("Cell to Cell (V)", cellToCell.GetOnData())
+                {
+                    LineColor = Colors.Blue,
+                    PointShape = GraphSeries.Shape.Circle,
+                    PointColor = Colors.Blue,
+                    ShapeRadius = 2,
+                    MaxDrawDistance = 130,
+                    IsDrawnInLegend = false,
+                };
+                ampGraph.Series.Add(ampsLine);
+            }
             if (cisSettings.HasMinOffValue)
             {
                 var redLine = new SingleValueGraphSeries($"{cisSettings.MinOffValue:F3} Line", cisSettings.MinOffValue.Value)
@@ -709,7 +860,7 @@ namespace CisProcessor
             //{
             //    RequestedPercent = 0.5
             //};
-            var chart1 = new Chart(report, "Survey Direction and Survey Date")
+            var chart1 = new Chart(report, "Survey Direction")// and Survey Date")
             {
                 LegendInfo =
                 {
@@ -770,11 +921,14 @@ namespace CisProcessor
 
             //chart1.LegendInfo.NameFontSize = 18f;
 
-            var chart1Series = new SurveyDirectionWithDateSeries(onOffFile.GetDirectionWithDateData());
+            //var chart1Series = new SurveyDirectionWithDateSeries(onOffFile.GetDirectionWithDateData());
+            var chart1Series = new SurveyDirectionSeries(onOffFile.GetDirectionData());
             chart1.Series.Add(chart1Series);
 
             splitContainer.AddSelfSizedContainer(topGlobalXAxis);
             splitContainer.AddContainer(graph1);
+            if(dcvgFile != null && dcvgFile.Points.Count > 0)
+                splitContainer.AddContainerPercent(dcvgGraph, 0.15);
             if (onOffFile.Type != FileType.Native)
             {
                 if (cisSettings.HasCisExceptions)
@@ -785,6 +939,8 @@ namespace CisProcessor
             splitContainer.AddSelfSizedContainer(chart1);
             //splitContainer.AddContainer(graph2);
             //splitContainer.AddContainer(graph3);
+            if(ampGraph != null)
+                splitContainer.AddContainerPercent(ampGraph, 0.15);
             splitContainer.AddSelfSizedContainer(bottomGlobalXAxis);
             report.Container = splitContainer;
             var lastFoot = onOffFile.Points.Last().Footage;
@@ -800,7 +956,7 @@ namespace CisProcessor
             };
             if (polData != null)
             {
-                addedPcmValues.Add(("Polarizaion", polData));
+                addedPcmValues.Add(("Polarization", polData));
             }
             if (acvgLabels != null)
             {
@@ -1006,6 +1162,80 @@ namespace CisProcessor
                 var mergeCell = new MergeCell() { Reference = new DocumentFormat.OpenXml.StringValue(mergeCellString) };
                 mergeCells.Append(mergeCell);
             }
+        }
+
+        private async Task Import()
+        {
+            var errorDialog = new MessageDialog("", "Error");
+
+            var folderPicker = new FolderPicker();
+            var folder = await folderPicker.PickSingleFolderAsync();
+            if (folder == null)
+            {
+                return;
+            }
+            var files = await folder.GetFilesAsync();
+            var count = 0;
+            foreach (var file in files)
+            {
+                var extension = file.FileType;
+                if (!extension.Equals(".csv", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var lines = await file.GetLines();
+                var tabCount = lines.Sum(l => l.Count(c => c == '\t'));
+                var commaCount = lines.Sum(l => l.Count(c => c == ','));
+                if (tabCount > commaCount)
+                {
+                    for (int i = 0; i < lines.Count; i++)
+                    {
+                        lines[i] = lines[i].Replace('\t', ',');
+                    }
+                }
+
+                var csv = new GeneralCsv(file.DisplayName, lines);
+                var csvLines = new List<string[]>
+                {
+                    csv.Headers.ToArray()
+                };
+                for (int i = 0; i < csv.Data.GetLength(0); i++)
+                {
+                    var line = GetRow(csv.Data, i);
+                    csvLines.Add(line);
+                }
+
+                var sempraShapeFileTest = new ShapefileData($"{file.DisplayName} Shapefile", csvLines);
+                await sempraShapeFileTest.WriteToFolder(folder);
+                ++count;
+            }
+            var finishDialog = new MessageDialog($"Made {count} shapefiles", "Finished");
+            await finishDialog.ShowAsync();
+        }
+
+        private static T[] GetRow<T>(T[,] matrix, int rowIndex)
+        {
+            if (matrix == null)
+                throw new ArgumentNullException(nameof(matrix), "Matrix cannot be null.");
+
+            int totalRows = matrix.GetLength(0);
+            int totalCols = matrix.GetLength(1);
+
+            if (rowIndex < 0 || rowIndex >= totalRows)
+                throw new ArgumentOutOfRangeException(nameof(rowIndex), $"Row index must be between 0 and {totalRows - 1}.");
+
+            T[] row = new T[totalCols];
+            for (int col = 0; col < totalCols; col++)
+            {
+                row[col] = matrix[rowIndex, col];
+            }
+            return row;
+        }
+
+        private async void DoShapefile_Click(object sender, RoutedEventArgs e)
+        {
+            await Import();
         }
     }
 }

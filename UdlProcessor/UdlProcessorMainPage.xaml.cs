@@ -30,9 +30,10 @@ namespace UdlProcessor
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        private const bool _makeHourly = true;
-        private const bool _makeDaily = true;
+        private const bool _makeHourly = false;
+        private const bool _makeDaily = false;
         private const bool _drawLine = false;
+        private List<string> _fileNameRemovals = new List<string> { "_" };
         public MainPage()
         {
             this.InitializeComponent();
@@ -71,6 +72,10 @@ namespace UdlProcessor
                 var udl = file as UdlFile;
                 var dailyUdlData = udl.GetDayFullData(24);
                 var fileName = file.Name.Replace(".csv", "");
+                foreach(var remove in _fileNameRemovals)
+                {
+                    fileName = fileName.Replace(remove, " ");
+                }
                 var fileFolder = await masterOutputFolder.CreateFolderAsync(fileName, CreationCollisionOption.OpenIfExists);
                 foreach (var (readType, dailyGraphData) in dailyUdlData)
                 {
@@ -117,8 +122,9 @@ namespace UdlProcessor
                     {
                         continue;
                     }
+                    
                     var graphTitle = $"{fullDataSet.StartTime:g} to {fullDataSet.EndTime:g} All Data".Replace("/", "-");
-                    var fullFileName = $"{readType} {fileName} All Data";
+                    var fullFileName = $"{readType} {fileName}";
                     await MakeFullGraphs(fullDataSet, readType, fullFileName, fileFolder, min, max);
                 }
             }
@@ -369,18 +375,42 @@ namespace UdlProcessor
             var startHour = dataSet.Values.First().Hour;
             var endHour = dataSet.Values.Last().Hour;
             var totalHours = endHour - startHour;
-            var minorTimeOffset = 2;
-            var majorTimeOffset = 6;
-            if (totalHours > 36)
-            {
-                minorTimeOffset = 6;
-                majorTimeOffset = 24;
-            }
-            if(totalHours > 120)
+            var minorTimeOffset = 0.1;
+            var majorTimeOffset = 0.5;
+            if (totalHours > 120)
             {
                 minorTimeOffset = (int)(totalHours / 5.0);
                 majorTimeOffset = (int)(totalHours / 5.0);
             }
+            else if (totalHours > 36)
+            {
+                minorTimeOffset = 6;
+                majorTimeOffset = 24;
+            }
+            else if (totalHours > 12)
+            {
+                minorTimeOffset = 3;
+                majorTimeOffset = 12;
+            }
+            else if(totalHours > 6)
+            {
+                minorTimeOffset = 2;
+                majorTimeOffset = 6;
+            }
+            else if(totalHours > 1)
+            {
+                minorTimeOffset = 0.5;
+                majorTimeOffset = 1;
+            }
+            else if (totalHours < 0.5)
+            {
+                var mins = (int)(totalHours * 60);
+                
+                majorTimeOffset = (double)mins/5/60;
+                minorTimeOffset = majorTimeOffset/4;
+            }
+
+
             var report = CreateReport(dataSet, reportName, readName, min, max, minorTimeOffset, majorTimeOffset);
             report.XAxisInfo.LabelFormat = "DateHour";
             report.XAxisInfo.StartDate = dataSet.StartTime;

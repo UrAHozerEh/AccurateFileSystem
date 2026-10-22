@@ -61,7 +61,7 @@ namespace AccurateFileSystem
                                 return new CisSettings(File.DisplayName, lines);
                             return new GeneralCsv(File.DisplayName, lines);
                         }
-                        catch
+                        catch(Exception ex)
                         {
                             return new GeneralCsv(File.DisplayName, lines);
                         }
@@ -210,104 +210,109 @@ namespace AccurateFileSystem
                 var extraCommasShort = extraCommasMatch.Success ? extraCommasMatch.Value.Substring(1) : "";
                 double? startFoot = null;
                 AllegroDataPoint lastPoint = null;
-
-                while (!reader.EndOfStream)
+                try
                 {
-                    line = reader.ReadLine().Trim();
-                    ++lineCount;
-                    if (isHeader)
+                    while (!reader.EndOfStream)
                     {
-                        if (extraCommasMatch.Success)
-                            line = line.Replace(extraCommasShort, "");
-                        var firstDelimiter = line.IndexOf(headerDelimiter);
-                        if (firstDelimiter == -1)
-                            throw new Exception();
-                        var key = line.Substring(0, firstDelimiter).Trim();
-                        var value = line.Substring(firstDelimiter + 1).Trim();
-                        if (key == "Records")
+                        line = reader.ReadLine().Trim();
+                        ++lineCount;
+                        if (isHeader)
                         {
-                            value = value.Replace(":", "");
-                            isHeader = false;
-                            if (header.ContainsKey("survey_type"))
+                            if (extraCommasMatch.Success)
+                                line = line.Replace(extraCommasShort, "");
+                            var firstDelimiter = line.IndexOf(headerDelimiter);
+                            if (firstDelimiter == -1)
+                                throw new Exception();
+                            var key = line.Substring(0, firstDelimiter).Trim();
+                            var value = line.Substring(firstDelimiter + 1).Trim();
+                            if (key == "Records")
                             {
-                                if (header["survey_type"] == "DC Survey")
+                                value = value.Replace(":", "");
+                                isHeader = false;
+                                if (header.ContainsKey("survey_type"))
                                 {
-                                    if (header.ContainsKey("onoff"))
+                                    if (header["survey_type"] == "DC Survey")
                                     {
-                                        if (header["onoff"] == "T")
-                                            type = FileType.OnOff;
-                                        else
-                                            type = FileType.Native;
+                                        if (header.ContainsKey("onoff"))
+                                        {
+                                            if (header["onoff"] == "T")
+                                                type = FileType.OnOff;
+                                            else
+                                                type = FileType.Native;
+                                        }
+                                    }
+                                    else if (header["survey_type"] == "DCVG Survey")
+                                    {
+                                        type = FileType.DCVG;
                                     }
                                 }
-                                else if (header["survey_type"] == "DCVG Survey")
+                                if (header.ContainsKey("survey type"))
                                 {
-                                    type = FileType.DCVG;
-                                }
-                            }
-                            if (header.ContainsKey("survey type"))
-                            {
-                                if (header["survey type"] == "DC Survey")
-                                {
-                                    if (header.ContainsKey("onoff"))
+                                    if (header["survey type"] == "DC Survey")
                                     {
-                                        if (header["onoff"] == "T")
-                                            type = FileType.OnOff;
-                                        else
-                                            type = FileType.Native;
+                                        if (header.ContainsKey("onoff"))
+                                        {
+                                            if (header["onoff"] == "T")
+                                                type = FileType.OnOff;
+                                            else
+                                                type = FileType.Native;
+                                        }
+                                    }
+                                    else if (header["survey type"] == "DCVG Survey")
+                                    {
+                                        type = FileType.DCVG;
                                     }
                                 }
-                                else if (header["survey type"] == "DCVG Survey")
-                                {
-                                    type = FileType.DCVG;
-                                }
                             }
+                            if (string.IsNullOrWhiteSpace(key) && string.IsNullOrWhiteSpace(value))
+                            {
+                                continue;
+                            }
+                            (key, value) = FixHeaderKeyValue(key, value);
+                            if (header.ContainsKey(key))
+                                header[key] = value;
+                            else
+                                header.Add(key, value);
                         }
-                        if (string.IsNullOrWhiteSpace(key) && string.IsNullOrWhiteSpace(value))
+                        else
                         {
-                            continue;
-                        }
-                        (key, value) = FixHeaderKeyValue(key, value);
-                        if (header.ContainsKey(key))
-                            header[key] = value;
-                        else
-                            header.Add(key, value);
-                    }
-                    else
-                    {
-                        if (extraCommasMatch.Success)
-                            line = line.Replace(extraCommasMatch.Value, "");
-                        if (line == "End survey" || string.IsNullOrEmpty(line))
-                            continue;
-                        AllegroDataPoint point;
-                        if (headerDelimiter == "=")
-                            point = ParseAllegroLineFromACI(pointId, line);
-                        else
-                            point = ParseAllegroLineFromCSV(pointId, line, type);
-                        if (startFoot == null)
-                            startFoot = point.Footage;
+                            if (extraCommasMatch.Success)
+                                line = line.Replace(extraCommasMatch.Value, "");
+                            if (line == "End survey" || string.IsNullOrEmpty(line))
+                                continue;
+                            AllegroDataPoint point;
+                            if (headerDelimiter == "=")
+                                point = ParseAllegroLineFromACI(pointId, line);
+                            else
+                                point = ParseAllegroLineFromCSV(pointId, line, type);
+                            if (startFoot == null)
+                                startFoot = point.Footage;
 
-                        if (extension != ".dvg")
-                            point.Footage -= startFoot ?? 0;
-                        if (noGaps && lastPoint != null && point.Footage - lastPoint.Footage > 20)
-                        {
-                            startFoot += point.Footage - lastPoint.Footage - 10;
-                            point.Footage -= point.Footage - lastPoint.Footage - 10;
-                        }
-                        if (noGaps && lastPoint != null && type == FileType.OnOff && lastPoint.Footage + 20 == point.Footage)
-                        {
-                            var extrapolatedOn = (lastPoint.On + point.On) / 2;
-                            var extrapolatedOff = (lastPoint.Off + point.Off) / 2;
-                            var curGps = point.HasGPS ? point.GPS : lastPoint.GPS;
-                            var extrapolatedPoint = new AllegroDataPoint(point.Id, lastPoint.Footage + 10, extrapolatedOn, extrapolatedOff, curGps, point.Times, point.IndicationValue, "", false);
-                            point.Id += 1;
-                            points.Add(extrapolatedPoint.Id, extrapolatedPoint);
+                            if (extension != ".dvg")
+                                point.Footage -= startFoot ?? 0;
+                            if (noGaps && lastPoint != null && point.Footage - lastPoint.Footage > 20)
+                            {
+                                startFoot += point.Footage - lastPoint.Footage - 10;
+                                point.Footage -= point.Footage - lastPoint.Footage - 10;
+                            }
+                            if (noGaps && lastPoint != null && type == FileType.OnOff && lastPoint.Footage + 20 == point.Footage)
+                            {
+                                var extrapolatedOn = (lastPoint.On + point.On) / 2;
+                                var extrapolatedOff = (lastPoint.Off + point.Off) / 2;
+                                var curGps = point.HasGPS ? point.GPS : lastPoint.GPS;
+                                var extrapolatedPoint = new AllegroDataPoint(point.Id, lastPoint.Footage + 10, extrapolatedOn, extrapolatedOff, curGps, point.Times, point.IndicationValue, "", false);
+                                point.Id += 1;
+                                points.Add(extrapolatedPoint.Id, extrapolatedPoint);
+                                ++pointId;
+                            }
+                            points.Add(point.Id, point);
+                            lastPoint = point;
                             ++pointId;
                         }
-                        points.Add(point.Id, point);
-                        lastPoint = point;
-                        ++pointId;
                     }
+                } catch(Exception ex)
+                {
+                    throw new Exception($"Allegro file line '{lineCount}' has an issue.");
                 }
             }
             var output = new AllegroCISFile(FileName, extension, header, points, type);

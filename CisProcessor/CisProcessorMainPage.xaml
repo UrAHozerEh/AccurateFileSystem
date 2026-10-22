@@ -14,6 +14,7 @@
             <RowDefinition/>
             <RowDefinition/>
             <RowDefinition/>
+            <RowDefinition/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
@@ -22,5 +23,6 @@
         <CheckBox x:Name="PassingShapes" Content="Passing Shapefiles" Grid.Row="1"/>
         <CheckBox x:Name="FileDebug" Content="Debug Files" Grid.Row="2"/>
         <CheckBox x:Name="StaticComments" Content="Debug Static Comments" Grid.Row="3"/>
+        <Button x:Name="DoShapefile" Content="Make Shapefiles" HorizontalAlignment="Center" Grid.Row="4" Click="DoShapefile_Click"/>
     </Grid>
 </Page>

@@ -16,6 +16,7 @@ namespace AccurateReportSystem
     public class PGEDirectExaminationPriorityChartSeries : ExceptionsChartSeries
     {
         public bool IsPge { get; } = true;
+        public string PriorityName => IsPge ? "Priority" : "Level";
         public bool ReportQCanShowMidCis { get; set; } = false;
         public override int NumberOfValues => 3;
         public Color OneColor { get; set; } = Colors.Red;
@@ -53,8 +54,9 @@ namespace AccurateReportSystem
         private static int ACVG = 32;
         private static int ACVGCAT = 33;
 
-        public PGEDirectExaminationPriorityChartSeries(Chart chart, CisSeries cisSeries = null, IndicationSeries dcvgSeries = null, IndicationSeries acvgSeries = null, List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool isReverse, string ReadDate)> ampReads = null) : base(chart.LegendInfo, chart.YAxesInfo)
+        public PGEDirectExaminationPriorityChartSeries(Chart chart, bool isPge, CisSeries cisSeries = null, IndicationSeries dcvgSeries = null, IndicationSeries acvgSeries = null, List<(double Footage, BasicGeoposition Gps, double Value, double Percent, bool isReverse, string ReadDate)> ampReads = null) : base(chart.LegendInfo, chart.YAxesInfo)
         {
+            IsPge = isPge;
             CisSeries = cisSeries;
             DcvgSeries = dcvgSeries;
             AcvgSeries = acvgSeries;
@@ -279,21 +281,30 @@ namespace AccurateReportSystem
                 firstSempra[3] = lastPrimaryDes;
                 firstSempra[7] = $"{lastOn:F3}";
                 firstSempra[8] = $"{lastOff:F3}";
-                if (dcvgSeverities.ContainsKey(0))
+                if (!IsPge && lastRegion.Name == "HCA")
                 {
+                    firstSempra[14] = "1";
+                }
+                if (dcvgSeverities.ContainsKey(0) && dcvgSeverities[0].Item2 == PGESeverity.Minor)
+                {
+                    firstSempra[17] = "Yes";
                     firstSempra[9] = "1";
                 }
-                if (pcmSeverities.ContainsKey(lastStartFoot) && !double.IsNaN(lastAmpValue))
+                else
+                {
+                    firstSempra[17] = "No";
+                }
+                if (pcmSeverities.ContainsKey(lastStartFoot) && !double.IsNaN(lastAmpValue) && lastAmpValue != 0.0)
                     firstSempra[10] = $"{lastAmpValue:F1}";
                 if (lastDepth.HasValue && lastDepth.Value != 0)
                     firstSempra[11] = $"{lastDepth.Value:F1}";
                 firstSempra[15] = lastCisSeverity.GetDisplayName();
                 firstSempra[16] = lastAmpSeverity.GetDisplayName();
-                firstSempra[17] = "Yes";
+                
                 switch (lastPrio)
                 {
                     case 1:
-                        firstSempra[18] = "NRI";
+                        firstSempra[18] = "Level 1";
                         break;
                     case 2:
                         firstSempra[18] = "Level II";
@@ -302,7 +313,7 @@ namespace AccurateReportSystem
                         firstSempra[18] = "Level III";
                         break;
                     case 4:
-                        firstSempra[18] = "Level IV";
+                        firstSempra[18] = "NRI";
                         break;
                 }
                 firstSempra[19] = $"{lastGps.Latitude:F8}";
@@ -322,7 +333,7 @@ namespace AccurateReportSystem
                 firstShapeValues[ECDAREGION] = lastRegion.ReportQName;
                 firstShapeValues[LAT] = lastGps.Latitude.ToString("F8");
                 firstShapeValues[LON] = lastGps.Longitude.ToString("F8");
-                firstShapeValues[ECDACAT] = "Priority " + lastPrio.ToString();
+                firstShapeValues[ECDACAT] = $"{PriorityName} " + lastPrio.ToString();
                 firstShapeValues[CISCAT] = lastCisSeverity.GetDisplayName();
                 firstShapeValues[ON] = lastOn.ToString("F4");
                 firstShapeValues[OFF] = lastOff.ToString("F4");
@@ -342,7 +353,7 @@ namespace AccurateReportSystem
                     firstShapeValues[ECDAREGION] = lastRegion.ReportQName;
                     firstShapeValues[LAT] = lastDcvgGps.Latitude.ToString("F8");
                     firstShapeValues[LON] = lastDcvgGps.Longitude.ToString("F8");
-                    firstShapeValues[ECDACAT] = "Priority " + lastPrio.ToString();
+                    firstShapeValues[ECDACAT] = $"{PriorityName} " + lastPrio.ToString();
                     firstShapeValues[DCVGCAT] = IsPge ? lastDcvgSeverity.GetDisplayName() : "Indication";
                     DcvgShapefileOutput.Add(firstShapeValues);
                 }
@@ -360,12 +371,12 @@ namespace AccurateReportSystem
                     firstShapeValues[ECDAREGION] = lastRegion.ReportQName;
                     firstShapeValues[LAT] = lastAcvgGps.Latitude.ToString("F8");
                     firstShapeValues[LON] = lastAcvgGps.Longitude.ToString("F8");
-                    firstShapeValues[ECDACAT] = "Priority " + lastPrio.ToString();
+                    firstShapeValues[ECDACAT] = $"{PriorityName} " + lastPrio.ToString();
                     firstShapeValues[ACVG] = lastAcvgValue.ToString("F2");
                     firstShapeValues[ACVGCAT] = lastAcvgSeverity.GetDisplayName();
                     AcvgShapefileOutput.Add(firstShapeValues);
                 }
-                if (pcmSeverities.ContainsKey(lastStartFoot) && !Double.IsNaN(lastAmpValue))
+                if (pcmSeverities.ContainsKey(lastStartFoot) && !double.IsNaN(lastAmpValue))
                 {
                     firstShapeValues = new string[34];
 
@@ -379,8 +390,8 @@ namespace AccurateReportSystem
                     firstShapeValues[ECDAREGION] = lastRegion.ReportQName;
                     firstShapeValues[LAT] = lastAmpGps.Latitude.ToString("F8");
                     firstShapeValues[LON] = lastAmpGps.Longitude.ToString("F8");
-                    firstShapeValues[ECDACAT] = "Priority " + lastPrio.ToString();
-                    firstShapeValues[PCM] = lastAmpValue.ToString("F0");
+                    firstShapeValues[ECDACAT] = $"{PriorityName} " + lastPrio.ToString();
+                    firstShapeValues[10] = lastAmpValue.ToString("F0");
                     firstShapeValues[PCMCAT] = lastAmpSeverity.GetDisplayName();
                     AmpsShapeFileOutput.Add(firstShapeValues);
                 }
@@ -425,7 +436,7 @@ namespace AccurateReportSystem
                     shapeValues[ECDAREGION] = curRegion.ReportQName;
                     shapeValues[LAT] = curDcvgGps.Latitude.ToString("F8");
                     shapeValues[LON] = curDcvgGps.Longitude.ToString("F8");
-                    shapeValues[ECDACAT] = "Priority " + curPrio.ToString();
+                    shapeValues[ECDACAT] = $"{PriorityName} " + curPrio.ToString();
                     if (IsPge)
                     {
                         shapeValues[DCVGCAT] = curDcvgSeverity.GetDisplayName();
@@ -453,7 +464,8 @@ namespace AccurateReportSystem
                     shapeValues[ECDAREGION] = curRegion.ReportQName;
                     shapeValues[LAT] = curAcvgGps.Latitude.ToString("F8");
                     shapeValues[LON] = curAcvgGps.Longitude.ToString("F8");
-                    shapeValues[ECDACAT] = "Priority " + curPrio.ToString();
+                    shapeValues[ECDACAT] = $"{PriorityName} " + curPrio.ToString();
+
                     shapeValues[ACVG] = curAcvgValue.ToString("F2");
                     shapeValues[ACVGCAT] = curAcvgSeverity.GetDisplayName();
                     AcvgShapefileOutput.Add(shapeValues);
@@ -474,7 +486,7 @@ namespace AccurateReportSystem
                     shapeValues[ECDAREGION] = curRegion.ReportQName;
                     shapeValues[LAT] = curAmpgGps.Latitude.ToString("F8");
                     shapeValues[LON] = curAmpgGps.Longitude.ToString("F8");
-                    shapeValues[ECDACAT] = "Priority " + curPrio.ToString();
+                    shapeValues[ECDACAT] = $"{PriorityName} " + curPrio.ToString();
                     shapeValues[PCMCAT] = curAmpSeverity.GetDisplayName();
                     shapeValues[PCM] = curAmpValue.ToString("F0");
                     AmpsShapeFileOutput.Add(shapeValues);
@@ -489,21 +501,29 @@ namespace AccurateReportSystem
                     firstSempra[3] = curPrimaryDes;
                     firstSempra[7] = $"{curOn:F3}";
                     firstSempra[8] = $"{curOff:F3}";
-                    if (dcvgSeverities.ContainsKey(curFoot))
+                    if(!IsPge && curRegion.Name == "HCA")
                     {
+                        firstSempra[14] = "1";
+                    }
+                    if (dcvgSeverities.ContainsKey(curFoot) && dcvgSeverities[curFoot].Item2 == PGESeverity.Minor)
+                    {
+                        firstSempra[17] = "Yes";
                         firstSempra[9] = "1";
                     }
-                    if (pcmSeverities.ContainsKey(0) && !double.IsNaN(lastAmpValue))
+                    else
+                    {
+                        firstSempra[17] = "No";
+                    }
+                    if (pcmSeverities.ContainsKey(curFoot) && !double.IsNaN(curAmpValue) && curAmpValue != 0.0)
                         firstSempra[10] = $"{curAmpValue:F2}";
                     if (curDepth.HasValue && curDepth.Value != 0)
                         firstSempra[11] = $"{curDepth.Value:F2}";
                     firstSempra[15] = curCisSeverity.GetDisplayName();
                     firstSempra[16] = curAmpSeverity.GetDisplayName();
-                    firstSempra[17] = "Yes";
                     switch (curPrio)
                     {
                         case 1:
-                            firstSempra[18] = "NRI";
+                            firstSempra[18] = "Level I";
                             break;
                         case 2:
                             firstSempra[18] = "Level II";
@@ -512,7 +532,7 @@ namespace AccurateReportSystem
                             firstSempra[18] = "Level III";
                             break;
                         case 4:
-                            firstSempra[18] = "Level IV";
+                            firstSempra[18] = "NRI";
                             break;
                     }
                     firstSempra[19] = $"{curGps.Latitude:F8}";
@@ -536,7 +556,7 @@ namespace AccurateReportSystem
                     shapeValues[ECDAREGION] = curRegion.ReportQName;
                     shapeValues[LAT] = curGps.Latitude.ToString("F8");
                     shapeValues[LON] = curGps.Longitude.ToString("F8");
-                    shapeValues[ECDACAT] = "Priority " + curPrio.ToString();
+                    shapeValues[ECDACAT] = $"{PriorityName} " + curPrio.ToString();
                     shapeValues[CISCAT] = curCisSeverity.GetDisplayName();
                     shapeValues[ON] = curOn.ToString("F4");
                     shapeValues[OFF] = curOff.ToString("F4");
@@ -589,7 +609,7 @@ namespace AccurateReportSystem
                     if (lastRegion.ShouldSkip)
                         fullReason = "SKIP.";
                     var endFoot = curFoot;
-                    if (!lastRegion.ShouldSkip && curRegion.IsBuffer && cisChange)
+                    if ((!lastRegion.ShouldSkip && curRegion.IsBuffer && cisChange) || curRegion.ShouldSkip)
                     {
                         endFoot = lastRealFoot;
                     }
@@ -601,7 +621,7 @@ namespace AccurateReportSystem
                     else
                         lastStartFoot = lastRealFoot;
 
-                    if (!lastRegion.ShouldSkip && curRegion.IsBuffer && cisChange)
+                    if ((!lastRegion.ShouldSkip && curRegion.IsBuffer && cisChange) || curRegion.ShouldSkip)
                     {
                         lastStartFoot = lastRealFoot;
                     }
@@ -736,8 +756,9 @@ namespace AccurateReportSystem
             }
             else
             {
-                if (dcvg == PGESeverity.NRI)
+                if (dcvg != PGESeverity.Minor)
                 {
+                    // No DCVG
                     switch (cis)
                     {
                         case PGESeverity.NRI: return 4;
@@ -747,6 +768,7 @@ namespace AccurateReportSystem
                     }
                     return 2;
                 }
+                // Yes DCVG
                 switch (cis)
                 {
                     case PGESeverity.NRI: return 3;
@@ -762,9 +784,9 @@ namespace AccurateReportSystem
         {
             return new List<(string, Color)>()
             {
-                ("Priority III", ThreeColor),
-                ("Priority II", TwoColor),
-                ("Priority I", OneColor)
+                ($"{PriorityName} III", ThreeColor),
+                ($"{PriorityName} II", TwoColor),
+                ($"{PriorityName} I", OneColor)
             };
         }
     }
